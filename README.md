@@ -70,9 +70,9 @@ Personal Team reicht, die App läuft dann 7 Tage und muss neu installiert werden
 - **Display**: QR-Seite immer voll hell, optional dauerhaft; die Leerlauf-Collage stellt den vorherigen Wert wieder her.
 - **Fähigkeitsbericht**: nach dem Handshake schreibt die App `openbooth-capabilities.log` (Operationen, Events, Properties),
   holen mit `tools/pull-caps.sh`.
-- **Layouts & Branding**: Quelle je Ziel wählbar (Rückschau, Immich, WebDAV): Original oder ein Layout (Einzelbild mit
-  Branding, Collage 2×1/2×2, Streifen 3/4; Format, Hintergrund, Rand, eigenes Hintergrund-PNG). Das Layout der Rückschau
-  bestimmt die Serienlänge. Branding (Logo, Schriftzug, Position, Größe) gilt global. Originale bleiben immer unberührt.
+- **Layouts & Branding**: drei feste Layouts (1 Bild 10×15, 4 Bilder 10×15, 4 Bilder Streifen 5×15), drei Rahmen
+  (Hochzeit, Geburtstag, Feier), ein Schriftzug und optional ein Logo auf allen. Quelle je Ziel wählbar (Rückschau, Immich,
+  WebDAV): Original oder ein Layout; steht die Rückschau auf „4 Bilder“, macht die Box vier Aufnahmen. Originale bleiben unberührt.
 - Bilderserie 1/3/5 mit Pause, Rückschau mit Restzeitbalken und Löschen, editierbare Sprüche, Statusbanner mit
   automatischer Wiederherstellung, Log in `Documents/openbooth.log` (holen mit `tools/pull-log.sh`).
 

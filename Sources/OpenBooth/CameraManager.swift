@@ -81,12 +81,12 @@ final class CameraManager: NSObject, ObservableObject {
     /// Liefert das Bild fuer die Rueckschau (Layout) oder nil, wenn die Rueckschau die Originale zeigt.
     private func deliver(originals: [URL], stamp: String) async -> UIImage? {
         guard let s = settingsRef, !originals.isEmpty else { return nil }
-        var rendered: [UUID: URL] = [:]
+        var rendered: [FixedLayout: URL] = [:]
         func output(for source: String) async -> [URL] {
             guard let layout = s.layout(for: source) else { return originals }
-            if let url = rendered[layout.id] { return [url] }
+            if let url = rendered[layout] { return [url] }
             guard let url = await renderLayout(layout, originals: originals, stamp: stamp) else { return originals }
-            rendered[layout.id] = url
+            rendered[layout] = url
             return [url]
         }
         if s.immichEnabled { for u in await output(for: s.sourceImmich) { immich.enqueue(u) } }
@@ -103,19 +103,18 @@ final class CameraManager: NSObject, ObservableObject {
     private(set) var lastLayoutURL: URL?
 
     /// Layout rendern und unter Fotos/<Event>/layouts/ ablegen.
-    func renderLayout(_ layout: PhotoLayout, originals: [URL], stamp: String) async -> URL? {
+    func renderLayout(_ layout: FixedLayout, originals: [URL], stamp: String) async -> URL? {
         guard let s = settingsRef else { return nil }
-        let style = s.brandingStyle()
+        let frame = s.frame, text = s.brandingText, logo = Branding.loadLogo()
         let datas = originals.compactMap { try? Data(contentsOf: $0) }
-        let out = await Task.detached(priority: .userInitiated) { LayoutRenderer.render(photos: datas, layout: layout, branding: style) }.value
-        guard let out else { appendLog("Layout „\(layout.name)“: Rendern fehlgeschlagen"); return nil }
+        let out = await Task.detached(priority: .userInitiated) { LayoutRenderer.render(photos: datas, layout: layout, frame: frame, text: text, logo: logo) }.value
+        guard let out else { appendLog("Layout „\(layout.label)“: Rendern fehlgeschlagen"); return nil }
         let dir = Self.photosDir.appendingPathComponent("layouts", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let safe = layout.name.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: " ", with: "_")
-            let url = dir.appendingPathComponent("openbooth-\(stamp)-\(safe).jpg")
+            let url = dir.appendingPathComponent("openbooth-\(stamp)-\(layout.rawValue).jpg")
             try out.write(to: url)
-            appendLog("Layout „\(layout.name)“: \(url.lastPathComponent) aus \(datas.count) Fotos (\(out.count / 1_000_000) MB)")
+            appendLog("Layout „\(layout.label)“: \(url.lastPathComponent) aus \(datas.count) Fotos (\(out.count / 1_000_000) MB)")
             return url
         } catch { appendLog("Layout: \(error.localizedDescription)"); return nil }
     }

@@ -39,15 +39,12 @@ final class AppSettings: ObservableObject {
     @Published var webdavURL: String { didSet { d.set(webdavURL, forKey: "webdavURL") } }
     @Published var webdavUser: String { didSet { d.set(webdavUser, forKey: "webdavUser") } }
     @Published var webdavUploadRAW: Bool { didSet { d.set(webdavUploadRAW, forKey: "webdavUploadRAW") } }
-    @Published var brandingDark: Bool { didSet { d.set(brandingDark, forKey: "brandingDark") } }
-    /// Layouts (JSON) und Quellen je Ziel: "original" oder die UUID eines Layouts
-    @Published var layouts: [PhotoLayout] { didSet { if let j = try? JSONEncoder().encode(layouts) { d.set(j, forKey: "layouts") } } }
+    /// Rahmen fuer alle Layouts und Quellen je Ziel: "original", "single", "grid4" oder "strip4"
+    @Published var frameStyle: String { didSet { d.set(frameStyle, forKey: "frameStyle") } }
     @Published var sourceReview: String { didSet { d.set(sourceReview, forKey: "sourceReview") } }
     @Published var sourceImmich: String { didSet { d.set(sourceImmich, forKey: "sourceImmich") } }
     @Published var sourceWebDAV: String { didSet { d.set(sourceWebDAV, forKey: "sourceWebDAV") } }
     @Published var brandingText: String { didSet { d.set(brandingText, forKey: "brandingText") } }
-    @Published var brandingPosition: String { didSet { d.set(brandingPosition, forKey: "brandingPosition") } }
-    @Published var brandingSize: String { didSet { d.set(brandingSize, forKey: "brandingSize") } }
     @Published var soundsEnabled: Bool { didSet { d.set(soundsEnabled, forKey: "soundsEnabled") } }
     @Published var soundWelcome: Bool { didSet { d.set(soundWelcome, forKey: "soundWelcome") } }
     @Published var soundCountdown: Bool { didSet { d.set(soundCountdown, forKey: "soundCountdown") } }
@@ -90,19 +87,15 @@ final class AppSettings: ObservableObject {
         webdavURL = d.string(forKey: "webdavURL") ?? ""
         webdavUser = d.string(forKey: "webdavUser") ?? ""
         webdavUploadRAW = d.object(forKey: "webdavUploadRAW") as? Bool ?? false
-        brandingDark = d.object(forKey: "brandingDark") as? Bool ?? false
-        var ls = (d.data(forKey: "layouts")).flatMap { try? JSONDecoder().decode([PhotoLayout].self, from: $0) } ?? []
-        if ls.isEmpty { ls = [PhotoLayout.defaultSingle(), PhotoLayout.defaultCollage(), PhotoLayout.defaultStrip()] }
-        layouts = ls
-        // Migration: altes "Branding auf der Gaeste-Kopie" -> Uploads bekommen das Einzelbild-Layout
-        let legacyBranding = d.object(forKey: "brandingEnabled") as? Bool ?? false
-        let firstSingle = ls.first { $0.kind == .single }?.id.uuidString ?? PhotoLayout.originalID
-        sourceReview = d.string(forKey: "sourceReview") ?? PhotoLayout.originalID
-        sourceImmich = d.string(forKey: "sourceImmich") ?? (legacyBranding ? firstSingle : PhotoLayout.originalID)
-        sourceWebDAV = d.string(forKey: "sourceWebDAV") ?? (legacyBranding ? firstSingle : PhotoLayout.originalID)
+        frameStyle = d.string(forKey: "frameStyle") ?? FrameStyle.wedding.rawValue
+        // Quellen: nur noch feste Kennungen; alles andere (alte UUIDs) faellt auf Original zurueck
+        let ud = UserDefaults.standard
+        let src: (String) -> String = { key in
+            let v = ud.string(forKey: key) ?? FixedLayout.originalID
+            return FixedLayout.from(v) != nil ? v : FixedLayout.originalID
+        }
+        sourceReview = src("sourceReview"); sourceImmich = src("sourceImmich"); sourceWebDAV = src("sourceWebDAV")
         brandingText = d.string(forKey: "brandingText") ?? ""
-        brandingPosition = d.string(forKey: "brandingPosition") ?? BrandingPosition.bottomRight.rawValue
-        brandingSize = d.string(forKey: "brandingSize") ?? BrandingSize.medium.rawValue
         soundsEnabled = d.object(forKey: "soundsEnabled") as? Bool ?? true
         soundWelcome = d.object(forKey: "soundWelcome") as? Bool ?? true
         soundCountdown = d.object(forKey: "soundCountdown") as? Bool ?? true
@@ -113,18 +106,9 @@ final class AppSettings: ObservableObject {
 
     // MARK: Layout-Hilfen
 
-    func layout(for source: String) -> PhotoLayout? {
-        guard source != PhotoLayout.originalID, let id = UUID(uuidString: source) else { return nil }
-        return layouts.first { $0.id == id }
-    }
-    /// Layout der Rueckschau bestimmt die Serienlaenge, wenn es mehrere Slots hat.
-    var seriesLayout: PhotoLayout? { layout(for: sourceReview).flatMap { $0.kind.slots > 1 ? $0 : nil } }
-    var effectiveShots: Int { seriesLayout?.kind.slots ?? max(1, shotsPerCapture) }
-    var usedSources: [String] { [sourceReview, sourceImmich, sourceWebDAV] }
-
-    func brandingStyle() -> BrandingStyle {
-        BrandingStyle(text: brandingText, logo: Branding.loadLogo(),
-                      position: BrandingPosition(rawValue: brandingPosition) ?? .bottomRight,
-                      size: BrandingSize(rawValue: brandingSize) ?? .medium, dark: brandingDark)
-    }
+    func layout(for source: String) -> FixedLayout? { FixedLayout.from(source) }
+    /// Layout der Rueckschau bestimmt die Serienlaenge, wenn es mehrere Bilder hat.
+    var seriesLayout: FixedLayout? { layout(for: sourceReview).flatMap { $0.slots > 1 ? $0 : nil } }
+    var effectiveShots: Int { seriesLayout?.slots ?? max(1, shotsPerCapture) }
+    var frame: FrameStyle { FrameStyle(rawValue: frameStyle) ?? .wedding }
 }

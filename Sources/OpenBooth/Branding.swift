@@ -7,19 +7,6 @@
 
 import UIKit
 
-enum BrandingPosition: String, CaseIterable, Identifiable {
-    case bottomRight = "unten rechts", bottomLeft = "unten links", bottomCenter = "unten mittig",
-         topRight = "oben rechts", topLeft = "oben links"
-    var id: String { rawValue }
-}
-
-enum BrandingSize: String, CaseIterable, Identifiable {
-    case small = "klein", medium = "mittel", large = "groß"
-    var id: String { rawValue }
-    /// Hoehe des Blocks relativ zur Bildhoehe
-    var fraction: CGFloat { switch self { case .small: 0.06; case .medium: 0.09; case .large: 0.13 } }
-}
-
 enum Branding {
     static var logoURL: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("branding-logo.png")
