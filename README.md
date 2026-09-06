@@ -75,6 +75,11 @@ Personal Team reicht, die App läuft dann 7 Tage und muss neu installiert werden
 - **Display**: QR-Seite immer voll hell, optional dauerhaft; die Leerlauf-Collage stellt den vorherigen Wert wieder her.
 - **Fähigkeitsbericht**: nach dem Handshake schreibt die App `openbooth-capabilities.log` (Operationen, Events, Properties),
   holen mit `tools/pull-caps.sh`.
+- **Fernzugriff** (optional, Admin › Zugang): Statusseite im WLAN auf Port 8787 (eigener HTTP-Server auf Network.framework,
+  Bonjour „OpenBooth“), nur lesend: Kamera, Bildrate, Fotos, Speicherziele, letzte Protokollzeilen, Diagnose senden.
+  Login mit der Admin-PIN, nach fünf Fehlversuchen eine Minute Sperre.
+- **Diagnose**: „Diagnose teilen“ (Teilen-Menü) oder „An OpenBooth senden“ (HTTPS-Endpunkt); enthält Umgebung, Fähigkeiten
+  mit Rohdaten und Protokoll, keine Zugangsdaten, Seriennummer gekürzt. Optional automatisch bei Fehlern.
 - Bilderserie 1/3/5 mit Pause, Rückschau mit Restzeitbalken und Löschen, editierbare Sprüche, Statusbanner mit
   automatischer Wiederherstellung, Log in `Documents/openbooth.log` (holen mit `tools/pull-log.sh`).
 
