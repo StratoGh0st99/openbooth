@@ -12,6 +12,6 @@ xcodegen generate >/dev/null   # immer, damit neue Dateien im Projekt landen
 OUT=$(xcodebuild -project OpenBooth.xcodeproj -scheme OpenBooth -destination "id=$ID" -configuration Debug \
   -allowProvisioningUpdates -derivedDataPath build/dd build 2>&1 | grep -E "error:|BUILD (SUCCEEDED|FAILED)" | sed "s#$PWD/##")
 echo "$OUT"
-grep -q "BUILD SUCCEEDED" <<< "$OUT" || exit 1
+grep -q "BUILD SUCCEEDED" <<< "$OUT" || { echo "Build fehlgeschlagen"; exit 1; }
 xcrun devicectl device install app --device "$ID" build/dd/Build/Products/Debug-iphoneos/OpenBooth.app | grep -iE "installed|error"
 xcrun devicectl device process launch --device "$ID" de.reingruber.openbooth | tail -1

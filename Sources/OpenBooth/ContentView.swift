@@ -625,6 +625,18 @@ struct AdminPanel: View {
             }
         } header: { Text("PIN") } footer: { Text("Admin öffnen: mit zwei Fingern von oben nach unten wischen, dann PIN.") }
         SwiftUI.Section {
+            Toggle("Statusseite im WLAN", isOn: $settings.webEnabled)
+                .onChange(of: settings.webEnabled) { _, _ in cam.syncWeb() }
+            if settings.webEnabled {
+                ForEach(LocalWebServer.localAddresses(), id: \.self) { ip in
+                    LabeledContent("Adresse") { Text("http://\(ip):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
+                }
+                if LocalWebServer.localAddresses().isEmpty { Text("Kein WLAN verbunden").foregroundStyle(.secondary) }
+            }
+        } header: { Text("Fernzugriff") } footer: {
+            Text("Nur lesend: Kamera, Bildrate, Fotos, Speicherziele, Protokoll, Diagnose senden. Anmeldung mit der Admin-PIN, nach fünf Fehlversuchen eine Minute Sperre. Nur im selben WLAN erreichbar, solange die App im Vordergrund läuft.")
+        }
+        SwiftUI.Section {
             Toggle("Debug-Modus", isOn: $settings.debugMode)
         } header: { Text("Entwicklung") } footer: {
             Text("Im Debug-Modus öffnet der Admin beim Start und die Wischgeste braucht keine PIN.")

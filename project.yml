@@ -42,7 +42,8 @@ targets:
         NSCameraUsageDescription: "OpenBooth steuert die per USB angeschlossene Kamera (Liveview und Ausloesen)."
         NSPhotoLibraryAddUsageDescription: "OpenBooth speichert die aufgenommenen Fotos in deine Mediathek."
         NSPhotoLibraryUsageDescription: "OpenBooth zeigt die aufgenommenen Fotos in der Galerie."
-        NSLocalNetworkUsageDescription: "OpenBooth lädt Fotos auf deinen Immich-Server im lokalen Netz hoch."
+        NSLocalNetworkUsageDescription: "OpenBooth lädt Fotos auf Server im lokalen Netz hoch und bietet dort eine Statusseite an."
+        NSBonjourServices: ["_http._tcp"]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: de.reingruber.openbooth

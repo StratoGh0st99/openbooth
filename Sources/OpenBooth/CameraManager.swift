@@ -33,7 +33,35 @@ final class CameraManager: NSObject, ObservableObject {
     /// Nach Aenderung von Eventname oder Zielen: Fotoordner wechseln und alle Upload-Ziele neu konfigurieren.
     func syncUploaders() {
         if let s = settingsRef { switchEvent(to: Self.safeName(s.eventName)) }
-        syncImmich(); syncWebDAV()
+        syncImmich(); syncWebDAV(); syncWeb()
+    }
+
+    // MARK: Fernzugriff (Statusseite im WLAN)
+
+    let web = LocalWebServer()
+    private var lastFPS = 0
+    func syncWeb() {
+        guard let s = settingsRef else { return }
+        web.log = { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
+        web.pinProvider = { [weak self] in self?.settingsRef?.pin ?? "" }
+        web.diagnoseAction = { [weak self] in await self?.sendDiagnostics(reason: "Fernzugriff") }
+        web.statusProvider = { [weak self] in self?.webStatus() ?? WebStatus(event: "", camera: "keine", state: "", status: "", fps: 0, idle: false, photos: 0, lastPhoto: nil, immich: nil, webdav: nil, brightness: 0, log: [], uptime: "") }
+        if s.webEnabled { web.start() } else { web.stop() }
+    }
+    private let startedAt = Date()
+    private func webStatus() -> WebStatus {
+        let s = settingsRef
+        let f = DateFormatter(); f.dateStyle = .none; f.timeStyle = .short
+        let up = Int(Date().timeIntervalSince(startedAt))
+        let stateName: String = { switch state { case .connected: return "connected"; case .error: return "error"; default: return "\(state)" } }()
+        return WebStatus(event: s?.eventName ?? "",
+                         camera: sony?.deviceInfo.model.isEmpty == false ? sony!.deviceInfo.model : (devices.first?.name ?? "keine"),
+                         state: stateName, status: status, fps: lastFPS, idle: idle, photos: sessionPhotos.count,
+                         lastPhoto: sessionPhotos.first.flatMap { (try? $0.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate }.map { f.string(from: $0) },
+                         immich: s?.immichEnabled == true ? immich.lastMessage : nil,
+                         webdav: s?.webdavEnabled == true ? webdav.lastMessage : nil,
+                         brightness: Int(UIScreen.main.brightness * 100),
+                         log: Array(log.suffix(50)), uptime: String(format: "%dh %02dmin", up / 3600, (up % 3600) / 60))
     }
 
     /// Fotos liegen je Veranstaltung unter Documents/Fotos/<Name>/ (RAW in raw/ darunter).
@@ -168,7 +196,8 @@ final class CameraManager: NSObject, ObservableObject {
         tickCount += 1
         sampleUserBrightness()
         if tickCount % 3 == 0 { Self.logFile.snapshot() }
-        if tickCount % 15 == 0, liveRunning { appendLog("Liveview: \(frameCount / 30) Bilder/s"); frameCount = 0 }
+        if tickCount % 15 == 0, liveRunning { lastFPS = frameCount / 30; appendLog("Liveview: \(lastFPS) Bilder/s"); frameCount = 0 }
+        if !liveRunning { lastFPS = 0 }
         let idleFor = Date().timeIntervalSince(lastInteraction)
         let limit = TimeInterval(settingsRef?.idleSeconds ?? 120)
         let shouldIdle = idleFor > limit && !capturing && resultPhoto == nil && countdown == nil && !sessionPhotos.isEmpty
