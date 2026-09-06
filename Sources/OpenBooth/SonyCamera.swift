@@ -162,6 +162,8 @@ final class SonyCamera {
     private(set) var vendorProps: [UInt16] = []    // erste Liste aus 0x9202: Sony-Properties
     private(set) var controlCodes: [UInt16] = []   // zweite Liste aus 0x9202: Steuercodes fuer 0x9207
     private(set) var connectedAt = Date.distantPast
+    /// Von der Kamera gemeldetes ObjectAdded (Event 0xC201): Bild liegt bereit, nicht mehr pollen.
+    let objectAdded = EventSignal()
     private(set) var props: [UInt16: SonyPropDesc] = [:]
 
     init(device: ICCameraDevice) {
@@ -373,14 +375,26 @@ final class SonyCamera {
         try await control(SonyProp.shutterRelease, value: 1)
         try await control(SonyProp.shutterHalfRelease, value: 1)
 
-        // Auf das Bild im RAM warten (0xD215 >= 0x8000), maximal 35 s (Langzeitbelichtung + Speichern)
+        // Auf das Bild warten: die Kamera meldet ObjectAdded (0xC201) sofort; solange keine Events beobachtet
+        // wurden, alle 100 ms pollen, sonst nur noch jede Sekunde als Sicherheitsnetz. Maximal 35 s (Langzeitbelichtung).
         progress?("Warten auf das Bild …")
+        objectAdded.reset()
         let start = Date()
         var ready = false
+        var lastPoll = Date.distantPast
+        let pollEvery: TimeInterval = objectAdded.everSeen ? 1.0 : 0.1
         while Date().timeIntervalSince(start) < 35 {
-            try await refreshProps()
-            if let inMem = currentValue(SonyProp.objectInMemory), inMem >= 0x8000 { ready = true; break }
-            try await Task.sleep(nanoseconds: 100_000_000)
+            let signalled = objectAdded.consume()
+            if signalled || Date().timeIntervalSince(lastPoll) >= pollEvery {
+                lastPoll = Date()
+                try await refreshProps()
+                if let inMem = currentValue(SonyProp.objectInMemory), inMem >= 0x8000 {
+                    ready = true
+                    if signalled { progress?("Bild per Event gemeldet") }
+                    break
+                }
+            }
+            try await Task.sleep(nanoseconds: 30_000_000)
         }
         guard ready else { throw SonyError.timeout("Kamera hat kein Bild gemeldet (kein Fokus?)") }
         return try await fetchObjects(progress: progress)
@@ -422,4 +436,14 @@ final class SonyCamera {
         guard !objects.isEmpty else { throw SonyError.noImage }
         return objects
     }
+}
+
+/// Thread-sicheres Signal fuer PTP-Events (gesetzt vom Delegaten, gelesen in der Aufnahmeschleife).
+final class EventSignal: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+    private(set) var everSeen = false
+    func fire() { lock.lock(); flag = true; everSeen = true; lock.unlock() }
+    func reset() { lock.lock(); flag = false; lock.unlock() }
+    func consume() -> Bool { lock.lock(); defer { lock.unlock() }; let f = flag; flag = false; return f }
 }

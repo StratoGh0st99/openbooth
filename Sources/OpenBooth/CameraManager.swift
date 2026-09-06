@@ -180,7 +180,12 @@ final class CameraManager: NSObject, ObservableObject {
         if state == .connected, !liveRunning, !capturing, !settingsBusy, autoConnect, sony != nil {
             startLiveView()
         }
-        pollExternalCapture()
+        // Fremdausloesung: mit Events nur noch alle 30 s als Sicherheitsnetz, sonst alle 2 s
+        if !eventsWorking || tickCount % 15 == 0 { pollExternalCapture() }
+        if tickCount % 30 == 0, !eventCounts.isEmpty {
+            appendLog("Events letzte 60 s: " + eventCounts.sorted { $0.key < $1.key }.map { String(format: "0x%04X×%d", $0.key, $0.value) }.joined(separator: " "))
+            eventCounts = [:]
+        }
     }
 
     /// Ergebnis der Bewegungserkennung aus dem Liveview-Task.
@@ -646,6 +651,26 @@ final class CameraManager: NSObject, ObservableObject {
         return result
     }
 
+    // MARK: PTP-Events (zuhoeren statt fragen)
+
+    private var eventCounts: [UInt16: Int] = [:]
+    private(set) var eventsWorking = false      // mindestens ein ObjectAdded empfangen: Fremdausloesung laeuft ueber Events
+
+    private func handleEvent(code: UInt16, params: [UInt32]) {
+        eventCounts[code, default: 0] += 1
+        switch code {
+        case 0xC201:   // Sony ObjectAdded: neues Bild im RAM (Handle in Param 1)
+            appendLog(String(format: "Event ObjectAdded 0x%08X", params.first ?? 0))
+            if !eventsWorking { eventsWorking = true; appendLog("Kamera-Events kommen an, Fremdauslösung reagiert ab jetzt sofort") }
+            sony?.objectAdded.fire()
+            if !capturing { pollExternalCapture() }
+        case 0xC203:   // PropertyChanged: kommt bei jeder Einstellungsaenderung und beim Fokussieren, nur zaehlen
+            break
+        default:
+            if eventCounts[code] == 1 { appendLog(String(format: "PTP-Event 0x%04X %@", code, params.map { String(format: "0x%X", $0) }.joined(separator: " "))) }
+        }
+    }
+
     // MARK: Fremdausloesung (Ausloeser an der Kamera, Fernausloeser)
 
     private var pickupTask: Task<Void, Never>?
@@ -905,9 +930,14 @@ extension CameraManager: ICCameraDeviceDelegate {
     nonisolated func cameraDevice(_ camera: ICCameraDevice, didReceiveMetadata metadata: [AnyHashable: Any]?, for item: ICCameraItem, error: Error?) {}
     nonisolated func cameraDevice(_ camera: ICCameraDevice, didRenameItems items: [ICCameraItem]) {}
     nonisolated func cameraDeviceDidChangeCapability(_ camera: ICCameraDevice) {}
+    /// PTP-Event-Container: u32 Laenge, u16 Typ (4), u16 Code, u32 Transaktion, dann u32-Parameter.
     nonisolated func cameraDevice(_ camera: ICCameraDevice, didReceivePTPEvent eventData: Data) {
-        let code = eventData.count >= 8 ? eventData.readLE(UInt16.self, at: 6) : 0
-        Task { @MainActor in appendLog(String(format: "PTP-Event 0x%04X (%d Byte)", code, eventData.count)) }
+        guard eventData.count >= 12 else { return }
+        let code = eventData.readLE(UInt16.self, at: 6)
+        var params: [UInt32] = []
+        var off = 12
+        while off + 4 <= eventData.count { params.append(eventData.readLE(UInt32.self, at: off)); off += 4 }
+        Task { @MainActor in self.handleEvent(code: code, params: params) }
     }
     nonisolated func deviceDidBecomeReady(withCompleteContentCatalog device: ICCameraDevice) {}
     nonisolated func cameraDeviceDidRemoveAccessRestriction(_ device: ICDevice) {}

@@ -66,8 +66,9 @@ Personal Team reicht, die App läuft dann 7 Tage und muss neu installiert werden
   eigene Warteschlange mit Wiederholung. Getestet mit Nextcloud (`remote.php/dav/files/NAME/Ordner`).
 - **Collage endet bei Bewegung**: Liveview wird im Leerlauf auf 32×18 Graustufen verkleinert, die mittlere Änderung zum Vorbild
   über einer adaptiven Schwelle (Admin: Empfindlichkeit, aktueller Wert wird angezeigt) beendet die Collage.
-- **Fremdauslösung**: Bilder vom Auslöser an der Kamera oder per Fernauslöser werden alle 2 s über den RAM-Zähler `0xD215`
-  erkannt, genauso übernommen und in der Rückschau gezeigt (Speicherziel muss auf Übertragung an die App stehen).
+- **Fremdauslösung**: Bilder vom Auslöser an der Kamera oder per Fernauslöser werden sofort über das Sony-Event
+  `0xC201 ObjectAdded` erkannt (iPadOS reicht PTP-Events durch), genauso übernommen und in der Rückschau gezeigt.
+  Polling auf `0xD215` bleibt als Sicherheitsnetz (alle 30 s, ohne Events alle 2 s). Speicherziel muss auf Übertragung an die App stehen.
 - **Galerie** im Vollbild mit drei Spalten, Großansicht mit Durchwischen (ScrollView mit Seiten-Einrasten, TabView rastete
   nicht sauber), schließt nach einstellbarer Zeit ohne Berührung; Vorschauen 800 px per ImageIO in `.thumbs/` gecacht.
 - **Töne** (schaltbar): Willkommensklang beim Aufwachen, Countdown-Piepen, Auslösesignal, alles synthetisiert.
