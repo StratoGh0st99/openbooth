@@ -20,6 +20,8 @@
 	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>OpenBooth steuert die per USB angeschlossene Kamera (Liveview und Ausloesen).</string>
 	<key>NSLocalNetworkUsageDescription</key>
@@ -29,6 +31,8 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>OpenBooth zeigt die aufgenommenen Fotos in der Galerie.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
