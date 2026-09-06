@@ -19,6 +19,9 @@ final class AppSettings: ObservableObject {
     @Published var debugMode: Bool { didSet { d.set(debugMode, forKey: "debugMode") } }
     @Published var autoReports: Bool { didSet { d.set(autoReports, forKey: "autoReports") } }
     @Published var webEnabled: Bool { didSet { d.set(webEnabled, forKey: "webEnabled") } }
+    @Published var restoreCameraSettings: Bool { didSet { d.set(restoreCameraSettings, forKey: "restoreCameraSettings") } }
+    /// Zuletzt in der App gesetzte Kamerawerte je Modell: [Modell: [Code(hex): Wert]]
+    @Published var rememberedCamera: [String: [String: Int]] { didSet { d.set(rememberedCamera, forKey: "rememberedCamera") } }
     @Published var autoConnect: Bool { didSet { d.set(autoConnect, forKey: "autoConnect") } }
     @Published var countdownSeconds: Int { didSet { d.set(countdownSeconds, forKey: "countdownSeconds") } }
     @Published var resultSeconds: Int { didSet { d.set(resultSeconds, forKey: "resultSeconds") } }
@@ -64,6 +67,8 @@ final class AppSettings: ObservableObject {
         debugMode = d.object(forKey: "debugMode") as? Bool ?? false
         autoReports = d.object(forKey: "autoReports") as? Bool ?? false
         webEnabled = d.object(forKey: "webEnabled") as? Bool ?? false
+        restoreCameraSettings = d.object(forKey: "restoreCameraSettings") as? Bool ?? true
+        rememberedCamera = d.dictionary(forKey: "rememberedCamera") as? [String: [String: Int]] ?? [:]
         autoConnect = d.object(forKey: "autoConnect") as? Bool ?? true
         countdownSeconds = d.object(forKey: "countdownSeconds") as? Int ?? 3
         resultSeconds = d.object(forKey: "resultSeconds") as? Int ?? 10
@@ -92,6 +97,10 @@ final class AppSettings: ObservableObject {
         soundCountdown = d.object(forKey: "soundCountdown") as? Bool ?? true
         maxBrightness = d.object(forKey: "maxBrightness") as? Bool ?? false
         motionWake = d.object(forKey: "motionWake") as? Bool ?? true
-        motionThreshold = d.object(forKey: "motionThreshold") as? Int ?? 8
+        // Standard 6 (Dauerlauf 2026-09-06: Ruhepegel max 2,9, Treffer ab 8,8); alter Standard 8 wird einmalig migriert
+        var mt = d.object(forKey: "motionThreshold") as? Int ?? 6
+        if mt == 8, !d.bool(forKey: "motionThresholdV2") { mt = 6 }
+        d.set(true, forKey: "motionThresholdV2")
+        motionThreshold = mt
     }
 }

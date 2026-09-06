@@ -503,6 +503,8 @@ struct AdminPanel: View {
                     .disabled(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected)
             }
             Toggle("Automatisch verbinden", isOn: $settings.autoConnect)
+            Toggle("Kameraeinstellungen aus der App beim Anstecken wiederherstellen", isOn: $settings.restoreCameraSettings)
+            LabeledContent("Akku", value: "iPad \(cam.batteryText(cam.iPadBattery()))" + (cam.cameraBattery().map { ", Kamera \($0) %" } ?? ""))
             Toggle("Liveview spiegeln", isOn: $settings.mirrorLiveView)
             Toggle("Histogramm in Liveview und Rückschau", isOn: $settings.showHistogram)
             HStack {

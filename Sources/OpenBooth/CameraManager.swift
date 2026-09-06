@@ -45,7 +45,16 @@ final class CameraManager: NSObject, ObservableObject {
         web.log = { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
         web.pinProvider = { [weak self] in self?.settingsRef?.pin ?? "" }
         web.diagnoseAction = { [weak self] in await self?.sendDiagnostics(reason: "Fernzugriff") }
-        web.statusProvider = { [weak self] in self?.webStatus() ?? WebStatus(event: "", camera: "keine", state: "", status: "", fps: 0, idle: false, photos: 0, lastPhoto: nil, immich: nil, webdav: nil, brightness: 0, log: [], uptime: "") }
+        web.statusProvider = { [weak self] in self?.webStatus() ?? WebStatus(event: "", camera: "keine", state: "", status: "", fps: 0, idle: false, photos: 0, lastPhoto: nil, immich: nil, webdav: nil, brightness: 0, log: [], uptime: "", ipadBattery: "", cameraBattery: nil, motionThreshold: 6, motionLevel: 0) }
+        web.settingsAction = { [weak self] key, value in
+            guard let s = self?.settingsRef else { return false }
+            switch key {
+            case "motionThreshold": guard (2...40).contains(value) else { return false }; s.motionThreshold = value
+            default: return false
+            }
+            self?.appendLog("Fernzugriff: \(key) = \(value)")
+            return true
+        }
         if s.webEnabled { web.start() } else { web.stop() }
     }
     private let startedAt = Date()
@@ -61,7 +70,9 @@ final class CameraManager: NSObject, ObservableObject {
                          immich: s?.immichEnabled == true ? immich.lastMessage : nil,
                          webdav: s?.webdavEnabled == true ? webdav.lastMessage : nil,
                          brightness: Int(UIScreen.main.brightness * 100),
-                         log: Array(log.suffix(50)), uptime: String(format: "%dh %02dmin", up / 3600, (up % 3600) / 60))
+                         log: Array(log.suffix(50)), uptime: String(format: "%dh %02dmin", up / 3600, (up % 3600) / 60),
+                         ipadBattery: batteryText(iPadBattery()), cameraBattery: cameraBattery(),
+                         motionThreshold: s?.motionThreshold ?? 6, motionLevel: motionLevel)
     }
 
     /// Fotos liegen je Veranstaltung unter Documents/Fotos/<Name>/ (RAW in raw/ darunter).
@@ -195,6 +206,7 @@ final class CameraManager: NSObject, ObservableObject {
     private func tick() {
         tickCount += 1
         sampleUserBrightness()
+        if tickCount % 150 == 0 { appendLog("Akku: iPad \(batteryText(iPadBattery())), Kamera \(cameraBattery().map { "\($0) %" } ?? "unbekannt")") }
         if tickCount % 3 == 0 { Self.logFile.snapshot() }
         if tickCount % 15 == 0, liveRunning { lastFPS = frameCount / 30; appendLog("Liveview: \(lastFPS) Bilder/s"); frameCount = 0 }
         if !liveRunning { lastFPS = 0 }
@@ -203,9 +215,12 @@ final class CameraManager: NSObject, ObservableObject {
         let shouldIdle = idleFor > limit && !capturing && resultPhoto == nil && countdown == nil && !sessionPhotos.isEmpty
         if shouldIdle != idle { idle = shouldIdle }
 
-        // Liveview-Waechter: laeuft, aber seit 8 s kein Bild -> neu starten
-        if state == .connected, liveRunning, !capturing, Date().timeIntervalSince(lastFrame) > 8 {
-            appendLog("Liveview liefert nichts mehr, Neustart")
+        // Liveview-Waechter: seit 8 s kein Bild -> neu starten. Kommen aber Kamera-Events (Kamera arbeitet, z. B. eigener
+        // Ausloeser, Menue offen), erst nach 20 s: dann ist der Liveview wirklich haengen geblieben.
+        let stalled = Date().timeIntervalSince(lastFrame)
+        let eventsRecently = Date().timeIntervalSince(lastEventAt) < 8
+        if state == .connected, liveRunning, !capturing, stalled > (eventsRecently ? 20 : 8) {
+            appendLog(String(format: "Liveview liefert seit %.0f s nichts mehr%@, Neustart", stalled, eventsRecently ? " (Kamera meldet Events)" : ""))
             stopLiveView()
             startLiveView()
         }
@@ -284,6 +299,24 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     /// Diagnosedatei zum Teilen: Umgebung, aktueller Faehigkeitsbericht mit Rohdaten, komplettes Protokoll.
+    // MARK: Akku
+
+    /// iPad-Akku in Prozent (-1 unbekannt) und ob es laedt
+    func iPadBattery() -> (Int, Bool) {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        let l = UIDevice.current.batteryLevel
+        let charging = UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full
+        return (l < 0 ? -1 : Int((l * 100).rounded()), charging)
+    }
+    func batteryText(_ b: (Int, Bool)) -> String { b.0 < 0 ? "unbekannt" : "\(b.0) %\(b.1 ? " (lädt)" : "")" }
+    /// Kamera-Akku in Prozent aus Sony-Property 0xD218 (aktualisiert bei jedem Property-Abruf)
+    func cameraBattery() -> Int? {
+        guard let cam = sony else { return nil }
+        if let v = cam.currentValue(0xD218) { return Int(v) }
+        if let v = cam.currentValue(0x5001) { return Int(v) }
+        return nil
+    }
+
     /// Diagnose an den OpenBooth-Endpunkt schicken. Liefert die Kennung des Servers.
     @Published private(set) var reportStatus = ""
     private var lastAutoReport = Date.distantPast
@@ -489,6 +522,7 @@ final class CameraManager: NSObject, ObservableObject {
                 state = .connected
                 status = "Verbunden"
                 settings = cam.settings()
+                await restoreRememberedSettings(cam)
                 connectedSince = Date()
                 recoverAttempts = 0
                 lastError = nil
@@ -513,6 +547,33 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
+    /// Gesetzten Wert je Kameramodell merken, damit er beim naechsten Anstecken wieder gesetzt wird
+    private func remember(code: UInt16, value: Int64, for cam: SonyCamera) {
+        guard let s = settingsRef else { return }
+        let model = cam.deviceInfo.model.isEmpty ? "Kamera" : cam.deviceInfo.model
+        var m = s.rememberedCamera[model] ?? [:]
+        m[String(format: "%04X", code)] = Int(value)
+        s.rememberedCamera[model] = m
+    }
+
+    /// Nach dem Verbinden: gemerkte Werte setzen, die von der Kamera abweichen (nur schreibbare Properties).
+    private func restoreRememberedSettings(_ cam: SonyCamera) async {
+        guard let s = settingsRef, s.restoreCameraSettings else { return }
+        let model = cam.deviceInfo.model.isEmpty ? "Kamera" : cam.deviceInfo.model
+        guard let saved = s.rememberedCamera[model], !saved.isEmpty else { return }
+        var applied = 0
+        for (hex, value) in saved.sorted(by: { $0.key < $1.key }) {
+            guard let code = UInt16(hex, radix: 16), let cur = cam.currentValue(code), cur != Int64(value) else { continue }
+            guard cam.settings().first(where: { $0.code == code })?.writable == true else { continue }
+            do {
+                try await cam.setSetting(code, to: Int64(value))
+                applied += 1
+                appendLog("Wiederhergestellt: 0x\(hex) = \(SonyFormat.label(code: code, value: Int64(value)))")
+            } catch { appendLog("Wiederherstellen 0x\(hex): \(error.localizedDescription)") }
+        }
+        if applied > 0 { try? await cam.refreshProps(); settings = cam.settings(); appendLog("\(applied) Kameraeinstellung(en) aus der App wiederhergestellt") }
+    }
+
     func apply(_ code: UInt16, value: Int64) {
         guard let cam = sony, !settingsBusy else { return }
         settingsBusy = true
@@ -522,6 +583,7 @@ final class CameraManager: NSObject, ObservableObject {
             do {
                 try await cam.setSetting(code, to: value) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
                 appendLog("Einstellung 0x\(String(code, radix: 16)) = \(SonyFormat.label(code: code, value: value))")
+                remember(code: code, value: value, for: cam)
             } catch {
                 appendLog("EINSTELLUNG FEHLER: \(error.localizedDescription)")
                 status = "Einstellung nicht übernommen"
@@ -726,8 +788,10 @@ final class CameraManager: NSObject, ObservableObject {
     private var eventCounts: [UInt16: Int] = [:]
     private(set) var eventsWorking = false      // mindestens ein ObjectAdded empfangen: Fremdausloesung laeuft ueber Events
 
+    private var lastEventAt = Date.distantPast
     private func handleEvent(code: UInt16, params: [UInt32]) {
         eventCounts[code, default: 0] += 1
+        lastEventAt = Date()
         switch code {
         case 0xC201:   // Sony ObjectAdded: neues Bild im RAM (Handle in Param 1)
             appendLog(String(format: "Event ObjectAdded 0x%08X", params.first ?? 0))

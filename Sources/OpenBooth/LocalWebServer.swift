@@ -25,6 +25,10 @@ struct WebStatus: Encodable {
     var brightness: Int         // Prozent
     var log: [String]
     var uptime: String
+    var ipadBattery: String
+    var cameraBattery: Int?
+    var motionThreshold: Int
+    var motionLevel: Double
 }
 
 final class LocalWebServer: @unchecked Sendable {
@@ -39,6 +43,7 @@ final class LocalWebServer: @unchecked Sendable {
     var statusProvider: (@MainActor () -> WebStatus)?
     var pinProvider: (@MainActor () -> String)?
     var diagnoseAction: (@MainActor () async -> String?)?
+    var settingsAction: (@MainActor (String, Int) -> Bool)?   // wenige Werte aenderbar (Schluessel, Wert)
     var log: ((String) -> Void)?
 
     private(set) var running = false
@@ -167,6 +172,15 @@ final class LocalWebServer: @unchecked Sendable {
             let st = await MainActor.run { statusProvider?() }
             guard let st, let json = try? JSONEncoder().encode(st) else { return http(500, Data(), type: "text/plain") }
             return http(200, json, type: "application/json; charset=utf-8")
+        case ("POST", "/api/setting"):
+            guard authed else { return http(401, Data("unauthorized".utf8), type: "text/plain") }
+            let form = String(decoding: body, as: UTF8.self).components(separatedBy: "&").reduce(into: [String: String]()) { d, kv in
+                let a = kv.components(separatedBy: "="); if a.count == 2 { d[a[0]] = a[1].removingPercentEncoding }
+            }
+            guard let key = form["key"], let v = Int(form["value"] ?? "") else { return http(400, Data("bad request".utf8), type: "text/plain") }
+            let action = settingsAction
+            let ok = await MainActor.run { action?(key, v) ?? false }
+            return http(ok ? 200 : 400, Data((ok ? "ok" : "abgelehnt").utf8), type: "text/plain; charset=utf-8")
         case ("POST", "/api/diagnose"):
             guard authed else { return http(401, Data("unauthorized".utf8), type: "text/plain") }
             let action = diagnoseAction
@@ -213,6 +227,7 @@ final class LocalWebServer: @unchecked Sendable {
         <!doctype html><title>OpenBooth</title>\(style)<h1>OpenBooth <small id=ev></small></h1>
         <div class=card id=cam></div>
         <div class=card id=targets></div>
+        <div class=card id=motion></div>
         <div class=card><div class=row><span class=k>Protokoll</span><span><button onclick=diag()>Diagnose senden</button> <span id=dres class=k></span></span></div><pre id=log>…</pre></div>
         <p class=k style="text-align:center"><a href=/logout style="color:#888">Abmelden</a></p>
         <script>
@@ -220,9 +235,11 @@ final class LocalWebServer: @unchecked Sendable {
         function row(k,v){return `<div class=row><span class=k>${k}</span><span>${v}</span></div>`}
         async function tick(){try{const r=await fetch('/api/status');if(r.status==401){location.reload();return}const s=await r.json();
         $('ev').textContent=s.event;const col=s.state=='connected'?(s.fps>0?'#34c759':'#ffd60a'):'#ff453a';
-        $('cam').innerHTML=row('Kamera',`<span class=dot style="background:${col}"></span>${s.camera}`)+row('Status',s.status)+row('Liveview',s.fps+' Bilder/s')+row('Modus',s.idle?'Leerlauf (Collage)':'bereit')+row('Fotos heute',s.photos+(s.lastPhoto?' · zuletzt '+s.lastPhoto:''))+row('Display',s.brightness+' %')+row('Läuft seit',s.uptime);
+        $('cam').innerHTML=row('Kamera',`<span class=dot style="background:${col}"></span>${s.camera}`)+row('Status',s.status)+row('Liveview',s.fps+' Bilder/s')+row('Modus',s.idle?'Leerlauf (Collage)':'bereit')+row('Fotos heute',s.photos+(s.lastPhoto?' · zuletzt '+s.lastPhoto:''))+row('Display',s.brightness+' %')+row('Akku iPad',s.ipadBattery)+row('Akku Kamera',s.cameraBattery!=null?s.cameraBattery+' %':'unbekannt')+row('Läuft seit',s.uptime);
         $('targets').innerHTML=row('Immich',s.immich??'aus')+row('WebDAV',s.webdav??'aus');
+        if(!window.editing){$('motion').innerHTML=row('Bewegung, Pegel',s.idle?s.motionLevel.toFixed(1):'nur im Leerlauf')+row('Schwelle',`<button onclick="thr(-1)">−</button> <b id=thr>${s.motionThreshold}</b> <button onclick="thr(1)">+</button>`)}
         $('log').textContent=s.log.join('\\n');}catch(e){}}
+        async function thr(d){window.editing=true;const v=parseInt($('thr').textContent)+d;const r=await fetch('/api/setting',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'key=motionThreshold&value='+v});if(r.ok)$('thr').textContent=v;window.editing=false}
         async function diag(){$('dres').textContent='sende …';const r=await fetch('/api/diagnose',{method:'POST'});$('dres').textContent=await r.text()}
         tick();setInterval(tick,3000);
         </script>
