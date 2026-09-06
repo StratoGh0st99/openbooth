@@ -35,7 +35,7 @@ enum ReportSender {
         let (d, resp) = try await URLSession.shared.upload(for: r, from: body)
         let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
         guard code == 200, let id = String(data: d, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !id.isEmpty else {
-            throw NSError(domain: "Report", code: code, userInfo: [NSLocalizedDescriptionKey: "Server antwortet mit HTTP \(code)"])
+            throw NSError(domain: "Report", code: code, userInfo: [NSLocalizedDescriptionKey: "Server answered HTTP \(code)"])
         }
         return id
     }

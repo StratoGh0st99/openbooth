@@ -17,7 +17,7 @@ final class WebDAVUploader: ObservableObject {
 
     @Published private(set) var pending: [Item] = []
     @Published private(set) var uploaded = 0
-    @Published private(set) var lastMessage = "aus"
+    @Published private(set) var lastMessage = String(localized: "off")
 
     var enabled = false
     var baseURL = ""        // Basis-URL plus Eventordner, z. B. https://cloud.example.de/remote.php/dav/files/paul/Hochzeit
@@ -45,7 +45,7 @@ final class WebDAVUploader: ObservableObject {
         if u != baseURL { folderChecked = false }
         baseURL = u
         self.user = user.trimmingCharacters(in: .whitespaces)
-        lastMessage = enabled ? (pending.isEmpty ? "bereit" : "\(pending.count) ausstehend") : "aus"
+        lastMessage = enabled ? (pending.isEmpty ? String(localized: "ready") : String(localized: "\(pending.count) pending")) : String(localized: "off")
         if enabled { kick() }
     }
 
@@ -53,7 +53,7 @@ final class WebDAVUploader: ObservableObject {
         guard enabled else { return }
         pending.append(Item(path: fileURL.path.replacingOccurrences(of: docs.path + "/", with: "")))
         saveQueue()
-        lastMessage = "\(pending.count) ausstehend"
+        lastMessage = String(localized: "\(pending.count) pending")
         kick()
     }
 
@@ -73,16 +73,16 @@ final class WebDAVUploader: ObservableObject {
                 pending.removeFirst()
                 uploaded += 1
                 saveQueue()
-                lastMessage = pending.isEmpty ? "alles hochgeladen (\(uploaded))" : "\(pending.count) ausstehend"
+                lastMessage = pending.isEmpty ? String(localized: "all uploaded (\(uploaded))") : String(localized: "\(pending.count) pending")
                 backoff = 2
             } catch {
                 if (error as NSError).domain == "WebDAV", (error as NSError).code == 4 {
-                    log?("WebDAV: \(error.localizedDescription), Eintrag verworfen"); pending.removeFirst(); saveQueue(); continue
+                    log?("WebDAV: \(error.localizedDescription), entry dropped"); pending.removeFirst(); saveQueue(); continue
                 }
                 pending[0].attempts += 1
                 saveQueue()
-                lastMessage = "Fehler: \(error.localizedDescription)"
-                log?("WebDAV: \(error.localizedDescription) (Versuch \(pending[0].attempts), warte \(backoff) s)")
+                lastMessage = String(localized: "Error: \(error.localizedDescription)")
+                log?("WebDAV: \(error.localizedDescription) (attempt \(pending[0].attempts), waiting \(backoff) s)")
                 if pending[0].attempts >= 8 {
                     let it = pending.removeFirst(); pending.append(Item(path: it.path)); saveQueue()
                 }
@@ -96,7 +96,7 @@ final class WebDAVUploader: ObservableObject {
 
     private func request(_ path: String, method: String) throws -> URLRequest {
         guard !baseURL.isEmpty, let url = URL(string: baseURL + path) else {
-            throw NSError(domain: "WebDAV", code: 1, userInfo: [NSLocalizedDescriptionKey: "Ordner-URL fehlt oder ist ungültig"])
+            throw NSError(domain: "WebDAV", code: 1, userInfo: [NSLocalizedDescriptionKey: String(localized: "Folder URL missing or invalid")])
         }
         var r = URLRequest(url: url)
         r.httpMethod = method
@@ -120,16 +120,16 @@ final class WebDAVUploader: ObservableObject {
         let (_, pr) = try await URLSession.shared.data(for: probe)
         switch status(pr) {
         case 200...299: folderChecked = true; return
-        case 401, 403: throw NSError(domain: "WebDAV", code: 401, userInfo: [NSLocalizedDescriptionKey: "Zugang verweigert (HTTP \(status(pr))): Benutzer oder Passwort prüfen"])
+        case 401, 403: throw NSError(domain: "WebDAV", code: 401, userInfo: [NSLocalizedDescriptionKey: "Access denied (HTTP \(status(pr))): check user or password"])
         case 404: break
-        default: throw NSError(domain: "WebDAV", code: status(pr), userInfo: [NSLocalizedDescriptionKey: "Server antwortet mit HTTP \(status(pr))"])
+        default: throw NSError(domain: "WebDAV", code: status(pr), userInfo: [NSLocalizedDescriptionKey: "Server answered HTTP \(status(pr))"])
         }
         let (_, mr) = try await URLSession.shared.data(for: try request("", method: "MKCOL"))
         guard (200...299).contains(status(mr)) || status(mr) == 405 else {
-            throw NSError(domain: "WebDAV", code: status(mr), userInfo: [NSLocalizedDescriptionKey: "Ordner konnte nicht angelegt werden (HTTP \(status(mr)))"])
+            throw NSError(domain: "WebDAV", code: status(mr), userInfo: [NSLocalizedDescriptionKey: String(localized: "Folder could not be created (HTTP \(status(mr)))")])
         }
         folderChecked = true
-        log?("WebDAV: Ordner angelegt")
+        log?("WebDAV: folder created")
     }
 
     /// Verbindungstest: Ordner erreichbar oder anlegbar.
@@ -137,16 +137,16 @@ final class WebDAVUploader: ObservableObject {
         do {
             folderChecked = false
             try await ensureFolder()
-            return "OK, Ordner erreichbar"
+            return String(localized: "OK, folder reachable")
         } catch {
-            return "Fehler: \(error.localizedDescription)"
+            return String(localized: "Error: \(error.localizedDescription)")
         }
     }
 
     private func upload(_ item: Item) async throws {
         let fileURL = docs.appendingPathComponent(item.path)
         guard let data = try? Data(contentsOf: fileURL) else {
-            throw NSError(domain: "WebDAV", code: 4, userInfo: [NSLocalizedDescriptionKey: "Datei fehlt: \(item.path)"])
+            throw NSError(domain: "WebDAV", code: 4, userInfo: [NSLocalizedDescriptionKey: "File missing: \(item.path)"])
         }
         try await ensureFolder()
         let name = fileURL.lastPathComponent.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? fileURL.lastPathComponent
@@ -159,6 +159,6 @@ final class WebDAVUploader: ObservableObject {
             let txt = String(data: d.prefix(120), encoding: .utf8) ?? ""
             throw NSError(domain: "WebDAV", code: code, userInfo: [NSLocalizedDescriptionKey: "Upload HTTP \(code) \(txt)"])
         }
-        log?("WebDAV: \(fileURL.lastPathComponent) hochgeladen (\(data.count / 1_000_000) MB)")
+        log?("WebDAV: \(fileURL.lastPathComponent) uploaded (\(data.count / 1_000_000) MB)")
     }
 }

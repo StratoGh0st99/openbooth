@@ -1,0 +1,2336 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    " (charging)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " (lädt)"
+          }
+        }
+      }
+    },
+    "%@  ·  Press the button!": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@  ·  Drückt auf den Knopf!"
+          }
+        }
+      }
+    },
+    "%lld pending": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ausstehend"
+          }
+        }
+      }
+    },
+    "%lld photos": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Fotos"
+          }
+        }
+      }
+    },
+    "%lld phrases, random, never the same one twice in a row.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Sprüche, zufällig, nie zweimal derselbe nacheinander."
+          }
+        }
+      }
+    },
+    ", camera %lld %": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", Kamera %lld %"
+          }
+        }
+      }
+    },
+    "A text file with iPad and app version, all camera operations, events and properties including raw data (hex) and the full log. Enough to support a new camera model without access to the camera. Contains no passwords, API keys or server addresses; the camera serial number is shortened. “Send to OpenBooth” sends exactly this file to the developers. “Automatically” does so on capture errors and connection failures, at most every 10 minutes, never otherwise.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine Textdatei mit iPad- und App-Version, allen Operationen, Events und Properties der Kamera samt Rohdaten (Hex) und dem vollständigen Protokoll. Reicht, um ein neues Kameramodell ohne Zugriff auf die Kamera zu unterstützen. Enthält keine Passwörter, API-Keys oder Server-Adressen, die Kamera-Seriennummer wird gekürzt. „An OpenBooth senden“ schickt genau diese Datei an die Entwickler. „Automatisch“ tut das bei Aufnahmefehlern und Verbindungsabbrüchen, höchstens alle 10 Minuten, sonst nie."
+          }
+        }
+      }
+    },
+    "API key": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API-Key"
+          }
+        }
+      }
+    },
+    "API key saved, enter a new one to replace it": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API-Key gespeichert, neuen eingeben zum Ersetzen"
+          }
+        }
+      }
+    },
+    "Access": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zugang"
+          }
+        }
+      }
+    },
+    "Add": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hinzufügen"
+          }
+        }
+      }
+    },
+    "Address": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adresse"
+          }
+        }
+      }
+    },
+    "Admin PIN of the photo booth. Reachable only on the local Wi‑Fi.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Admin-PIN der Fotobox. Nur im lokalen WLAN erreichbar."
+          }
+        }
+      }
+    },
+    "Album could not be created": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Album konnte nicht angelegt werden"
+          }
+        }
+      }
+    },
+    "Album: “%@” (event name)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Album: „%@“ (Name der Veranstaltung)"
+          }
+        }
+      }
+    },
+    "All photos of the evening": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle Fotos vom Abend"
+          }
+        }
+      }
+    },
+    "Allow Camera under Settings › OpenBooth": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen › OpenBooth › Kamera erlauben"
+          }
+        }
+      }
+    },
+    "Aperture": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blende"
+          }
+        }
+      }
+    },
+    "App gallery on the iPad": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App-Galerie auf dem iPad"
+          }
+        }
+      }
+    },
+    "Back to the booth": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zur Fotobox"
+          }
+        }
+      }
+    },
+    "Base URL, e.g. https://cloud.example.com/remote.php/dav/files/name": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Basis-URL, z. B. https://cloud.example.de/remote.php/dav/files/name"
+          }
+        }
+      }
+    },
+    "Battery": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akku"
+          }
+        }
+      }
+    },
+    "Battery camera": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akku Kamera"
+          }
+        }
+      }
+    },
+    "Battery iPad": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akku iPad"
+          }
+        }
+      }
+    },
+    "Camera": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera"
+          }
+        }
+      }
+    },
+    "Camera RAM": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera-RAM"
+          }
+        }
+      }
+    },
+    "Camera disconnected": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera getrennt"
+          }
+        }
+      }
+    },
+    "Camera found": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera gefunden"
+          }
+        }
+      }
+    },
+    "Camera found, connecting…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera gefunden, wird verbunden …"
+          }
+        }
+      }
+    },
+    "Camera not responding": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera antwortet nicht"
+          }
+        }
+      }
+    },
+    "Camera ready, image coming…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera bereit, Bild kommt …"
+          }
+        }
+      }
+    },
+    "Camera settings": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kameraeinstellungen"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abbrechen"
+          }
+        }
+      }
+    },
+    "Capture": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufnahme"
+          }
+        }
+      }
+    },
+    "Capture failed": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufnahme fehlgeschlagen"
+          }
+        }
+      }
+    },
+    "Card + RAM": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Karte + RAM"
+          }
+        }
+      }
+    },
+    "Checking…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prüfe …"
+          }
+        }
+      }
+    },
+    "Cheese!|Smile!|Cheesecake!|Spaghetti!|Sunshine!|Show your teeth!|Everyone together!|And… smile!|Say cheeeese!|Pineapple!|Whisky!|Shine!|A smile please!|Now!|Gummy bears!|Big cheese!": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cheese!|Bitte lächeln!|Käsekuchen!|Spaghetti!|Sonnenschein!|Zähne zeigen!|Alle zusammen!|Und… lächeln!|Sag Cheeeese!|Ananas!|Whisky!|Strahlen!|Ein Lächeln bitte!|Jetzt!|Gummibärchen!|Dreikäsehoch!"
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schließen"
+          }
+        }
+      }
+    },
+    "Closes after: %lld s without touch": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schließt nach: %lld s ohne Berührung"
+          }
+        }
+      }
+    },
+    "Collage after: %lld s without activity": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collage nach: %lld s ohne Aktion"
+          }
+        }
+      }
+    },
+    "Collage changes every: %lld s": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collage wechselt alle: %lld s"
+          }
+        }
+      }
+    },
+    "Connect a camera": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera anschließen"
+          }
+        }
+      }
+    },
+    "Connect automatically": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisch verbinden"
+          }
+        }
+      }
+    },
+    "Connected": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbunden"
+          }
+        }
+      }
+    },
+    "Connecting camera…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera wird verbunden …"
+          }
+        }
+      }
+    },
+    "Connecting…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbinde …"
+          }
+        }
+      }
+    },
+    "Connection": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbindung"
+          }
+        }
+      }
+    },
+    "Countdown beeps and shutter signal": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Countdown-Piepen und Auslösesignal"
+          }
+        }
+      }
+    },
+    "Countdown: %lld s": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Countdown: %lld s"
+          }
+        }
+      }
+    },
+    "Create": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anlegen"
+          }
+        }
+      }
+    },
+    "Create an API key in Immich under Account Settings › API Keys. It is stored in the iPad keychain. Uploads run in the background with a queue and catch up when offline.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API-Key in Immich unter Kontoeinstellungen › API-Schlüssel anlegen. Er wird im Schlüsselbund des iPads gespeichert. Upload läuft im Hintergrund mit Warteschlange, ohne Netz wird nachgeholt."
+          }
+        }
+      }
+    },
+    "Current": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktuell"
+          }
+        }
+      }
+    },
+    "Current image change": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktuelle Bildänderung"
+          }
+        }
+      }
+    },
+    "Debug mode": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Debug-Modus"
+          }
+        }
+      }
+    },
+    "Defaults": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Löschen"
+          }
+        }
+      }
+    },
+    "Delete series": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serie löschen"
+          }
+        }
+      }
+    },
+    "Destinations": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speicherorte"
+          }
+        }
+      }
+    },
+    "Development": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entwicklung"
+          }
+        }
+      }
+    },
+    "Diagnostics": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnose"
+          }
+        }
+      }
+    },
+    "Display": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Display"
+          }
+        }
+      }
+    },
+    "Display & Sounds": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anzeige & Töne"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fertig"
+          }
+        }
+      }
+    },
+    "During the idle collage the brightness returns to the previous value and goes back up on motion or capture. The QR page is always at full brightness.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Während der Leerlauf-Collage geht die Helligkeit auf den vorherigen Wert zurück, bei Bewegung oder Aufnahme wieder hoch. Die QR-Seite ist immer voll hell."
+          }
+        }
+      }
+    },
+    "End when motion is detected in front of the camera": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei Bewegung vor der Kamera beenden"
+          }
+        }
+      }
+    },
+    "Error: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fehler: %@"
+          }
+        }
+      }
+    },
+    "Event": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Veranstaltung"
+          }
+        }
+      }
+    },
+    "Flow": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ablauf"
+          }
+        }
+      }
+    },
+    "Folder URL missing or invalid": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ordner-URL fehlt oder ist ungültig"
+          }
+        }
+      }
+    },
+    "Folder could not be created (HTTP %@))": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ordner konnte nicht angelegt werden (HTTP %@))"
+          }
+        }
+      }
+    },
+    "Front camera": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frontkamera"
+          }
+        }
+      }
+    },
+    "Full log in Documents/openbooth.log, fetch with tools/pull-log.sh. Camera capabilities in openbooth-capabilities.log.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vollständig in Documents/openbooth.log, holen mit tools/pull-log.sh. Kamera-Fähigkeiten in openbooth-capabilities.log."
+          }
+        }
+      }
+    },
+    "Gallery": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galerie"
+          }
+        }
+      }
+    },
+    "Gallery (%lld)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galerie (%lld)"
+          }
+        }
+      }
+    },
+    "Gallery for guests": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galerie für Gäste"
+          }
+        }
+      }
+    },
+    "Guest view (live)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gästesicht (live)"
+          }
+        }
+      }
+    },
+    "HEIF only": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nur HEIF"
+          }
+        }
+      }
+    },
+    "Handshake": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handshake"
+          }
+        }
+      }
+    },
+    "Handshake failed": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handshake fehlgeschlagen"
+          }
+        }
+      }
+    },
+    "Histogram in live view and review": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Histogramm in Liveview und Rückschau"
+          }
+        }
+      }
+    },
+    "Idle": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leerlauf"
+          }
+        }
+      }
+    },
+    "Idle (collage)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leerlauf (Collage)"
+          }
+        }
+      }
+    },
+    "Image quality": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bildqualität"
+          }
+        }
+      }
+    },
+    "Immich server": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Immich-Server"
+          }
+        }
+      }
+    },
+    "In debug mode the admin opens at launch and the swipe gesture needs no PIN.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im Debug-Modus öffnet der Admin beim Start und die Wischgeste braucht keine PIN."
+          }
+        }
+      }
+    },
+    "It continues automatically once reconnected": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sobald sie wieder angeschlossen ist, geht es automatisch weiter"
+          }
+        }
+      }
+    },
+    "JPEG only": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nur JPEG"
+          }
+        }
+      }
+    },
+    "Keep display at full brightness": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Display dauerhaft auf volle Helligkeit"
+          }
+        }
+      }
+    },
+    "Last error": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Letzter Fehler"
+          }
+        }
+      }
+    },
+    "Live view": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liveview"
+          }
+        }
+      }
+    },
+    "Log": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protokoll"
+          }
+        }
+      }
+    },
+    "Log (%lld lines)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protokoll (%lld Zeilen)"
+          }
+        }
+      }
+    },
+    "Looking for a camera…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suche Kamera …"
+          }
+        }
+      }
+    },
+    "Manual": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manuell"
+          }
+        }
+      }
+    },
+    "Manual (reversed)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manuell (umgekehrt)"
+          }
+        }
+      }
+    },
+    "Measures the strongest of 16 image cells after subtracting brightness changes across the whole frame (lights on/off, someone else’s flash). A lower threshold reacts earlier. Motion, a tap or a capture end the collage.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemessen wird das stärkste von 16 Bildfeldern nach Abzug von Helligkeitswechseln im ganzen Bild (Licht an/aus, fremder Blitz). Kleinere Schwelle reagiert früher. Bewegung, Tipp oder Aufnahme beenden die Collage."
+          }
+        }
+      }
+    },
+    "Memory card": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speicherkarte"
+          }
+        }
+      }
+    },
+    "Mirror live view": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liveview spiegeln"
+          }
+        }
+      }
+    },
+    "Mode": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modus"
+          }
+        }
+      }
+    },
+    "Motion, level": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bewegung, Pegel"
+          }
+        }
+      }
+    },
+    "Name, e.g. Anna & Paul’s wedding": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name, z. B. Hochzeit Anna & Paul"
+          }
+        }
+      }
+    },
+    "New": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neu"
+          }
+        }
+      }
+    },
+    "New PIN (at least 4 digits)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neue PIN (mindestens 4 Ziffern)"
+          }
+        }
+      }
+    },
+    "New event": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neue Veranstaltung"
+          }
+        }
+      }
+    },
+    "New phrase": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neuer Spruch"
+          }
+        }
+      }
+    },
+    "No Wi‑Fi connected": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein WLAN verbunden"
+          }
+        }
+      }
+    },
+    "No access to the camera": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein Zugriff auf die Kamera"
+          }
+        }
+      }
+    },
+    "No album name": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein Albumname"
+          }
+        }
+      }
+    },
+    "No camera. Connect a Sony in “PC Remote” mode via USB-C.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Kamera. Sony im Modus „PC-Fernbedienung“ per USB-C anschließen."
+          }
+        }
+      }
+    },
+    "OK, folder reachable": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK, Ordner erreichbar"
+          }
+        }
+      }
+    },
+    "Off": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aus"
+          }
+        }
+      }
+    },
+    "On": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein"
+          }
+        }
+      }
+    },
+    "One more!": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch ein Foto!"
+          }
+        }
+      }
+    },
+    "One of them appears at random after the countdown.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nach dem Countdown erscheint zufällig einer davon."
+          }
+        }
+      }
+    },
+    "Only applies when image quality in the camera settings is RAW or RAW+JPEG. The JPEG is always uploaded.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wirkt nur, wenn die Bildqualität in den Kameraeinstellungen auf RAW oder RAW+JPEG steht. Das JPEG geht immer hoch."
+          }
+        }
+      }
+    },
+    "Open admin: swipe down with two fingers, then enter the PIN.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Admin öffnen: mit zwei Fingern von oben nach unten wischen, dann PIN."
+          }
+        }
+      }
+    },
+    "PIN": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN"
+          }
+        }
+      }
+    },
+    "PTP pass-through blocked": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PTP-Durchreichen blockiert"
+          }
+        }
+      }
+    },
+    "PTP pass-through works": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PTP-Durchreichen funktioniert"
+          }
+        }
+      }
+    },
+    "PTP test": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PTP-Test"
+          }
+        }
+      }
+    },
+    "Password or app password": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passwort oder App-Passwort"
+          }
+        }
+      }
+    },
+    "Password saved, enter a new one to replace it": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passwort gespeichert, neues eingeben zum Ersetzen"
+          }
+        }
+      }
+    },
+    "Pause between shots: %lld s": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause zwischen Bildern: %lld s"
+          }
+        }
+      }
+    },
+    "Photo %lld of %lld": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto %lld von %lld"
+          }
+        }
+      }
+    },
+    "Photo Booth": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotobox"
+          }
+        }
+      }
+    },
+    "Photo picked up from the camera": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto von der Kamera übernommen"
+          }
+        }
+      }
+    },
+    "Photo saved": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto gespeichert"
+          }
+        }
+      }
+    },
+    "Photos to your phone": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotos aufs Handy"
+          }
+        }
+      }
+    },
+    "Photos today": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotos heute"
+          }
+        }
+      }
+    },
+    "Phrase": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spruch"
+          }
+        }
+      }
+    },
+    "Phrases": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprüche"
+          }
+        }
+      }
+    },
+    "Phrases at the shutter": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprüche beim Auslösen"
+          }
+        }
+      }
+    },
+    "Pick up photos taken with the camera’s own shutter": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotos vom Kamera-Auslöser übernehmen"
+          }
+        }
+      }
+    },
+    "Play countdown": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Countdown anhören"
+          }
+        }
+      }
+    },
+    "Play welcome": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Willkommen anhören"
+          }
+        }
+      }
+    },
+    "Please check the USB cable": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitte USB-Kabel prüfen"
+          }
+        }
+      }
+    },
+    "Power-cycle the camera or reconnect USB": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera aus- und einschalten oder USB neu stecken"
+          }
+        }
+      }
+    },
+    "Preset focus": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preset-Fokus"
+          }
+        }
+      }
+    },
+    "Program": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Programm"
+          }
+        }
+      }
+    },
+    "RAW only": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nur RAW"
+          }
+        }
+      }
+    },
+    "Read-only: camera, frame rate, photos, destinations, log, send diagnostics. Sign in with the admin PIN; five failed attempts lock for one minute. Reachable only on the same Wi‑Fi while the app is in the foreground.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur lesend: Kamera, Bildrate, Fotos, Speicherziele, Protokoll, Diagnose senden. Anmeldung mit der Admin-PIN, nach fünf Fehlversuchen eine Minute Sperre. Nur im selben WLAN erreichbar, solange die App im Vordergrund läuft."
+          }
+        }
+      }
+    },
+    "Rear camera": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rückkamera"
+          }
+        }
+      }
+    },
+    "Reconnecting to the camera…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbindung zur Kamera wird erneuert …"
+          }
+        }
+      }
+    },
+    "Reload": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neu laden"
+          }
+        }
+      }
+    },
+    "Remote access": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fernzugriff"
+          }
+        }
+      }
+    },
+    "Remove": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entfernen"
+          }
+        }
+      }
+    },
+    "Remove “%@” from the list?": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„%@“ aus der Liste entfernen?"
+          }
+        }
+      }
+    },
+    "Restore camera settings made in the app when connecting": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kameraeinstellungen aus der App beim Anstecken wiederherstellen"
+          }
+        }
+      }
+    },
+    "Review: %lld s": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rückschau: %lld s"
+          }
+        }
+      }
+    },
+    "Running since": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Läuft seit"
+          }
+        }
+      }
+    },
+    "Save": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speichern"
+          }
+        }
+      }
+    },
+    "Save destination": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speicherziel"
+          }
+        }
+      }
+    },
+    "Scan the QR code with your phone camera": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QR-Code mit der Handykamera scannen"
+          }
+        }
+      }
+    },
+    "Scan the QR code with your phone, then sign in with the admin PIN.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QR-Code mit dem Handy scannen, dann mit der Admin-PIN anmelden."
+          }
+        }
+      }
+    },
+    "Send diagnostics": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnose senden"
+          }
+        }
+      }
+    },
+    "Send error reports automatically": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fehlerberichte automatisch senden"
+          }
+        }
+      }
+    },
+    "Send to OpenBooth": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An OpenBooth senden"
+          }
+        }
+      }
+    },
+    "Sending failed": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senden fehlgeschlagen"
+          }
+        }
+      }
+    },
+    "Sending…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sende …"
+          }
+        }
+      }
+    },
+    "Sensitivity: threshold %lld": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empfindlichkeit: Schwelle %lld"
+          }
+        }
+      }
+    },
+    "Sent, ID %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesendet, Kennung %@"
+          }
+        }
+      }
+    },
+    "Server or API key missing": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server oder API-Key fehlt"
+          }
+        }
+      }
+    },
+    "Server, e.g. https://immich.example.com": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server, z. B. https://immich.example.de"
+          }
+        }
+      }
+    },
+    "Session failed": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session fehlgeschlagen"
+          }
+        }
+      }
+    },
+    "Set": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setzen"
+          }
+        }
+      }
+    },
+    "Setting effect in live view": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungseffekt im Liveview"
+          }
+        }
+      }
+    },
+    "Setting not applied": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellung nicht übernommen"
+          }
+        }
+      }
+    },
+    "Share diagnostics…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnose teilen …"
+          }
+        }
+      }
+    },
+    "Share link could not be created": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freigabelink konnte nicht angelegt werden"
+          }
+        }
+      }
+    },
+    "Share link: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freigabelink: %@"
+          }
+        }
+      }
+    },
+    "Shots per capture: %lld": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilder pro Auslösung: %lld"
+          }
+        }
+      }
+    },
+    "Show QR code to the album for guests": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QR-Code zum Album für Gäste anzeigen"
+          }
+        }
+      }
+    },
+    "Shown above the live view, and large in the center when no camera is connected.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steht über dem Liveview und ohne Kamera groß in der Mitte."
+          }
+        }
+      }
+    },
+    "Shutter speed": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verschlusszeit"
+          }
+        }
+      }
+    },
+    "Sign in": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anmelden"
+          }
+        }
+      }
+    },
+    "Sign out": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abmelden"
+          }
+        }
+      }
+    },
+    "Simulator: no camera available": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simulator: keine Kamera möglich"
+          }
+        }
+      }
+    },
+    "Sony handshake…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sony-Handshake …"
+          }
+        }
+      }
+    },
+    "Sony in “PC Remote” mode via USB-C": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sony im Modus „PC-Fernbedienung“ per USB-C"
+          }
+        }
+      }
+    },
+    "Sounds": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Töne"
+          }
+        }
+      }
+    },
+    "Start live view": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liveview starten"
+          }
+        }
+      }
+    },
+    "Status": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        }
+      }
+    },
+    "Status page on Wi‑Fi": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Statusseite im WLAN"
+          }
+        }
+      }
+    },
+    "Step in front of the camera\\nand press the button!": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stellt euch vor die Kamera\\nund drückt auf den Knopf!"
+          }
+        }
+      }
+    },
+    "Stop live view": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liveview stoppen"
+          }
+        }
+      }
+    },
+    "Take a photo": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foto aufnehmen"
+          }
+        }
+      }
+    },
+    "Targets": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziele"
+          }
+        }
+      }
+    },
+    "Test connection": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbindung testen"
+          }
+        }
+      }
+    },
+    "Testing…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teste …"
+          }
+        }
+      }
+    },
+    "Text": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text"
+          }
+        }
+      }
+    },
+    "That didn’t work. Please try again.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das hat leider nicht geklappt. Bitte noch einmal."
+          }
+        }
+      }
+    },
+    "The app gallery feeds review, gallery and collage and is always on.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die App-Galerie ist die Quelle für Rückschau, Galerie und Collage und bleibt immer an."
+          }
+        }
+      }
+    },
+    "The camera didn’t take a picture. Maybe no focus? Please try again.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Kamera hat kein Bild gemacht. Vielleicht kein Fokus? Bitte noch einmal."
+          }
+        }
+      }
+    },
+    "The camera rejected the command. Please try again.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Kamera hat den Befehl nicht angenommen. Bitte noch einmal."
+          }
+        }
+      }
+    },
+    "The camera took too long. Please try again.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Kamera hat zu lange gebraucht. Bitte noch einmal."
+          }
+        }
+      }
+    },
+    "The folder “%@” is created below it. Nextcloud: remote.php/dav/files/USER, preferably with an app password. The password is stored in the iPad keychain.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Darunter wird der Ordner „%@“ angelegt. Nextcloud: remote.php/dav/files/BENUTZER, am besten mit App-Passwort. Passwort liegt im Schlüsselbund des iPads."
+          }
+        }
+      }
+    },
+    "The link points to the server address above. Guests must be able to reach it, so enter e.g. https://immich.example.com rather than a home-network IP.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Link zeigt auf die Server-Adresse oben. Gäste müssen sie erreichen können, also z. B. https://immich.example.de statt einer IP im Heimnetz eintragen."
+          }
+        }
+      }
+    },
+    "The name is used as the Immich album and the WebDAV folder. Each event keeps its own photos on the iPad.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Name ist Immich-Album und WebDAV-Ordner zugleich. Fotos jeder Veranstaltung liegen getrennt auf dem iPad."
+          }
+        }
+      }
+    },
+    "The photos stay on the iPad in the event’s folder, only the entry disappears.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Fotos bleiben auf dem iPad im Ordner der Veranstaltung erhalten, nur der Eintrag verschwindet."
+          }
+        }
+      }
+    },
+    "Threshold": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schwelle"
+          }
+        }
+      }
+    },
+    "Title": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titel"
+          }
+        }
+      }
+    },
+    "Too many attempts, please wait a minute.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zu viele Versuche, bitte eine Minute warten."
+          }
+        }
+      }
+    },
+    "Transfer to the app": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Übertragung an die App"
+          }
+        }
+      }
+    },
+    "Transferred size": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Übertragene Größe"
+          }
+        }
+      }
+    },
+    "Try again": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nochmal versuchen"
+          }
+        }
+      }
+    },
+    "Upload RAW files too": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RAW-Dateien mit hochladen"
+          }
+        }
+      }
+    },
+    "Use the iPad camera as fallback when no USB camera is present": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad-Kamera als Ersatz, wenn keine Kamera per USB da ist"
+          }
+        }
+      }
+    },
+    "User": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Benutzer"
+          }
+        }
+      }
+    },
+    "Values are set directly in the camera. Image quality RAW or RAW+JPEG also delivers the ARW file.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Werte werden direkt in der Kamera gesetzt. Bildqualität RAW oder RAW+JPEG liefert zusätzlich die ARW-Datei."
+          }
+        }
+      }
+    },
+    "WebDAV folder": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WebDAV-Ordner"
+          }
+        }
+      }
+    },
+    "WebDAV folder (Nextcloud, NAS, Storage Box)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WebDAV-Ordner (Nextcloud, NAS, Storage Box)"
+          }
+        }
+      }
+    },
+    "Welcome": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Begrüßung"
+          }
+        }
+      }
+    },
+    "Welcome chime when waking up": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Willkommensklang beim Aufwachen"
+          }
+        }
+      }
+    },
+    "Wrong PIN": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falsche PIN"
+          }
+        }
+      }
+    },
+    "Wrong PIN.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PIN falsch."
+          }
+        }
+      }
+    },
+    "all uploaded (%lld)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "alles hochgeladen (%lld)"
+          }
+        }
+      }
+    },
+    "always": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "immer"
+          }
+        }
+      }
+    },
+    "fps": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilder/s"
+          }
+        }
+      }
+    },
+    "iPad camera": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad-Kamera"
+          }
+        }
+      }
+    },
+    "iPad camera (fallback)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad-Kamera (Ersatz)"
+          }
+        }
+      }
+    },
+    "iPad camera active": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad-Kamera aktiv"
+          }
+        }
+      }
+    },
+    "iPad photo library (Photos app)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad-Mediathek (Fotos-App)"
+          }
+        }
+      }
+    },
+    "last": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "zuletzt"
+          }
+        }
+      }
+    },
+    "not found": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nicht gefunden"
+          }
+        }
+      }
+    },
+    "off": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aus"
+          }
+        }
+      }
+    },
+    "only during the collage": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nur während der Collage"
+          }
+        }
+      }
+    },
+    "only while idle": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nur im Leerlauf"
+          }
+        }
+      }
+    },
+    "ready": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bereit"
+          }
+        }
+      }
+    },
+    "rejected": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "abgelehnt"
+          }
+        }
+      }
+    },
+    "sending…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sende …"
+          }
+        }
+      }
+    },
+    "unknown": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "unbekannt"
+          }
+        }
+      }
+    },
+    "📸 Photo Booth": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "📸 Fotobox"
+          }
+        }
+      }
+    }
+  }
+}

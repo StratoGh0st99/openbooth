@@ -13,7 +13,7 @@ import UIKit
 
 struct WebStatus: Encodable {
     var event: String
-    var camera: String          // Modell oder "keine"
+    var camera: String          // Modell oder "none"
     var state: String
     var status: String
     var fps: Int
@@ -57,8 +57,8 @@ final class LocalWebServer: @unchecked Sendable {
             l.service = NWListener.Service(name: "OpenBooth", type: "_http._tcp")
             l.stateUpdateHandler = { [weak self] st in
                 switch st {
-                case .ready: self?.running = true; self?.log?("Fernzugriff: Statusseite auf Port \(Self.port) bereit")
-                case .failed(let e): self?.running = false; self?.log?("Fernzugriff: Fehler \(e.localizedDescription)"); self?.stop()
+                case .ready: self?.running = true; self?.log?("Remote: status page ready on port \(Self.port)")
+                case .failed(let e): self?.running = false; self?.log?("Remote: error \(e.localizedDescription)"); self?.stop()
                 case .cancelled: self?.running = false
                 default: break
                 }
@@ -67,7 +67,7 @@ final class LocalWebServer: @unchecked Sendable {
             l.start(queue: queue)
             listener = l
         } catch {
-            log?("Fernzugriff: konnte nicht starten (\(error.localizedDescription))")
+            log?("Remote: could not start (\(error.localizedDescription))")
         }
     }
 
@@ -145,7 +145,7 @@ final class LocalWebServer: @unchecked Sendable {
         switch (method, p) {
         case ("POST", "/login"):
             if let block = failedAttempts[ip], block.until > Date() {
-                return http(429, html(loginPage(error: "Zu viele Versuche, bitte eine Minute warten.")))
+                return http(429, html(loginPage(error: String(localized: "Too many attempts, please wait a minute."))))
             }
             let form = String(decoding: body, as: UTF8.self)
             let pin = form.components(separatedBy: "&").compactMap { kv -> String? in
@@ -155,13 +155,13 @@ final class LocalWebServer: @unchecked Sendable {
             if !expected.isEmpty, pin == expected {
                 let t = UUID().uuidString.replacingOccurrences(of: "-", with: "")
                 sessions.insert(t); failedAttempts[ip] = nil
-                log?("Fernzugriff: Anmeldung von \(ip)")
+                log?("Remote: login from \(ip)")
                 return http(303, Data(), extra: ["Location": "/", "Set-Cookie": "ob=\(t); Path=/; HttpOnly; SameSite=Strict"])
             }
             let n = (failedAttempts[ip]?.count ?? 0) + 1
             failedAttempts[ip] = (n, n >= 5 ? Date().addingTimeInterval(60) : Date())
-            log?("Fernzugriff: falsche PIN von \(ip) (\(n))")
-            return http(200, html(loginPage(error: "PIN falsch.")))
+            log?("Remote: wrong PIN from \(ip) (\(n))")
+            return http(200, html(loginPage(error: String(localized: "Wrong PIN."))))
         case ("GET", "/logout"):
             if let token { sessions.remove(token) }
             return http(303, Data(), extra: ["Location": "/", "Set-Cookie": "ob=; Path=/; Max-Age=0"])
@@ -180,14 +180,14 @@ final class LocalWebServer: @unchecked Sendable {
             guard let key = form["key"], let v = Int(form["value"] ?? "") else { return http(400, Data("bad request".utf8), type: "text/plain") }
             let action = settingsAction
             let ok = await MainActor.run { action?(key, v) ?? false }
-            return http(ok ? 200 : 400, Data((ok ? "ok" : "abgelehnt").utf8), type: "text/plain; charset=utf-8")
+            return http(ok ? 200 : 400, Data((ok ? "ok" : String(localized: "rejected")).utf8), type: "text/plain; charset=utf-8")
         case ("POST", "/api/diagnose"):
             guard authed else { return http(401, Data("unauthorized".utf8), type: "text/plain") }
             let action = diagnoseAction
             let id: String? = if let action { await action() } else { nil }
-            return http(200, Data((id.map { "Gesendet, Kennung \($0)" } ?? "Senden fehlgeschlagen").utf8), type: "text/plain; charset=utf-8")
+            return http(200, Data((id.map { String(localized: "Sent, ID \($0)") } ?? String(localized: "Sending failed")).utf8), type: "text/plain; charset=utf-8")
         default:
-            return http(404, Data("nicht gefunden".utf8), type: "text/plain; charset=utf-8")
+            return http(404, Data(String(localized: "not found").utf8), type: "text/plain; charset=utf-8")
         }
     }
 
@@ -214,33 +214,44 @@ final class LocalWebServer: @unchecked Sendable {
     input[type=password]{letter-spacing:.3em;width:8em;text-align:center}form{display:flex;gap:10px;align-items:center}.err{color:#ff6b6b}</style>
     """
 
+    private func L(_ k: String.LocalizationValue) -> String { String(localized: k) }
+
     private func loginPage(error: String?) -> String {
         """
-        <!doctype html><title>OpenBooth</title>\(style)<h1>OpenBooth <small>Fernzugriff</small></h1>
+        <!doctype html><title>OpenBooth</title>\(style)<h1>OpenBooth <small>\(L("Remote access"))</small></h1>
         <div class=card><form method=post action=/login><input type=password name=pin inputmode=numeric autocomplete=off placeholder="PIN" autofocus>
-        <button>Anmelden</button></form>\(error.map { "<p class=err>\($0)</p>" } ?? "")<p class=k>Admin-PIN der Fotobox. Nur im lokalen WLAN erreichbar.</p></div>
+        <button>\(L("Sign in"))</button></form>\(error.map { "<p class=err>\($0)</p>" } ?? "")<p class=k>\(L("Admin PIN of the photo booth. Reachable only on the local Wi‑Fi."))</p></div>
         """
     }
 
     private var statusPage: String {
-        """
+        let labels: [String: String] = [
+            "camera": L("Camera"), "status": L("Status"), "live": L("Live view"), "fps": L("fps"), "mode": L("Mode"),
+            "idle": L("Idle (collage)"), "ready": L("ready"), "photos": L("Photos today"), "last": L("last"), "display": L("Display"),
+            "batIpad": L("Battery iPad"), "batCam": L("Battery camera"), "unknown": L("unknown"), "uptime": L("Running since"),
+            "off": L("off"), "motion": L("Motion, level"), "idleOnly": L("only while idle"), "threshold": L("Threshold"),
+            "log": L("Log"), "diag": L("Send diagnostics"), "sending": L("sending…"), "logout": L("Sign out"),
+        ]
+        let t = String(data: (try? JSONSerialization.data(withJSONObject: labels)) ?? Data("{}".utf8), encoding: .utf8) ?? "{}"
+        return """
         <!doctype html><title>OpenBooth</title>\(style)<h1>OpenBooth <small id=ev></small></h1>
         <div class=card id=cam></div>
         <div class=card id=targets></div>
         <div class=card id=motion></div>
-        <div class=card><div class=row><span class=k>Protokoll</span><span><button onclick=diag()>Diagnose senden</button> <span id=dres class=k></span></span></div><pre id=log>…</pre></div>
-        <p class=k style="text-align:center"><a href=/logout style="color:#888">Abmelden</a></p>
+        <div class=card><div class=row><span class=k id=lblog></span><span><button onclick=diag() id=bdiag></button> <span id=dres class=k></span></span></div><pre id=log>…</pre></div>
+        <p class=k style="text-align:center"><a href=/logout style="color:#888" id=lout></a></p>
         <script>
-        const $=id=>document.getElementById(id);
+        const T=\(t);const $=id=>document.getElementById(id);
+        $('lblog').textContent=T.log;$('bdiag').textContent=T.diag;$('lout').textContent=T.logout;
         function row(k,v){return `<div class=row><span class=k>${k}</span><span>${v}</span></div>`}
         async function tick(){try{const r=await fetch('/api/status');if(r.status==401){location.reload();return}const s=await r.json();
         $('ev').textContent=s.event;const col=s.state=='connected'?(s.fps>0?'#34c759':'#ffd60a'):'#ff453a';
-        $('cam').innerHTML=row('Kamera',`<span class=dot style="background:${col}"></span>${s.camera}`)+row('Status',s.status)+row('Liveview',s.fps+' Bilder/s')+row('Modus',s.idle?'Leerlauf (Collage)':'bereit')+row('Fotos heute',s.photos+(s.lastPhoto?' · zuletzt '+s.lastPhoto:''))+row('Display',s.brightness+' %')+row('Akku iPad',s.ipadBattery)+row('Akku Kamera',s.cameraBattery!=null?s.cameraBattery+' %':'unbekannt')+row('Läuft seit',s.uptime);
-        $('targets').innerHTML=row('Immich',s.immich??'aus')+row('WebDAV',s.webdav??'aus');
-        if(!window.editing){$('motion').innerHTML=row('Bewegung, Pegel',s.idle?s.motionLevel.toFixed(1):'nur im Leerlauf')+row('Schwelle',`<button onclick="thr(-1)">−</button> <b id=thr>${s.motionThreshold}</b> <button onclick="thr(1)">+</button>`)}
+        $('cam').innerHTML=row(T.camera,`<span class=dot style="background:${col}"></span>${s.camera}`)+row(T.status,s.status)+row(T.live,s.fps+' '+T.fps)+row(T.mode,s.idle?T.idle:T.ready)+row(T.photos,s.photos+(s.lastPhoto?' · '+T.last+' '+s.lastPhoto:''))+row(T.display,s.brightness+' %')+row(T.batIpad,s.ipadBattery)+row(T.batCam,s.cameraBattery!=null?s.cameraBattery+' %':T.unknown)+row(T.uptime,s.uptime);
+        $('targets').innerHTML=row('Immich',s.immich??T.off)+row('WebDAV',s.webdav??T.off);
+        if(!window.editing){$('motion').innerHTML=row(T.motion,s.idle?s.motionLevel.toFixed(1):T.idleOnly)+row(T.threshold,`<button onclick="thr(-1)">−</button> <b id=thr>${s.motionThreshold}</b> <button onclick="thr(1)">+</button>`)}
         $('log').textContent=s.log.join('\\n');}catch(e){}}
         async function thr(d){window.editing=true;const v=parseInt($('thr').textContent)+d;const r=await fetch('/api/setting',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'key=motionThreshold&value='+v});if(r.ok)$('thr').textContent=v;window.editing=false}
-        async function diag(){$('dres').textContent='sende …';const r=await fetch('/api/diagnose',{method:'POST'});$('dres').textContent=await r.text()}
+        async function diag(){$('dres').textContent=T.sending;const r=await fetch('/api/diagnose',{method:'POST'});$('dres').textContent=await r.text()}
         tick();setInterval(tick,3000);
         </script>
         """

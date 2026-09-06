@@ -24,7 +24,7 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var liveFrame: UIImage?
     @Published var liveRunning = false
     @Published var lastPhoto: UIImage?
-    @Published var status = "Kamera anschließen"
+    @Published var status = String(localized: "Connect a camera")
     @Published var authorization = "unbekannt"
     @Published var settings: [CameraSetting] = []
     @Published var settingsBusy = false
@@ -54,21 +54,21 @@ final class CameraManager: NSObject, ObservableObject {
     }
     private func startIPadCamera() async {
         guard ipadCam == nil, settingsRef?.ipadFallback ?? true else { return }
-        guard await IPadCamera.authorized() else { appendLog("iPad-Kamera: kein Zugriff (Einstellungen › OpenBooth › Kamera)"); return }
+        guard await IPadCamera.authorized() else { appendLog("iPad camera: no access (Settings › OpenBooth › Camera)"); return }
         let cam = IPadCamera()
         do {
             try cam.start(front: settingsRef?.ipadFrontCamera ?? true) { [weak self] img in
                 Task { @MainActor in self?.ingestFallbackFrame(img) }
             }
-        } catch { appendLog("iPad-Kamera: \(error.localizedDescription)"); return }
+        } catch { appendLog("iPad camera: \(error.localizedDescription)"); return }
         ipadCam = cam
         usingIPadCamera = true
         state = .connected
-        status = "iPad-Kamera (Ersatz)"
+        status = String(localized: "iPad camera (fallback)")
         liveRunning = true
         lastFrame = Date()
         banner = nil
-        appendLog("iPad-Kamera als Ersatz gestartet (\(settingsRef?.ipadFrontCamera ?? true ? "Front" : "Rück")kamera)")
+        appendLog("iPad camera started as fallback (\(settingsRef?.ipadFrontCamera ?? true ? "front" : "rear") camera)")
     }
     func stopIPadCamera(reason: String) {
         fallbackTimer?.cancel(); fallbackTimer = nil
@@ -78,15 +78,15 @@ final class CameraManager: NSObject, ObservableObject {
         liveRunning = false
         liveFrame = nil
         liveHistogram = nil
-        if sony == nil { state = .browsing; status = "Suche Kamera …" }
-        appendLog("iPad-Kamera gestoppt (\(reason))")
+        if sony == nil { state = .browsing; status = String(localized: "Looking for a camera…") }
+        appendLog("iPad camera stopped (\(reason))")
     }
     /// Einstellungen geaendert: Ersatzkamera an/aus oder Front/Rueck wechseln
     func syncFallback() {
         guard let s = settingsRef else { return }
-        if !s.ipadFallback { stopIPadCamera(reason: "ausgeschaltet"); return }
+        if !s.ipadFallback { stopIPadCamera(reason: "disabled"); return }
         if let cam = ipadCam, cam.position == (s.ipadFrontCamera ? .front : .back) { return }
-        if ipadCam != nil { stopIPadCamera(reason: "Kamerawechsel") }
+        if ipadCam != nil { stopIPadCamera(reason: "camera switched") }
         scheduleFallback()
     }
     private var fallbackMotion = MotionDetector()
@@ -110,15 +110,15 @@ final class CameraManager: NSObject, ObservableObject {
         guard let s = settingsRef else { return }
         web.log = { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
         web.pinProvider = { [weak self] in self?.settingsRef?.pin ?? "" }
-        web.diagnoseAction = { [weak self] in await self?.sendDiagnostics(reason: "Fernzugriff") }
-        web.statusProvider = { [weak self] in self?.webStatus() ?? WebStatus(event: "", camera: "keine", state: "", status: "", fps: 0, idle: false, photos: 0, lastPhoto: nil, immich: nil, webdav: nil, brightness: 0, log: [], uptime: "", ipadBattery: "", cameraBattery: nil, motionThreshold: 6, motionLevel: 0) }
+        web.diagnoseAction = { [weak self] in await self?.sendDiagnostics(reason: "Remote access") }
+        web.statusProvider = { [weak self] in self?.webStatus() ?? WebStatus(event: "", camera: "none", state: "", status: "", fps: 0, idle: false, photos: 0, lastPhoto: nil, immich: nil, webdav: nil, brightness: 0, log: [], uptime: "", ipadBattery: "", cameraBattery: nil, motionThreshold: 6, motionLevel: 0) }
         web.settingsAction = { [weak self] key, value in
             guard let s = self?.settingsRef else { return false }
             switch key {
             case "motionThreshold": guard (2...40).contains(value) else { return false }; s.motionThreshold = value
             default: return false
             }
-            self?.appendLog("Fernzugriff: \(key) = \(value)")
+            self?.appendLog("Remote: \(key) = \(value)")
             return true
         }
         if s.webEnabled { web.start() } else { web.stop() }
@@ -130,7 +130,7 @@ final class CameraManager: NSObject, ObservableObject {
         let up = Int(Date().timeIntervalSince(startedAt))
         let stateName: String = { switch state { case .connected: return "connected"; case .error: return "error"; default: return "\(state)" } }()
         return WebStatus(event: s?.eventName ?? "",
-                         camera: sony?.deviceInfo.model.isEmpty == false ? sony!.deviceInfo.model : (ipadCam != nil ? "iPad-Kamera (Ersatz)" : (devices.first?.name ?? "keine")),
+                         camera: sony?.deviceInfo.model.isEmpty == false ? sony!.deviceInfo.model : (ipadCam != nil ? String(localized: "iPad camera (fallback)") : (devices.first?.name ?? "none")),
                          state: stateName, status: status, fps: lastFPS, idle: idle, photos: sessionPhotos.count,
                          lastPhoto: sessionPhotos.first.flatMap { (try? $0.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate }.map { f.string(from: $0) },
                          immich: s?.immichEnabled == true ? immich.lastMessage : nil,
@@ -142,7 +142,7 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     /// Fotos liegen je Veranstaltung unter Documents/Fotos/<Name>/ (RAW in raw/ darunter).
-    private static var currentEvent = "Fotobox"
+    private static var currentEvent = String(localized: "Photo Booth")
     private func switchEvent(to name: String) {
         Self.migrateFlatPhotos(into: name)
         guard name != Self.currentEvent || sessionPhotos.isEmpty else { return }
@@ -150,7 +150,7 @@ final class CameraManager: NSObject, ObservableObject {
         dismissResult()
         sessionPhotos = Self.loadSessionPhotos()
         lastPhoto = nil
-        appendLog("Veranstaltung „\(name)“: \(sessionPhotos.count) Fotos")
+        appendLog("Event “\(name)”: \(sessionPhotos.count) photos")
     }
     /// Einmalig: Fotos aus der alten flachen Struktur Documents/Fotos/*.jpg in den Ordner der Veranstaltung schieben.
     private static func migrateFlatPhotos(into name: String) {
@@ -178,7 +178,7 @@ final class CameraManager: NSObject, ObservableObject {
     /// Eventname als Album- und Ordnername: ohne Pfadzeichen, nie leer.
     static func safeName(_ s: String) -> String {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: "\\", with: "-")
-        return t.isEmpty ? "Fotobox" : t
+        return t.isEmpty ? String(localized: "Photo Booth") : t
     }
     /// Datei an alle aktiven Upload-Ziele geben.
     private func upload(_ url: URL, isRAW: Bool) {
@@ -192,7 +192,7 @@ final class CameraManager: NSObject, ObservableObject {
         immich.configure(enabled: s.immichEnabled, server: s.immichURL, album: Self.safeName(s.eventName))
         if s.immichEnabled, immich.shareURL == nil, !s.immichURL.isEmpty {
             Task { [weak self] in
-                do { try await self?.immich.ensureShareLink() } catch { self?.appendLog("Immich: Freigabelink: \(error.localizedDescription)") }
+                do { try await self?.immich.ensureShareLink() } catch { self?.appendLog("Immich: share link: \(error.localizedDescription)") }
             }
         }
     }
@@ -219,8 +219,8 @@ final class CameraManager: NSObject, ObservableObject {
         let text: String
         var detail: String? = nil
     }
-    @Published var banner: Banner? = Banner(kind: .info, text: "Kamera anschließen")
-    @Published var captureError: String?      // Overlay mit "Nochmal versuchen"
+    @Published var banner: Banner? = Banner(kind: .info, text: String(localized: "Connect a camera"))
+    @Published var captureError: String?      // Overlay mit "Try again"
     @Published var lastError: String?         // fuer das Admin-Panel
     private var recoverAttempts = 0
     private var recoverTask: Task<Void, Never>?
@@ -272,9 +272,9 @@ final class CameraManager: NSObject, ObservableObject {
     private func tick() {
         tickCount += 1
         sampleUserBrightness()
-        if tickCount % 150 == 0 { appendLog("Akku: iPad \(batteryText(iPadBattery())), Kamera \(cameraBattery().map { "\($0) %" } ?? "unbekannt")") }
+        if tickCount % 150 == 0 { appendLog("Battery: iPad \(batteryText(iPadBattery())), camera \(cameraBattery().map { "\($0) %" } ?? "unknown")") }
         if tickCount % 3 == 0 { Self.logFile.snapshot() }
-        if tickCount % 15 == 0, liveRunning { lastFPS = frameCount / 30; appendLog("Liveview: \(lastFPS) Bilder/s"); frameCount = 0 }
+        if tickCount % 15 == 0, liveRunning { lastFPS = frameCount / 30; appendLog("Live view: \(lastFPS) fps"); frameCount = 0 }
         if !liveRunning { lastFPS = 0 }
         let idleFor = Date().timeIntervalSince(lastInteraction)
         let limit = TimeInterval(settingsRef?.idleSeconds ?? 120)
@@ -286,7 +286,7 @@ final class CameraManager: NSObject, ObservableObject {
         let stalled = Date().timeIntervalSince(lastFrame)
         let eventsRecently = Date().timeIntervalSince(lastEventAt) < 8
         if state == .connected, liveRunning, !capturing, ipadCam == nil, stalled > (eventsRecently ? 20 : 8) {
-            appendLog(String(format: "Liveview liefert seit %.0f s nichts mehr%@, Neustart", stalled, eventsRecently ? " (Kamera meldet Events)" : ""))
+            appendLog(String(format: "Live view stalled for %.0f s%@, restarting", stalled, eventsRecently ? " (camera is sending events)" : ""))
             stopLiveView()
             startLiveView()
         }
@@ -297,7 +297,7 @@ final class CameraManager: NSObject, ObservableObject {
         // Fremdausloesung: mit Events nur noch alle 30 s als Sicherheitsnetz, sonst alle 2 s
         if !eventsWorking || tickCount % 15 == 0 { pollExternalCapture() }
         if tickCount % 30 == 0, !eventCounts.isEmpty {
-            appendLog("Events letzte 60 s: " + eventCounts.sorted { $0.key < $1.key }.map { String(format: "0x%04X×%d", $0.key, $0.value) }.joined(separator: " "))
+            appendLog("Events last 60 s: " + eventCounts.sorted { $0.key < $1.key }.map { String(format: "0x%04X×%d", $0.key, $0.value) }.joined(separator: " "))
             eventCounts = [:]
         }
     }
@@ -309,10 +309,10 @@ final class CameraManager: NSObject, ObservableObject {
         // alle 30 s im Leerlauf (erst nach Einschwingen, nicht direkt beim Leerlaufbeginn): Ruhepegel und Rauschen
         if noise > 0, Date().timeIntervalSince(lastNoiseLog) > 30 {
             lastNoiseLog = Date()
-            appendLog(String(format: "Bewegung Ruhepegel: Feld %.1f, global %.1f, Rauschen %.1f, Schwelle %d", level, global, noise, settingsRef?.motionThreshold ?? 8))
+            appendLog(String(format: "Motion idle level: cell %.1f, global %.1f, noise %.1f, threshold %d", level, global, noise, settingsRef?.motionThreshold ?? 8))
         }
         if hit, idle {
-            appendLog(String(format: "Bewegung erkannt (%.1f), Collage aus", level))
+            appendLog(String(format: "Motion detected (%.1f), collage off", level))
             noteInteraction()
         }
     }
@@ -323,8 +323,8 @@ final class CameraManager: NSObject, ObservableObject {
         let report = cam.capabilitiesReport()
         try? report.data(using: .utf8)?.write(to: Self.capabilitiesURL, options: .atomic)
         let di = cam.deviceInfo
-        appendLog("Fähigkeiten: \(di.operations.count) Operationen, \(di.events.count) Events, \(di.properties.count)+\(cam.vendorProps.count) Properties, \(cam.controlCodes.count) Steuercodes → openbooth-capabilities.log")
-        appendLog("Operationen: " + di.operations.sorted().map { PTPNames.hex($0) }.joined(separator: " "))
+        appendLog("Capabilities: \(di.operations.count) operations, \(di.events.count) events, \(di.properties.count)+\(cam.vendorProps.count) properties, \(cam.controlCodes.count) control codes → openbooth-capabilities.log")
+        appendLog("Operations: " + di.operations.sorted().map { PTPNames.hex($0) }.joined(separator: " "))
     }
 
     // MARK: Display-Helligkeit
@@ -344,11 +344,11 @@ final class CameraManager: NSObject, ObservableObject {
             sampleUserBrightness()
             forcingBrightness = true
             screen.brightness = 1.0
-            appendLog(String(format: "Helligkeit voll (vorher %.2f)", userBrightness))
+            appendLog(String(format: "Brightness full (was %.2f)", userBrightness))
         } else if !wantFull, forcingBrightness {
             forcingBrightness = false
             screen.brightness = userBrightness
-            appendLog(String(format: "Helligkeit zurück auf %.2f", userBrightness))
+            appendLog(String(format: "Brightness back to %.2f", userBrightness))
         }
     }
 
@@ -374,7 +374,7 @@ final class CameraManager: NSObject, ObservableObject {
         let charging = UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full
         return (l < 0 ? -1 : Int((l * 100).rounded()), charging)
     }
-    func batteryText(_ b: (Int, Bool)) -> String { b.0 < 0 ? "unbekannt" : "\(b.0) %\(b.1 ? " (lädt)" : "")" }
+    func batteryText(_ b: (Int, Bool)) -> String { b.0 < 0 ? String(localized: "unknown") : "\(b.0) %\(b.1 ? String(localized: " (charging)") : "")" }
     /// Kamera-Akku in Prozent aus Sony-Property 0xD218 (aktualisiert bei jedem Property-Abruf)
     func cameraBattery() -> Int? {
         guard let cam = sony else { return nil }
@@ -389,15 +389,15 @@ final class CameraManager: NSObject, ObservableObject {
     func sendDiagnostics(reason: String) async -> String? {
         guard let url = makeDiagnosticsFile() else { return nil }
         let v = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") + "-" + (Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?")
-        reportStatus = "Sende …"
+        reportStatus = String(localized: "Sending…")
         do {
             let id = try await ReportSender.send(fileURL: url, appVersion: v)
-            reportStatus = "Gesendet, Kennung \(id)"
-            appendLog("Diagnose gesendet (\(reason)), Kennung \(id)")
+            reportStatus = "Sent, ID \(id)"
+            appendLog("Diagnostics sent (\(reason)), ID \(id)")
             return id
         } catch {
-            reportStatus = "Senden fehlgeschlagen: \(error.localizedDescription)"
-            appendLog("Diagnose senden: \(error.localizedDescription)")
+            reportStatus = "Sending failed: \(error.localizedDescription)"
+            appendLog("Send diagnostics: \(error.localizedDescription)")
             return nil
         }
     }
@@ -405,22 +405,22 @@ final class CameraManager: NSObject, ObservableObject {
     private func autoReport(_ reason: String) {
         guard settingsRef?.autoReports == true, Date().timeIntervalSince(lastAutoReport) > 600 else { return }
         lastAutoReport = Date()
-        Task { await sendDiagnostics(reason: "automatisch: \(reason)") }
+        Task { await sendDiagnostics(reason: "automatic: \(reason)") }
     }
 
     func makeDiagnosticsFile() -> URL? {
         var text = Diagnostics.environment(settingsRef)
-        text += "Kamera-Zustand: \(status)\(lastError.map { ", letzter Fehler: \($0)" } ?? "")\n\n"
+        text += "Camera state: \(status)\(lastError.map { ", last error: \($0)" } ?? "")\n\n"
         if let cam = sony { text += cam.capabilitiesReport() }
         else if let d = try? String(contentsOf: Self.capabilitiesURL, encoding: .utf8) { text += d }
-        else { text += "(kein Fähigkeitsbericht, Kamera wurde noch nicht erkannt)\n" }
-        text += "\n# Protokoll\n"
+        else { text += "(no capability report, camera not detected yet)\n" }
+        text += "\n# Log\n"
         Self.logFile.snapshot()
         let logURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("openbooth.export.log")
         text += (try? String(contentsOf: logURL, encoding: .utf8)) ?? log.joined(separator: "\n")
         let f = DateFormatter(); f.dateFormat = "yyyyMMdd-HHmm"
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("OpenBooth-Diagnose-\(f.string(from: Date())).txt")
-        do { try text.data(using: .utf8)?.write(to: out, options: .atomic); return out } catch { appendLog("Diagnose: \(error.localizedDescription)"); return nil }
+        do { try text.data(using: .utf8)?.write(to: out, options: .atomic); return out } catch { appendLog("Diagnostics: \(error.localizedDescription)"); return nil }
     }
 
     func noteInteraction() {
@@ -441,7 +441,7 @@ final class CameraManager: NSObject, ObservableObject {
     final class LogFile {
         private let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("openbooth.log")
         private let q = DispatchQueue(label: "openbooth.log")
-        init() { append("===== App gestartet \(Date()) =====") }
+        init() { append("===== App started \(Date()) =====") }
         /// Abgeschlossene Kopie fuer den Download (die wachsende Datei laesst sich per devicectl nicht uebertragen).
         func snapshot() {
             q.async {
@@ -470,27 +470,27 @@ final class CameraManager: NSObject, ObservableObject {
     // MARK: Suche
 
     func start() {
-        appendLog("Autorisierung anfragen …")
+        appendLog("Requesting authorization…")
         #if targetEnvironment(simulator)
         // Der Simulator kennt weder USB-Kameras noch die Autorisierungsabfrage von ImageCaptureCore
         authorization = "Simulator"
         state = .browsing
-        status = "Simulator: keine Kamera möglich"
-        banner = Banner(kind: .info, text: "Kamera anschließen", detail: "Sony im Modus „PC-Fernbedienung“ per USB-C")
+        status = String(localized: "Simulator: no camera available")
+        banner = Banner(kind: .info, text: String(localized: "Connect a camera"), detail: String(localized: "Sony in “PC Remote” mode via USB-C"))
         return
         #endif
         browser.requestContentsAuthorization { [weak self] status in
             Task { @MainActor in
                 guard let self else { return }
                 self.authorization = Self.describe(status)
-                self.appendLog("Autorisierung: \(self.authorization)")
+                self.appendLog("Authorization: \(self.authorization)")
                 self.browser.start()
                 self.state = .browsing
-                self.status = "Suche Kamera …"
-                if self.authorization == "verweigert" {
-                    self.banner = Banner(kind: .error, text: "Kein Zugriff auf die Kamera", detail: "Einstellungen › OpenBooth › Kamera erlauben")
+                self.status = String(localized: "Looking for a camera…")
+                if self.authorization == "denied" {
+                    self.banner = Banner(kind: .error, text: String(localized: "No access to the camera"), detail: String(localized: "Allow Camera under Settings › OpenBooth"))
                 } else if self.devices.isEmpty {
-                    self.banner = Banner(kind: .info, text: "Kamera anschließen", detail: "Sony im Modus „PC-Fernbedienung“ per USB-C")
+                    self.banner = Banner(kind: .info, text: String(localized: "Connect a camera"), detail: String(localized: "Sony in “PC Remote” mode via USB-C"))
                     self.scheduleFallback()
                 }
             }
@@ -499,10 +499,10 @@ final class CameraManager: NSObject, ObservableObject {
 
     static func describe(_ s: ICAuthorizationStatus) -> String {
         switch s {
-        case .authorized: return "erteilt"
-        case .denied: return "verweigert"
-        case .restricted: return "eingeschränkt"
-        case .notDetermined: return "nicht entschieden"
+        case .authorized: return "granted"
+        case .denied: return "denied"
+        case .restricted: return "restricted"
+        case .notDetermined: return "not determined"
         default: return "\(s.rawValue)"
         }
     }
@@ -512,23 +512,23 @@ final class CameraManager: NSObject, ObservableObject {
     func openSession(_ dev: ICCameraDevice) {
         device = dev
         dev.delegate = self
-        appendLog("Session öffnen: \(dev.name ?? "?")")
-        status = "Verbinde …"
+        appendLog("Opening session: \(dev.name ?? "?")")
+        status = String(localized: "Connecting…")
         dev.requestOpenSession { [weak self] error in
             Task { @MainActor in
                 guard let self else { return }
                 if let error = error {
-                    self.appendLog("Session-Fehler: \(error.localizedDescription)")
+                    self.appendLog("Session error: \(error.localizedDescription)")
                     self.state = .error(error.localizedDescription)
-                    self.status = "Session fehlgeschlagen"
+                    self.status = String(localized: "Session failed")
                     self.lastError = error.localizedDescription
                     self.scheduleRecover(reason: "Session")
                     return
                 }
-                self.appendLog("Session offen")
+                self.appendLog("Session open")
                 self.state = .sessionOpen
-                self.status = "Session offen"
-                self.banner = Banner(kind: .working, text: "Kamera wird verbunden …")
+                self.status = "Session open"
+                self.banner = Banner(kind: .working, text: String(localized: "Connecting camera…"))
                 let cam = SonyCamera(device: dev)
                 self.sony = cam
                 await cam.transport.setLogHandler { [weak self] line in
@@ -538,7 +538,7 @@ final class CameraManager: NSObject, ObservableObject {
                     if await self.probeAsync(), await self.connectAsync() {
                         self.startLiveView()
                     } else {
-                        self.scheduleRecover(reason: "Verbindung")
+                        self.scheduleRecover(reason: "Connection")
                     }
                 }
             }
@@ -556,17 +556,17 @@ final class CameraManager: NSObject, ObservableObject {
                 let ops = info.operations.map { String(format: "%04X", $0) }.joined(separator: " ")
                 deviceSummary = "\(info.manufacturer) \(info.model) FW \(info.deviceVersion), VendorExt 0x\(String(info.vendorExtensionID, radix: 16)), \(info.operations.count) Operationen"
                 appendLog("DeviceInfo OK: \(deviceSummary)")
-                appendLog("Operationen: \(ops)")
+                appendLog("Operations: \(ops)")
                 appendLog("Events: " + info.events.map { String(format: "%04X", $0) }.joined(separator: " "))
                 appendLog("Properties: " + info.properties.map { String(format: "%04X", $0) }.joined(separator: " "))
                 writeCapabilities(cam)   // schon nach dem Probe, damit auch fremde Kameras (Handshake scheitert) im Bericht landen
                 state = .probed
-                status = "PTP-Durchreichen funktioniert"
+                status = String(localized: "PTP pass-through works")
                 return true
             } catch {
-                appendLog("PROBE FEHLER: \(error.localizedDescription)  [\((error as NSError).domain) \((error as NSError).code)]")
+                appendLog("PROBE ERROR: \(error.localizedDescription)  [\((error as NSError).domain) \((error as NSError).code)]")
                 state = .error(error.localizedDescription)
-                status = "PTP-Durchreichen blockiert"
+                status = String(localized: "PTP pass-through blocked")
                 lastError = error.localizedDescription
                 return false
             }
@@ -578,27 +578,27 @@ final class CameraManager: NSObject, ObservableObject {
     func connectAsync() async -> Bool {
         guard let cam = sony else { return false }
             do {
-                status = "Sony-Handshake …"
+                status = String(localized: "Sony handshake…")
                 try await cam.connect()
-                appendLog("Handshake OK, Protokoll 0x\(String(cam.protocolVersion, radix: 16)), \(cam.vendorCodes.count) Vendor-Codes, \(cam.props.count) Properties")
+                appendLog("Handshake OK, protocol 0x\(String(cam.protocolVersion, radix: 16)), \(cam.vendorCodes.count) vendor codes, \(cam.props.count) properties")
                 writeCapabilities(cam)
                 if let iso = cam.currentValue(SonyProp.iso) { appendLog("ISO = \(iso)") }
-                if let f = cam.currentValue(SonyProp.fNumber) { appendLog("Blende = f/\(Double(f) / 100)") }
-                if let s = cam.currentValue(SonyProp.shutterSpeed) { appendLog("Verschluss = \(SonyFormat.label(code: SonyProp.shutterSpeed, value: s))") }
+                if let f = cam.currentValue(SonyProp.fNumber) { appendLog("Aperture = f/\(Double(f) / 100)") }
+                if let s = cam.currentValue(SonyProp.shutterSpeed) { appendLog("Shutter = \(SonyFormat.label(code: SonyProp.shutterSpeed, value: s))") }
                 appendLog("ObjectInMemory(0xD215) = \(cam.currentValue(SonyProp.objectInMemory).map(String.init) ?? "fehlt"), FocusFound(0xD213) = \(cam.currentValue(SonyProp.focusFound).map(String.init) ?? "fehlt")")
                 state = .connected
-                status = "Verbunden"
+                status = String(localized: "Connected")
                 settings = cam.settings()
                 await restoreRememberedSettings(cam)
                 connectedSince = Date()
                 recoverAttempts = 0
                 lastError = nil
-                banner = Banner(kind: .working, text: "Kamera bereit, Bild kommt …")
+                banner = Banner(kind: .working, text: String(localized: "Camera ready, image coming…"))
                 return true
             } catch {
-                appendLog("HANDSHAKE FEHLER: \(error.localizedDescription)")
+                appendLog("HANDSHAKE ERROR: \(error.localizedDescription)")
                 state = .error(error.localizedDescription)
-                status = "Handshake fehlgeschlagen"
+                status = String(localized: "Handshake failed")
                 lastError = error.localizedDescription
                 return false
             }
@@ -610,14 +610,14 @@ final class CameraManager: NSObject, ObservableObject {
         guard let cam = sony else { return }
         Task {
             do { try await cam.refreshProps(); settings = cam.settings() }
-            catch { appendLog("Einstellungen lesen: \(error.localizedDescription)") }
+            catch { appendLog("Reading settings: \(error.localizedDescription)") }
         }
     }
 
     /// Gesetzten Wert je Kameramodell merken, damit er beim naechsten Anstecken wieder gesetzt wird
     private func remember(code: UInt16, value: Int64, for cam: SonyCamera) {
         guard let s = settingsRef else { return }
-        let model = cam.deviceInfo.model.isEmpty ? "Kamera" : cam.deviceInfo.model
+        let model = cam.deviceInfo.model.isEmpty ? "Camera" : cam.deviceInfo.model
         var m = s.rememberedCamera[model] ?? [:]
         m[String(format: "%04X", code)] = Int(value)
         s.rememberedCamera[model] = m
@@ -626,7 +626,7 @@ final class CameraManager: NSObject, ObservableObject {
     /// Nach dem Verbinden: gemerkte Werte setzen, die von der Kamera abweichen (nur schreibbare Properties).
     private func restoreRememberedSettings(_ cam: SonyCamera) async {
         guard let s = settingsRef, s.restoreCameraSettings else { return }
-        let model = cam.deviceInfo.model.isEmpty ? "Kamera" : cam.deviceInfo.model
+        let model = cam.deviceInfo.model.isEmpty ? "Camera" : cam.deviceInfo.model
         guard let saved = s.rememberedCamera[model], !saved.isEmpty else { return }
         var applied = 0
         for (hex, value) in saved.sorted(by: { $0.key < $1.key }) {
@@ -635,10 +635,10 @@ final class CameraManager: NSObject, ObservableObject {
             do {
                 try await cam.setSetting(code, to: Int64(value))
                 applied += 1
-                appendLog("Wiederhergestellt: 0x\(hex) = \(SonyFormat.label(code: code, value: Int64(value)))")
-            } catch { appendLog("Wiederherstellen 0x\(hex): \(error.localizedDescription)") }
+                appendLog("Restored: 0x\(hex) = \(SonyFormat.label(code: code, value: Int64(value)))")
+            } catch { appendLog("Restore 0x\(hex): \(error.localizedDescription)") }
         }
-        if applied > 0 { try? await cam.refreshProps(); settings = cam.settings(); appendLog("\(applied) Kameraeinstellung(en) aus der App wiederhergestellt") }
+        if applied > 0 { try? await cam.refreshProps(); settings = cam.settings(); appendLog("\(applied) camera setting(s) restored from the app") }
     }
 
     func apply(_ code: UInt16, value: Int64) {
@@ -649,11 +649,11 @@ final class CameraManager: NSObject, ObservableObject {
         Task {
             do {
                 try await cam.setSetting(code, to: value) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
-                appendLog("Einstellung 0x\(String(code, radix: 16)) = \(SonyFormat.label(code: code, value: value))")
+                appendLog("Setting 0x\(String(code, radix: 16)) = \(SonyFormat.label(code: code, value: value))")
                 remember(code: code, value: value, for: cam)
             } catch {
-                appendLog("EINSTELLUNG FEHLER: \(error.localizedDescription)")
-                status = "Einstellung nicht übernommen"
+                appendLog("SETTING ERROR: \(error.localizedDescription)")
+                status = String(localized: "Setting not applied")
             }
             settings = cam.settings()
             settingsBusy = false
@@ -694,9 +694,9 @@ final class CameraManager: NSObject, ObservableObject {
                     }
                 } catch {
                     failures += 1
-                    await MainActor.run { self?.appendLog("Liveview: \(error.localizedDescription)") }
+                    await MainActor.run { self?.appendLog("Live view: \(error.localizedDescription)") }
                     if failures > 20 {
-                        await MainActor.run { self?.scheduleRecover(reason: "Liveview") }
+                        await MainActor.run { self?.scheduleRecover(reason: "live view") }
                         break
                     }
                     try? await Task.sleep(nanoseconds: 300_000_000)
@@ -718,17 +718,17 @@ final class CameraManager: NSObject, ObservableObject {
     func scheduleRecover(reason: String) {
         guard recoverTask == nil, let dev = device else { return }
         recoverAttempts += 1
-        appendLog("Wiederherstellung #\(recoverAttempts) (\(reason))")
+        appendLog("Recovery #\(recoverAttempts) (\(reason))")
         if recoverAttempts > 5 {
-            banner = Banner(kind: .error, text: "Kamera antwortet nicht", detail: "Kamera aus- und einschalten oder USB neu stecken")
-            autoReport("Kamera antwortet nach 5 Versuchen nicht")
+            banner = Banner(kind: .error, text: String(localized: "Camera not responding"), detail: String(localized: "Power-cycle the camera or reconnect USB"))
+            autoReport("camera not responding after 5 attempts")
             recoverTask = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 20_000_000_000)   // danach weiter versuchen, aber langsamer
-                await MainActor.run { self?.recoverTask = nil; self?.recoverAttempts = 3; self?.scheduleRecover(reason: "erneut") }
+                await MainActor.run { self?.recoverTask = nil; self?.recoverAttempts = 3; self?.scheduleRecover(reason: "retry") }
             }
             return
         }
-        banner = Banner(kind: .warning, text: "Verbindung zur Kamera wird erneuert …", detail: "Versuch \(recoverAttempts) von 5")
+        banner = Banner(kind: .warning, text: String(localized: "Reconnecting to the camera…"), detail: "Attempt \(recoverAttempts) of 5")
         stopLiveView()
         state = .deviceFound
         recoverTask = Task { [weak self] in
@@ -742,7 +742,7 @@ final class CameraManager: NSObject, ObservableObject {
                     self.device = nil
                     self.openSession(dev)
                 } else {
-                    self.banner = Banner(kind: .warning, text: "Kamera getrennt", detail: "Bitte USB-Kabel prüfen")
+                    self.banner = Banner(kind: .warning, text: String(localized: "Camera disconnected"), detail: String(localized: "Please check the USB cable"))
                 }
             }
         }
@@ -789,17 +789,17 @@ final class CameraManager: NSObject, ObservableObject {
                         }
                     } else if let ip = ipadCam {
                         let o = try await ip.capture()
-                        appendLog("iPad-Kamera: \(o.filename) (\(o.data.count / 1024) KB)")
+                        appendLog("iPad camera: \(o.filename) (\(o.data.count / 1024) KB)")
                         objects = [o]
                     } else { throw SonyError.noSession }
                     if let (img, url) = try await store(objects) { taken.append(img); takenURLs.append(url) }
                 } catch {
-                    appendLog("AUFNAHME FEHLER (Bild \(shot)/\(shots)): \(error.localizedDescription)")
-                    status = "Aufnahme fehlgeschlagen"
+                    appendLog("CAPTURE ERROR (image \(shot)/\(shots)): \(error.localizedDescription)")
+                    status = String(localized: "Capture failed")
                     lastError = error.localizedDescription
                     if taken.isEmpty {
                         captureError = Self.friendly(error)
-                        autoReport("Aufnahme fehlgeschlagen")
+                        autoReport(String(localized: "Capture failed"))
                         capturePhrase = nil
                         break
                     }
@@ -809,7 +809,7 @@ final class CameraManager: NSObject, ObservableObject {
             shotNumber = 0
             if !taken.isEmpty {
                 showResult(taken, urls: takenURLs)
-                status = taken.count == 1 ? "Foto gespeichert" : "\(taken.count) Fotos gespeichert"
+                status = taken.count == 1 ? String(localized: "Photo saved") : "\(taken.count) photos saved"
             }
             capturing = false
             if wasLive { startLiveView() }
@@ -826,7 +826,7 @@ final class CameraManager: NSObject, ObservableObject {
         var rawURL: URL?
         if let raw = rawObj {
             rawURL = try Self.saveRAW(raw.data, stamp: stamp)
-            appendLog("RAW gesichert: \(rawURL!.lastPathComponent) (\(raw.data.count / 1_000_000) MB)")
+            appendLog("RAW saved: \(rawURL!.lastPathComponent) (\(raw.data.count / 1_000_000) MB)")
             upload(rawURL!, isRAW: true)
         }
         if let jpeg = jpegObj?.data {
@@ -844,7 +844,7 @@ final class CameraManager: NSObject, ObservableObject {
                 Self.saveRAWOnlyToPhotos(raw.data) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
             }
             let preview = await Self.previewImage(from: raw.data)
-            appendLog(preview == nil ? "RAW-Vorschau: keine dekodierbare Vorschau in der ARW" : "RAW-Vorschau: \(Int(preview!.size.width))x\(Int(preview!.size.height))")
+            appendLog(preview == nil ? "RAW preview: no decodable preview in the ARW" : "RAW preview: \(Int(preview!.size.width))x\(Int(preview!.size.height))")
             if let img = preview {
                 result = (img, rawURL); lastPhoto = img
                 // JPEG-Ableitung fuer Galerie und Collage neben das ARW legen
@@ -871,7 +871,7 @@ final class CameraManager: NSObject, ObservableObject {
         switch code {
         case 0xC201:   // Sony ObjectAdded: neues Bild im RAM (Handle in Param 1)
             appendLog(String(format: "Event ObjectAdded 0x%08X", params.first ?? 0))
-            if !eventsWorking { eventsWorking = true; appendLog("Kamera-Events kommen an, Fremdauslösung reagiert ab jetzt sofort") }
+            if !eventsWorking { eventsWorking = true; appendLog("Camera events arrive, external shutter now reacts instantly") }
             sony?.objectAdded.fire()
             if !capturing { pollExternalCapture() }
         case 0xC203:   // PropertyChanged: kommt bei jeder Einstellungsaenderung und beim Fokussieren, nur zaehlen
@@ -898,15 +898,15 @@ final class CameraManager: NSObject, ObservableObject {
             self.dismissResult()
             let wasLive = self.liveTask != nil
             self.stopLiveView()
-            self.appendLog("Bild von der Kamera ausgelöst, wird übernommen")
+            self.appendLog("Picture taken on the camera, picking it up")
             do {
                 let objects = try await cam.fetchObjects { [weak self] msg in Task { @MainActor in self?.appendLog(msg) } }
                 if let (img, url) = try await self.store(objects) {
                     self.showResult([img], urls: [url])
-                    self.status = "Foto von der Kamera übernommen"
+                    self.status = String(localized: "Photo picked up from the camera")
                 }
             } catch {
-                self.appendLog("FREMDAUSLÖSUNG FEHLER: \(error.localizedDescription)")
+                self.appendLog("EXTERNAL SHUTTER ERROR: \(error.localizedDescription)")
             }
             self.capturing = false
             if wasLive { self.startLiveView() }
@@ -987,10 +987,10 @@ final class CameraManager: NSObject, ObservableObject {
     /// Technischen Fehler in einen Satz fuer Gaeste uebersetzen.
     static func friendly(_ error: Error) -> String {
         let t = error.localizedDescription
-        if t.contains("Fokus") || t.contains("kein Bild gemeldet") { return "Die Kamera hat kein Bild gemacht. Vielleicht kein Fokus? Bitte noch einmal." }
-        if t.contains("Zeitueberschreitung") || t.contains("Zeitüberschreitung") { return "Die Kamera hat zu lange gebraucht. Bitte noch einmal." }
-        if t.contains("PTP-Fehler") { return "Die Kamera hat den Befehl nicht angenommen. Bitte noch einmal." }
-        return "Das hat leider nicht geklappt. Bitte noch einmal."
+        if t.contains("focus") || t.contains("no image") { return String(localized: "The camera didn’t take a picture. Maybe no focus? Please try again.") }
+        if t.contains("Timeout") || t.contains("timeout") { return String(localized: "The camera took too long. Please try again.") }
+        if t.contains("PTP error") { return String(localized: "The camera rejected the command. Please try again.") }
+        return String(localized: "That didn’t work. Please try again.")
     }
 
     func dismissResult() {
@@ -1010,7 +1010,7 @@ final class CameraManager: NSObject, ObservableObject {
             ThumbnailStore.remove(url)
             sessionPhotos.removeAll { $0 == url }
             resultURLs.remove(at: index)
-            appendLog("Foto aus App-Galerie gelöscht: \(url.lastPathComponent)")
+            appendLog("Photo deleted from app gallery: \(url.lastPathComponent)")
         }
         resultPhotos.remove(at: index)
         resultPhoto = resultPhotos.first
@@ -1060,7 +1060,7 @@ final class CameraManager: NSObject, ObservableObject {
     /// alternatePhoto wird von Photos mit Fehler 3300 abgelehnt, am Geraet geprueft.)
     static func saveToPhotos(_ jpeg: Data, raw: Data?, log: ((String) -> Void)? = nil) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { st in
-            guard st == .authorized || st == .limited else { log?("Mediathek: kein Zugriff (\(st.rawValue))"); return }
+            guard st == .authorized || st == .limited else { log?("Photo library: no access (\(st.rawValue))"); return }
             let base = stamp()
             PHPhotoLibrary.shared().performChanges({
                 let r1 = PHAssetCreationRequest.forAsset()
@@ -1073,21 +1073,21 @@ final class CameraManager: NSObject, ObservableObject {
                     r2.addResource(with: .photo, data: raw, options: o2)
                 }
             }) { ok, err in
-                log?(ok ? "Mediathek: gespeichert\(raw != nil ? " (JPEG + RAW)" : "")" : "Mediathek: FEHLER \(err?.localizedDescription ?? "?")")
+                log?(ok ? "Photo library: saved\(raw != nil ? " (JPEG + RAW)" : "")" : "Photo library: ERROR \(err?.localizedDescription ?? "?")")
             }
         }
     }
 
     static func saveRAWOnlyToPhotos(_ raw: Data, log: ((String) -> Void)? = nil) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { st in
-            guard st == .authorized || st == .limited else { log?("Mediathek: kein Zugriff"); return }
+            guard st == .authorized || st == .limited else { log?("Photo library: no access"); return }
             PHPhotoLibrary.shared().performChanges({
                 let req = PHAssetCreationRequest.forAsset()
                 let o = PHAssetResourceCreationOptions()
                 o.originalFilename = "openbooth-\(stamp()).ARW"
                 o.uniformTypeIdentifier = "com.sony.arw-raw-image"
                 req.addResource(with: .photo, data: raw, options: o)
-            }) { ok, err in log?(ok ? "Mediathek: RAW gespeichert" : "Mediathek: RAW FEHLER \(err?.localizedDescription ?? "?")") }
+            }) { ok, err in log?(ok ? "Photo library: RAW saved" : "Photo library: RAW ERROR \(err?.localizedDescription ?? "?")") }
         }
     }
 
@@ -1099,12 +1099,12 @@ extension CameraManager: ICDeviceBrowserDelegate {
     nonisolated func deviceBrowser(_ browser: ICDeviceBrowser, didAdd device: ICDevice, moreComing: Bool) {
         Task { @MainActor in
             guard let cam = device as? ICCameraDevice else { return }
-            appendLog("Kamera gefunden: \(cam.name ?? "?")  Modell: \(cam.productKind ?? "?")  Transport: \(cam.transportType ?? "?")")
-            stopIPadCamera(reason: "USB-Kamera gefunden")
+            appendLog("Camera found: \(cam.name ?? "?")  model: \(cam.productKind ?? "?")  transport: \(cam.transportType ?? "?")")
+            stopIPadCamera(reason: "USB camera found")
             if !devices.contains(where: { $0 === cam }) { devices.append(cam) }
             state = .deviceFound
-            status = "Kamera gefunden"
-            banner = Banner(kind: .working, text: "Kamera gefunden, wird verbunden …")
+            status = String(localized: "Camera found")
+            banner = Banner(kind: .working, text: String(localized: "Camera found, connecting…"))
             if autoConnect && self.device == nil {
                 // kurz warten, bis die Kamera nach dem Anstecken bereit ist
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
@@ -1115,7 +1115,7 @@ extension CameraManager: ICDeviceBrowserDelegate {
 
     nonisolated func deviceBrowser(_ browser: ICDeviceBrowser, didRemove device: ICDevice, moreGoing: Bool) {
         Task { @MainActor in
-            appendLog("Kamera entfernt: \(device.name ?? "?")")
+            appendLog("Camera removed: \(device.name ?? "?")")
             devices.removeAll { $0 === device }
             if self.device === device {
                 stopLiveView()
@@ -1124,9 +1124,9 @@ extension CameraManager: ICDeviceBrowserDelegate {
                 sony = nil
                 liveFrame = nil
                 state = .browsing
-                status = "Kamera getrennt"
+                status = String(localized: "Camera disconnected")
                 scheduleFallback()
-                banner = Banner(kind: .warning, text: "Kamera getrennt", detail: "Sobald sie wieder angeschlossen ist, geht es automatisch weiter")
+                banner = Banner(kind: .warning, text: String(localized: "Camera disconnected"), detail: String(localized: "It continues automatically once reconnected"))
             }
         }
     }
@@ -1138,10 +1138,10 @@ extension CameraManager: ICCameraDeviceDelegate {
     nonisolated func didRemove(_ device: ICDevice) {}
     nonisolated func device(_ device: ICDevice, didOpenSessionWithError error: Error?) {}
     nonisolated func device(_ device: ICDevice, didCloseSessionWithError error: Error?) {
-        Task { @MainActor in appendLog("Session geschlossen \(error.map { ": \($0.localizedDescription)" } ?? "")") }
+        Task { @MainActor in appendLog("Session closed\(error.map { ": \($0.localizedDescription)" } ?? "")") }
     }
     nonisolated func deviceDidBecomeReady(_ device: ICDevice) {
-        Task { @MainActor in appendLog("Gerät bereit") }
+        Task { @MainActor in appendLog("Device ready") }
     }
     nonisolated func cameraDevice(_ camera: ICCameraDevice, didAdd items: [ICCameraItem]) {}
     nonisolated func cameraDevice(_ camera: ICCameraDevice, didRemove items: [ICCameraItem]) {}

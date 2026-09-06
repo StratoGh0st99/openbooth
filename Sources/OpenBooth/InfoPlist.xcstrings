@@ -1,0 +1,70 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "NSCameraUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenBooth controls the camera connected via USB (live view and shutter) and uses the iPad camera as a fallback when none is connected."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenBooth steuert die per USB angeschlossene Kamera (Liveview und Auslösen) und nutzt die iPad-Kamera als Ersatz, wenn keine angeschlossen ist."
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryAddUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenBooth saves the captured photos to your photo library."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenBooth speichert die aufgenommenen Fotos in deine Mediathek."
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenBooth shows the captured photos in the gallery."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenBooth zeigt die aufgenommenen Fotos in der Galerie."
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenBooth uploads photos to servers on the local network and offers a status page there."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenBooth lädt Fotos auf Server im lokalen Netz hoch und bietet dort eine Statusseite an."
+          }
+        }
+      }
+    }
+  }
+}

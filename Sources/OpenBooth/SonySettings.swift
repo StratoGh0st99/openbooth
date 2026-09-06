@@ -37,27 +37,27 @@ enum SonyFormat {
         0x8050: "Movie P", 0x8051: "Movie A", 0x8052: "Movie S", 0x8053: "Movie M",
     ]
     static let focusModes: [Int64: String] = [
-        1: "Manuell", 2: "AF-S", 3: "AF Makro", 0x8004: "AF-C", 0x8005: "AF-A", 0x8006: "DMF",
-        0x8007: "Manuell (umgekehrt)", 0x8008: "AF-D", 0x8009: "Preset-Fokus",
+        1: String(localized: "Manual"), 2: "AF-S", 3: "AF Makro", 0x8004: "AF-C", 0x8005: "AF-A", 0x8006: "DMF",
+        0x8007: String(localized: "Manual (reversed)"), 0x8008: "AF-D", 0x8009: String(localized: "Preset focus"),
     ]
-    static let onOff12: [Int64: String] = [1: "Ein", 2: "Aus"]
-    static let storeDestinations: [Int64: String] = [1: "Kamera-RAM", 16: "Speicherkarte", 17: "Karte + RAM"]
+    static let onOff12: [Int64: String] = [1: String(localized: "On"), 2: String(localized: "Off")]
+    static let storeDestinations: [Int64: String] = [1: String(localized: "Camera RAM"), 16: String(localized: "Memory card"), 17: String(localized: "Card + RAM")]
     static let imageQualities: [Int64: String] = [1: "RAW", 2: "RAW+JPEG", 3: "JPEG"]
-    static let pcSaveFormats: [Int64: String] = [0: "Aus", 1: "RAW & JPEG", 2: "nur JPEG", 3: "nur RAW", 4: "RAW & HEIF", 5: "nur HEIF"]
+    static let pcSaveFormats: [Int64: String] = [0: String(localized: "Off"), 1: "RAW & JPEG", 2: String(localized: "JPEG only"), 3: String(localized: "RAW only"), 4: "RAW & HEIF", 5: String(localized: "HEIF only")]
     static let pcSaveSizes: [Int64: String] = [1: "Original", 2: "2 MP"]
 
     /// Die Einstellungen, die die Fotobox braucht, in Anzeigereihenfolge.
     static let wanted: [(code: UInt16, title: String)] = [
-        (0x500E, "Programm"),
+        (0x500E, String(localized: "Program")),
         (SonyProp.iso, "ISO"),
-        (SonyProp.fNumber, "Blende"),
-        (SonyProp.shutterSpeed, "Verschlusszeit"),
+        (SonyProp.fNumber, String(localized: "Aperture")),
+        (SonyProp.shutterSpeed, String(localized: "Shutter speed")),
         (SonyProp.focusMode, "Fokus"),
-        (SonyProp.liveViewSettingEffect, "Einstellungseffekt im Liveview"),
-        (SonyProp.imageQuality, "Bildqualität"),
-        (SonyProp.pcSaveImageFormat, "Übertragung an die App"),
-        (SonyProp.pcSaveImageSize, "Übertragene Größe"),
-        (0xD222, "Speicherziel"),
+        (SonyProp.liveViewSettingEffect, String(localized: "Setting effect in live view")),
+        (SonyProp.imageQuality, String(localized: "Image quality")),
+        (SonyProp.pcSaveImageFormat, String(localized: "Transfer to the app")),
+        (SonyProp.pcSaveImageSize, String(localized: "Transferred size")),
+        (0xD222, String(localized: "Save destination")),
     ]
 
     static func label(code: UInt16, value v: Int64) -> String {
@@ -109,7 +109,7 @@ extension SonyCamera {
     /// Setzt einen Wert. Erst direkt (ControlDeviceA, Protokoll 3), dann als 32-Bit-Wert, dann schrittweise
     /// ueber ControlDeviceB entlang der Enum-Reihenfolge (noetig bei Protokoll 2, z. B. ILCE-6400).
     func setSetting(_ code: UInt16, to target: Int64, log: ((String) -> Void)? = nil) async throws {
-        guard let desc = props[code] else { throw SonyError.badData("Property 0x\(String(code, radix: 16)) unbekannt") }
+        guard let desc = props[code] else { throw SonyError.badData("Property 0x\(String(code, radix: 16)) unknown") }
         if desc.currentValue == target { return }
 
         func verify() async throws -> Bool {
@@ -123,20 +123,20 @@ extension SonyCamera {
         }
 
         if protocolVersion >= 0x12C {
-            log?("setze 0x\(String(code, radix: 16)) direkt auf \(target)")
+            log?("setting 0x\(String(code, radix: 16)) directly to \(target)")
             try await setValue(code, value: target, type: desc.dataType)
             if try await verify() { return }
             if PTP.size(of: desc.dataType) == 2 {
                 // libgphoto2 schickt z. B. FNumber im Protokoll 3 als UINT32
-                log?("erneut als 32-Bit-Wert")
+                log?("retry as 32-bit value")
                 try await setValue(code, value: target, type: PTP.DTC.uint32)
                 if try await verify() { return }
             }
         }
 
         // Schrittweise: Position in der Enum vergleichen, mit +1/-1 (u8 0x01 / 0xFF) laufen, nach jedem Schritt lesen
-        guard !desc.enumValues.isEmpty else { throw SonyError.badData("keine Werteliste zum Schritt-Setzen") }
-        log?("setze 0x\(String(code, radix: 16)) schrittweise")
+        guard !desc.enumValues.isEmpty else { throw SonyError.badData("no value list for stepping") }
+        log?("setting 0x\(String(code, radix: 16)) stepwise")
         var steps = 60
         var first = true
         while steps > 0 {
@@ -145,7 +145,7 @@ extension SonyCamera {
             guard let d = props[code], let cur = d.currentValue else { break }
             if cur == target { return }
             let list = d.enumValues
-            guard let posNew = list.firstIndex(of: target) else { throw SonyError.badData("Zielwert nicht in der Liste") }
+            guard let posNew = list.firstIndex(of: target) else { throw SonyError.badData("target value not in list") }
             let posCur = list.firstIndex(of: cur) ?? posNew
             var stepVal: Int64
             if posNew > posCur { stepVal = first ? Int64(posNew - posCur) : 1 }
@@ -160,6 +160,6 @@ extension SonyCamera {
                 if currentValue(code) != cur { break }
             }
         }
-        if currentValue(code) != target { throw SonyError.timeout("Wert liess sich nicht setzen") }
+        if currentValue(code) != target { throw SonyError.timeout("value could not be set") }
     }
 }

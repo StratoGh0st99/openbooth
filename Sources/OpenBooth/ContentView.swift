@@ -35,7 +35,7 @@ struct ContentView: View {
                     let w: CGFloat = min(400, geo.size.width * 0.3)
                     let sc = w / max(1, geo.size.width)
                     VStack(spacing: 6) {
-                        Text("Gästesicht (live)").font(.caption).foregroundStyle(.secondary).padding(.top, 8)
+                        Text("Guest view (live)").font(.caption).foregroundStyle(.secondary).padding(.top, 8)
                         stage
                             .frame(width: geo.size.width, height: geo.size.height)
                             .scaleEffect(sc, anchor: .topLeading)
@@ -135,7 +135,7 @@ struct ContentView: View {
                         .transition(.scale.combined(with: .opacity))
                         .id(n)
                     if cam.shotTotal > 1 {
-                        Text("Foto \(cam.shotNumber) von \(cam.shotTotal)")
+                        Text("Photo \(cam.shotNumber) of \(cam.shotTotal)")
                             .font(.title.bold()).foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.8), radius: 10)
                     }
@@ -165,7 +165,7 @@ struct ContentView: View {
                             cam.noteInteraction()
                             showGallery = true
                         } label: {
-                            Label("Galerie", systemImage: "photo.on.rectangle").frame(width: 160, height: 56)
+                            Label("Gallery", systemImage: "photo.on.rectangle").frame(width: 160, height: 56)
                         }
                         .buttonStyle(.borderedProminent).tint(Color(white: 0.22))
                         .disabled(cam.sessionPhotos.isEmpty)
@@ -180,7 +180,7 @@ struct ContentView: View {
                     } label: {
                         VStack {
                             Image(systemName: "camera.fill").font(.system(size: 40))
-                            Text("Foto aufnehmen").font(.headline)
+                            Text("Take a photo").font(.headline)
                         }
                         .frame(width: 240, height: 120)
                     }
@@ -194,7 +194,7 @@ struct ContentView: View {
                             cam.noteInteraction()
                             showQR = true; cam.qrShown = true
                         } label: {
-                            Label("Fotos aufs Handy", systemImage: "qrcode").frame(width: 160, height: 56)
+                            Label("Photos to your phone", systemImage: "qrcode").frame(width: 160, height: 56)
                         }
                         .buttonStyle(.borderedProminent).tint(Color(white: 0.22))
                         .padding()
@@ -209,12 +209,12 @@ struct ContentView: View {
                 ZStack {
                     Color.black.opacity(0.92)
                     VStack(spacing: 20) {
-                        Text("Alle Fotos vom Abend").font(.system(size: 40, weight: .bold))
-                        Text("QR-Code mit der Handykamera scannen").font(.title3).foregroundStyle(.secondary)
+                        Text("All photos of the evening").font(.system(size: 40, weight: .bold))
+                        Text("Scan the QR code with your phone camera").font(.title3).foregroundStyle(.secondary)
                         QRCodeView(text: link).frame(width: 360, height: 360)
                             .padding(16).background(.white, in: RoundedRectangle(cornerRadius: 16))
                         Text(link).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
-                        Button { showQR = false; cam.qrShown = false } label: { Label("Schließen", systemImage: "xmark").frame(width: 200, height: 56) }
+                        Button { showQR = false; cam.qrShown = false } label: { Label("Close", systemImage: "xmark").frame(width: 200, height: 56) }
                             .buttonStyle(.bordered)
                     }
                 }
@@ -279,7 +279,7 @@ struct ContentView: View {
                                 Button(role: .destructive) {
                                     cam.deleteResult(at: 0)
                                 } label: {
-                                    Label("Löschen", systemImage: "trash").frame(width: 160, height: 56)
+                                    Label("Delete", systemImage: "trash").frame(width: 160, height: 56)
                                 }
                                 .buttonStyle(.bordered)
                             }
@@ -287,13 +287,13 @@ struct ContentView: View {
                                 cam.dismissResult()
                                 cam.capture(withCountdown: settings.countdownSeconds)
                             } label: {
-                                Label("Noch ein Foto!", systemImage: "camera.fill").frame(width: 220, height: 56)
+                                Label("One more!", systemImage: "camera.fill").frame(width: 220, height: 56)
                             }
                             .buttonStyle(.borderedProminent).tint(.red)
                             Button {
                                 cam.dismissResult()
                             } label: {
-                                Label("Fertig", systemImage: "checkmark").frame(width: 160, height: 56)
+                                Label("Done", systemImage: "checkmark").frame(width: 160, height: 56)
                             }
                             .buttonStyle(.bordered)
                         }
@@ -303,7 +303,7 @@ struct ContentView: View {
                         VStack(spacing: 6) {
                             QRCodeView(text: link).frame(width: 110, height: 110)
                                 .padding(6).background(.white, in: RoundedRectangle(cornerRadius: 8))
-                            Text("Fotos aufs Handy").font(.caption).foregroundStyle(.secondary)
+                            Text("Photos to your phone").font(.caption).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .padding(24)
@@ -348,9 +348,9 @@ struct ContentView: View {
                             Button {
                                 cam.captureError = nil
                                 cam.capture(withCountdown: settings.countdownSeconds)
-                            } label: { Label("Nochmal versuchen", systemImage: "arrow.clockwise").frame(width: 240, height: 56) }
+                            } label: { Label("Try again", systemImage: "arrow.clockwise").frame(width: 240, height: 56) }
                             .buttonStyle(.borderedProminent).tint(.red)
-                            Button { cam.captureError = nil } label: { Text("Schließen").frame(width: 160, height: 56) }
+                            Button { cam.captureError = nil } label: { Text("Close").frame(width: 160, height: 56) }
                                 .buttonStyle(.bordered)
                         }
                     }
@@ -383,14 +383,14 @@ struct AdminPanel: View {
     @EnvironmentObject var cam: CameraManager
     @EnvironmentObject var settings: AppSettings
     @Binding var adminUnlocked: Bool
-    // Startabschnitt per Startargument waehlbar (-adminSection "Kamera"), fuer Screenshots im Simulator
+    // Startabschnitt per Startargument waehlbar (-adminSection "Camera"), fuer Screenshots im Simulator
     @State private var section: Section = Section(rawValue: UserDefaults.standard.string(forKey: "adminSection") ?? "") ?? .event
     @State private var newPin = ""
     @State private var diagnosticsURL: URL?
 
     enum Section: String, CaseIterable, Identifiable {
-        case event = "Veranstaltung", camera = "Kamera", flow = "Ablauf", screen = "Anzeige & Töne",
-             storage = "Speicherorte", phrases = "Sprüche", access = "Zugang", log = "Protokoll"
+        case event = "Event", camera = "Camera", flow = "Flow", screen = "Display & Sounds",
+             storage = "Destinations", phrases = "Phrases", access = "Access", log = "Log"
         var id: String { rawValue }
         var icon: String {
             switch self {
@@ -416,7 +416,7 @@ struct AdminPanel: View {
                     Button { section = sec } label: {
                         HStack(spacing: 10) {
                             Image(systemName: sec.icon).frame(width: 22)
-                            Text(sec.rawValue)
+                            Text(LocalizedStringKey(sec.rawValue))
                             Spacer()
                             badge(for: sec)
                         }
@@ -436,7 +436,7 @@ struct AdminPanel: View {
                 }
                 .padding(.horizontal, 16).padding(.bottom, 10)
                 Button { adminUnlocked = false } label: {
-                    Label("Zur Fotobox", systemImage: "xmark").frame(maxWidth: .infinity, minHeight: 40)
+                    Label("Back to the booth", systemImage: "xmark").frame(maxWidth: .infinity, minHeight: 40)
                 }
                 .buttonStyle(.borderedProminent)
                 .padding(.horizontal, 12).padding(.bottom, 16)
@@ -487,39 +487,39 @@ struct AdminPanel: View {
     private var eventSection: some View {
         SwiftUI.Section {
             EventPanel()
-        } header: { Text("Veranstaltung") } footer: {
-            Text("Der Name ist Immich-Album und WebDAV-Ordner zugleich. Fotos jeder Veranstaltung liegen getrennt auf dem iPad.")
+        } header: { Text("Event") } footer: {
+            Text("The name is used as the Immich album and the WebDAV folder. Each event keeps its own photos on the iPad.")
         }
     }
 
     @ViewBuilder private var cameraSection: some View {
-        SwiftUI.Section("Verbindung") {
+        SwiftUI.Section("Connection") {
             if !cam.deviceSummary.isEmpty { Text(cam.deviceSummary).font(.caption).foregroundStyle(.secondary) }
             if cam.devices.isEmpty {
-                Label("Keine Kamera. Sony im Modus „PC-Fernbedienung“ per USB-C anschließen.", systemImage: "cable.connector")
+                Label("No camera. Connect a Sony in “PC Remote” mode via USB-C.", systemImage: "cable.connector")
             }
             ForEach(cam.devices, id: \.self) { dev in
-                Button { cam.openSession(dev) } label: { Label(dev.name ?? "Kamera", systemImage: "camera") }
+                Button { cam.openSession(dev) } label: { Label(dev.name ?? "Camera", systemImage: "camera") }
                     .disabled(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected)
             }
-            Toggle("Automatisch verbinden", isOn: $settings.autoConnect)
-            Toggle("Kameraeinstellungen aus der App beim Anstecken wiederherstellen", isOn: $settings.restoreCameraSettings)
-            Toggle("iPad-Kamera als Ersatz, wenn keine Kamera per USB da ist", isOn: $settings.ipadFallback)
+            Toggle("Connect automatically", isOn: $settings.autoConnect)
+            Toggle("Restore camera settings made in the app when connecting", isOn: $settings.restoreCameraSettings)
+            Toggle("Use the iPad camera as fallback when no USB camera is present", isOn: $settings.ipadFallback)
                 .onChange(of: settings.ipadFallback) { _, _ in cam.syncFallback() }
             if settings.ipadFallback {
-                Picker("iPad-Kamera", selection: $settings.ipadFrontCamera) { Text("Frontkamera").tag(true); Text("Rückkamera").tag(false) }
+                Picker("iPad camera", selection: $settings.ipadFrontCamera) { Text("Front camera").tag(true); Text("Rear camera").tag(false) }
                     .pickerStyle(.segmented)
                     .onChange(of: settings.ipadFrontCamera) { _, _ in cam.syncFallback() }
-                if cam.usingIPadCamera { Label("iPad-Kamera aktiv", systemImage: "ipad.and.arrow.forward").foregroundStyle(.orange) }
+                if cam.usingIPadCamera { Label("iPad camera active", systemImage: "ipad.and.arrow.forward").foregroundStyle(.orange) }
             }
-            LabeledContent("Akku", value: "iPad \(cam.batteryText(cam.iPadBattery()))" + (cam.cameraBattery().map { ", Kamera \($0) %" } ?? ""))
-            Toggle("Liveview spiegeln", isOn: $settings.mirrorLiveView)
-            Toggle("Histogramm in Liveview und Rückschau", isOn: $settings.showHistogram)
+            LabeledContent("Battery", value: "iPad \(cam.batteryText(cam.iPadBattery()))" + (cam.cameraBattery().map { String(localized: ", camera \($0) %") } ?? ""))
+            Toggle("Mirror live view", isOn: $settings.mirrorLiveView)
+            Toggle("Histogram in live view and review", isOn: $settings.showHistogram)
             HStack {
-                Button("PTP-Test") { cam.probe() }
+                Button("PTP test") { cam.probe() }
                     .disabled(!(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected))
                 Button("Handshake") { cam.connect() }.disabled(!(cam.state == .probed || cam.state == .connected))
-                Button(cam.liveRunning ? "Liveview stoppen" : "Liveview starten") {
+                Button(cam.liveRunning ? "Stop live view" : "Start live view") {
                     cam.liveRunning ? cam.stopLiveView() : cam.startLiveView()
                 }.disabled(cam.state != .connected)
             }
@@ -539,62 +539,62 @@ struct AdminPanel: View {
                     }
                 }
             } header: {
-                HStack { Text("Kameraeinstellungen"); Spacer(); Button("Neu laden") { cam.reloadSettings() }.font(.caption) }
+                HStack { Text("Camera settings"); Spacer(); Button("Reload") { cam.reloadSettings() }.font(.caption) }
             } footer: {
-                Text("Werte werden direkt in der Kamera gesetzt. Bildqualität RAW oder RAW+JPEG liefert zusätzlich die ARW-Datei.")
+                Text("Values are set directly in the camera. Image quality RAW or RAW+JPEG also delivers the ARW file.")
             }
         }
     }
 
     @ViewBuilder private var flowSection: some View {
-        SwiftUI.Section("Aufnahme") {
+        SwiftUI.Section("Capture") {
             Stepper("Countdown: \(settings.countdownSeconds) s", value: $settings.countdownSeconds, in: 0...10)
-            Stepper("Bilder pro Auslösung: \(settings.shotsPerCapture)", value: $settings.shotsPerCapture, in: 1...5, step: 2)
+            Stepper("Shots per capture: \(settings.shotsPerCapture)", value: $settings.shotsPerCapture, in: 1...5, step: 2)
             if settings.shotsPerCapture > 1 {
-                Stepper("Pause zwischen Bildern: \(settings.shotInterval) s", value: $settings.shotInterval, in: 0...10)
+                Stepper("Pause between shots: \(settings.shotInterval) s", value: $settings.shotInterval, in: 0...10)
             }
-            Stepper("Rückschau: \(settings.resultSeconds) s", value: $settings.resultSeconds, in: 3...60)
-            Toggle("Fotos vom Kamera-Auslöser übernehmen", isOn: $settings.pickupExternal)
+            Stepper("Review: \(settings.resultSeconds) s", value: $settings.resultSeconds, in: 3...60)
+            Toggle("Pick up photos taken with the camera’s own shutter", isOn: $settings.pickupExternal)
         }
         SwiftUI.Section {
-            Stepper("Collage nach: \(settings.idleSeconds) s ohne Aktion", value: $settings.idleSeconds, in: 30...900, step: 30)
-            Stepper("Collage wechselt alle: \(settings.slideshowInterval) s", value: $settings.slideshowInterval, in: 3...30)
-            Toggle("Bei Bewegung vor der Kamera beenden", isOn: $settings.motionWake)
+            Stepper("Collage after: \(settings.idleSeconds) s without activity", value: $settings.idleSeconds, in: 30...900, step: 30)
+            Stepper("Collage changes every: \(settings.slideshowInterval) s", value: $settings.slideshowInterval, in: 3...30)
+            Toggle("End when motion is detected in front of the camera", isOn: $settings.motionWake)
             if settings.motionWake {
-                Stepper("Empfindlichkeit: Schwelle \(settings.motionThreshold)", value: $settings.motionThreshold, in: 2...40)
-                LabeledContent("Aktuelle Bildänderung", value: cam.idle ? String(format: "%.1f", cam.motionLevel) : "nur während der Collage")
+                Stepper("Sensitivity: threshold \(settings.motionThreshold)", value: $settings.motionThreshold, in: 2...40)
+                LabeledContent("Current image change", value: cam.idle ? String(format: "%.1f", cam.motionLevel) : "only during the collage")
                     .foregroundStyle(.secondary)
             }
-        } header: { Text("Leerlauf") } footer: {
-            Text("Gemessen wird das stärkste von 16 Bildfeldern nach Abzug von Helligkeitswechseln im ganzen Bild (Licht an/aus, fremder Blitz). Kleinere Schwelle reagiert früher. Bewegung, Tipp oder Aufnahme beenden die Collage.")
+        } header: { Text("Idle") } footer: {
+            Text("Measures the strongest of 16 image cells after subtracting brightness changes across the whole frame (lights on/off, someone else’s flash). A lower threshold reacts earlier. Motion, a tap or a capture end the collage.")
         }
-        SwiftUI.Section("Galerie") {
-            Toggle("Galerie für Gäste", isOn: $settings.guestGallery)
+        SwiftUI.Section("Gallery") {
+            Toggle("Gallery for guests", isOn: $settings.guestGallery)
             if settings.guestGallery {
-                Stepper("Schließt nach: \(settings.gallerySeconds) s ohne Berührung", value: $settings.gallerySeconds, in: 10...300, step: 5)
+                Stepper("Closes after: \(settings.gallerySeconds) s without touch", value: $settings.gallerySeconds, in: 10...300, step: 5)
             }
         }
     }
 
     @ViewBuilder private var screenSection: some View {
         SwiftUI.Section {
-            TextField("Titel", text: $settings.welcomeTitle)
+            TextField("Title", text: $settings.welcomeTitle)
             TextField("Text", text: $settings.welcomeText, axis: .vertical).lineLimit(2...4)
-        } header: { Text("Begrüßung") } footer: { Text("Steht über dem Liveview und ohne Kamera groß in der Mitte.") }
+        } header: { Text("Welcome") } footer: { Text("Shown above the live view, and large in the center when no camera is connected.") }
         SwiftUI.Section {
-            Toggle("Display dauerhaft auf volle Helligkeit", isOn: $settings.maxBrightness)
+            Toggle("Keep display at full brightness", isOn: $settings.maxBrightness)
                 .onChange(of: settings.maxBrightness) { _, _ in cam.updateBrightness() }
         } header: { Text("Display") } footer: {
-            Text("Während der Leerlauf-Collage geht die Helligkeit auf den vorherigen Wert zurück, bei Bewegung oder Aufnahme wieder hoch. Die QR-Seite ist immer voll hell.")
+            Text("During the idle collage the brightness returns to the previous value and goes back up on motion or capture. The QR page is always at full brightness.")
         }
-        SwiftUI.Section("Töne") {
-            Toggle("Töne", isOn: $settings.soundsEnabled)
+        SwiftUI.Section("Sounds") {
+            Toggle("Sounds", isOn: $settings.soundsEnabled)
             if settings.soundsEnabled {
-                Toggle("Willkommensklang beim Aufwachen", isOn: $settings.soundWelcome)
-                Toggle("Countdown-Piepen und Auslösesignal", isOn: $settings.soundCountdown)
+                Toggle("Welcome chime when waking up", isOn: $settings.soundWelcome)
+                Toggle("Countdown beeps and shutter signal", isOn: $settings.soundCountdown)
                 HStack(spacing: 12) {
-                    Button("Willkommen anhören") { Sounds.shared.play("welcome") }
-                    Button("Countdown anhören") { Sounds.shared.play("tick"); Task { try? await Task.sleep(nanoseconds: 900_000_000); Sounds.shared.play("shot") } }
+                    Button("Play welcome") { Sounds.shared.play("welcome") }
+                    Button("Play countdown") { Sounds.shared.play("tick"); Task { try? await Task.sleep(nanoseconds: 900_000_000); Sounds.shared.play("shot") } }
                 }
                 .buttonStyle(.bordered)
             }
@@ -603,49 +603,49 @@ struct AdminPanel: View {
 
     @ViewBuilder private var storageSection: some View {
         SwiftUI.Section {
-            LabeledContent { Text("immer").foregroundStyle(.secondary) } label: { Label("App-Galerie auf dem iPad", systemImage: "internaldrive") }
-            Toggle(isOn: $settings.saveToPhotos) { Label("iPad-Mediathek (Fotos-App)", systemImage: "photo.on.rectangle.angled") }
-            Toggle(isOn: $settings.immichEnabled) { Label("Immich-Server", systemImage: "server.rack") }
+            LabeledContent { Text("always").foregroundStyle(.secondary) } label: { Label("App gallery on the iPad", systemImage: "internaldrive") }
+            Toggle(isOn: $settings.saveToPhotos) { Label("iPad photo library (Photos app)", systemImage: "photo.on.rectangle.angled") }
+            Toggle(isOn: $settings.immichEnabled) { Label("Immich server", systemImage: "server.rack") }
                 .onChange(of: settings.immichEnabled) { _, _ in cam.syncImmich() }
-            Toggle(isOn: $settings.webdavEnabled) { Label("WebDAV-Ordner (Nextcloud, NAS, Storage Box)", systemImage: "externaldrive.connected.to.line.below") }
+            Toggle(isOn: $settings.webdavEnabled) { Label("WebDAV folder (Nextcloud, NAS, Storage Box)", systemImage: "externaldrive.connected.to.line.below") }
                 .onChange(of: settings.webdavEnabled) { _, _ in cam.syncWebDAV() }
-        } header: { Text("Ziele") } footer: {
-            Text("Die App-Galerie ist die Quelle für Rückschau, Galerie und Collage und bleibt immer an.")
+        } header: { Text("Targets") } footer: {
+            Text("The app gallery feeds review, gallery and collage and is always on.")
         }
         if settings.immichEnabled {
-            SwiftUI.Section("Immich-Server") { ImmichPanel() }
+            SwiftUI.Section("Immich server") { ImmichPanel() }
         }
         if settings.webdavEnabled {
-            SwiftUI.Section("WebDAV-Ordner") { WebDAVPanel() }
+            SwiftUI.Section("WebDAV folder") { WebDAVPanel() }
         }
     }
 
     private var phrasesSection: some View {
         SwiftUI.Section {
             PhraseEditor()
-        } header: { Text("Sprüche beim Auslösen") } footer: { Text("Nach dem Countdown erscheint zufällig einer davon.") }
+        } header: { Text("Phrases at the shutter") } footer: { Text("One of them appears at random after the countdown.") }
     }
 
     @ViewBuilder private var accessSection: some View {
         SwiftUI.Section {
             HStack {
-                SecureField("Neue PIN (mindestens 4 Ziffern)", text: $newPin).keyboardType(.numberPad)
-                Button("Setzen") { if newPin.count >= 4 { settings.pin = newPin; newPin = "" } }
+                SecureField("New PIN (at least 4 digits)", text: $newPin).keyboardType(.numberPad)
+                Button("Set") { if newPin.count >= 4 { settings.pin = newPin; newPin = "" } }
                     .buttonStyle(.bordered).disabled(newPin.count < 4)
             }
-        } header: { Text("PIN") } footer: { Text("Admin öffnen: mit zwei Fingern von oben nach unten wischen, dann PIN.") }
+        } header: { Text("PIN") } footer: { Text("Open admin: swipe down with two fingers, then enter the PIN.") }
         SwiftUI.Section {
-            Toggle("Statusseite im WLAN", isOn: $settings.webEnabled)
+            Toggle("Status page on Wi‑Fi", isOn: $settings.webEnabled)
                 .onChange(of: settings.webEnabled) { _, _ in cam.syncWeb() }
             if settings.webEnabled {
                 let ips = LocalWebServer.localAddresses()
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(ips, id: \.self) { ip in
-                            LabeledContent("Adresse") { Text(verbatim: "http://\(ip):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
+                            LabeledContent("Address") { Text(verbatim: "http://\(ip):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
                         }
-                        if ips.isEmpty { Text("Kein WLAN verbunden").foregroundStyle(.secondary) }
-                        Text("QR-Code mit dem Handy scannen, dann mit der Admin-PIN anmelden.").font(.caption).foregroundStyle(.secondary)
+                        if ips.isEmpty { Text("No Wi‑Fi connected").foregroundStyle(.secondary) }
+                        Text("Scan the QR code with your phone, then sign in with the admin PIN.").font(.caption).foregroundStyle(.secondary)
                     }
                     if let ip = ips.first {
                         QRCodeView(text: "http://\(ip):\(LocalWebServer.port)").frame(width: 120, height: 120)
@@ -653,13 +653,13 @@ struct AdminPanel: View {
                     }
                 }
             }
-        } header: { Text("Fernzugriff") } footer: {
-            Text("Nur lesend: Kamera, Bildrate, Fotos, Speicherziele, Protokoll, Diagnose senden. Anmeldung mit der Admin-PIN, nach fünf Fehlversuchen eine Minute Sperre. Nur im selben WLAN erreichbar, solange die App im Vordergrund läuft.")
+        } header: { Text("Remote access") } footer: {
+            Text("Read-only: camera, frame rate, photos, destinations, log, send diagnostics. Sign in with the admin PIN; five failed attempts lock for one minute. Reachable only on the same Wi‑Fi while the app is in the foreground.")
         }
         SwiftUI.Section {
-            Toggle("Debug-Modus", isOn: $settings.debugMode)
-        } header: { Text("Entwicklung") } footer: {
-            Text("Im Debug-Modus öffnet der Admin beim Start und die Wischgeste braucht keine PIN.")
+            Toggle("Debug mode", isOn: $settings.debugMode)
+        } header: { Text("Development") } footer: {
+            Text("In debug mode the admin opens at launch and the swipe gesture needs no PIN.")
         }
     }
 
@@ -667,20 +667,20 @@ struct AdminPanel: View {
         SwiftUI.Section {
             HStack(spacing: 16) {
                 // Datei wird beim Antippen frisch erzeugt, dann Teilen-Menue (AirDrop, Mail, …)
-                Button { diagnosticsURL = cam.makeDiagnosticsFile() } label: { Label("Diagnose teilen …", systemImage: "square.and.arrow.up") }
+                Button { diagnosticsURL = cam.makeDiagnosticsFile() } label: { Label("Share diagnostics…", systemImage: "square.and.arrow.up") }
                     .buttonStyle(.bordered)
-                Button { Task { await cam.sendDiagnostics(reason: "manuell") } } label: { Label("An OpenBooth senden", systemImage: "paperplane") }
-                    .buttonStyle(.bordered).disabled(cam.reportStatus == "Sende …")
+                Button { Task { await cam.sendDiagnostics(reason: "manual") } } label: { Label("Send to OpenBooth", systemImage: "paperplane") }
+                    .buttonStyle(.bordered).disabled(cam.reportStatus == String(localized: "Sending…"))
                 Spacer()
                 if !cam.reportStatus.isEmpty { Text(cam.reportStatus).font(.caption).foregroundStyle(.secondary) }
             }
             .sheet(item: $diagnosticsURL) { url in ShareSheet(items: [url]) }
-            Toggle("Fehlerberichte automatisch senden", isOn: $settings.autoReports)
-        } header: { Text("Diagnose") } footer: {
-            Text("Eine Textdatei mit iPad- und App-Version, allen Operationen, Events und Properties der Kamera samt Rohdaten (Hex) und dem vollständigen Protokoll. Reicht, um ein neues Kameramodell ohne Zugriff auf die Kamera zu unterstützen. Enthält keine Passwörter, API-Keys oder Server-Adressen, die Kamera-Seriennummer wird gekürzt. „An OpenBooth senden“ schickt genau diese Datei an die Entwickler. „Automatisch“ tut das bei Aufnahmefehlern und Verbindungsabbrüchen, höchstens alle 10 Minuten, sonst nie.")
+            Toggle("Send error reports automatically", isOn: $settings.autoReports)
+        } header: { Text("Diagnostics") } footer: {
+            Text("A text file with iPad and app version, all camera operations, events and properties including raw data (hex) and the full log. Enough to support a new camera model without access to the camera. Contains no passwords, API keys or server addresses; the camera serial number is shortened. “Send to OpenBooth” sends exactly this file to the developers. “Automatically” does so on capture errors and connection failures, at most every 10 minutes, never otherwise.")
         }
         if let e = cam.lastError {
-            SwiftUI.Section("Letzter Fehler") { Text(e).foregroundStyle(.red).font(.callout) }
+            SwiftUI.Section("Last error") { Text(e).foregroundStyle(.red).font(.callout) }
         }
         SwiftUI.Section {
             ScrollViewReader { proxy in
@@ -697,8 +697,8 @@ struct AdminPanel: View {
             }
             .frame(minHeight: 420)
             .listRowInsets(EdgeInsets())
-        } header: { Text("Protokoll (\(cam.log.count) Zeilen)") } footer: {
-            Text("Vollständig in Documents/openbooth.log, holen mit tools/pull-log.sh. Kamera-Fähigkeiten in openbooth-capabilities.log.")
+        } header: { Text("Log (\(cam.log.count) lines)") } footer: {
+            Text("Full log in Documents/openbooth.log, fetch with tools/pull-log.sh. Camera capabilities in openbooth-capabilities.log.")
         }
     }
 }
@@ -722,7 +722,7 @@ struct PinPadView: View {
                     }
                 }
                 .padding(.bottom, 6)
-                if wrong { Text("Falsche PIN").foregroundStyle(.red).font(.callout) }
+                if wrong { Text("Wrong PIN").foregroundStyle(.red).font(.callout) }
                 let keys = [["1","2","3"],["4","5","6"],["7","8","9"],["⌫","0","OK"]]
                 ForEach(keys, id: \.self) { row in
                     HStack(spacing: 14) {
@@ -778,7 +778,7 @@ struct CollageView: View {
             }
             VStack {
                 Spacer()
-                Text("\(title)  ·  Drückt auf den Knopf!")
+                Text("\(title)  ·  Press the button!")
                     .font(.title2.bold())
                     .padding(.horizontal, 24).padding(.vertical, 10)
                     .background(.black.opacity(0.5), in: Capsule())
@@ -858,8 +858,8 @@ struct GalleryView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Galerie (\(photos.count))")
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Schließen") { dismiss() } } }
+            .navigationTitle("Gallery (\(photos.count))")
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Close") { dismiss() } } }
             .overlay {
                 if selected != nil {
                     ZStack {
@@ -1041,7 +1041,7 @@ struct PhraseEditor: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(settings.phrases.enumerated()), id: \.offset) { i, p in
                 HStack {
-                    TextField("Spruch", text: Binding(
+                    TextField("Phrase", text: Binding(
                         get: { settings.phrases.indices.contains(i) ? settings.phrases[i] : "" },
                         set: { v in if settings.phrases.indices.contains(i) { settings.phrases[i] = v } }
                     ))
@@ -1053,16 +1053,16 @@ struct PhraseEditor: View {
                 }
             }
             HStack {
-                TextField("Neuer Spruch", text: $newPhrase).textFieldStyle(.roundedBorder)
+                TextField("New phrase", text: $newPhrase).textFieldStyle(.roundedBorder)
                     .onSubmit { add() }
-                Button("Hinzufügen") { add() }.buttonStyle(.bordered)
+                Button("Add") { add() }.buttonStyle(.bordered)
                     .disabled(newPhrase.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             HStack {
-                Text("\(settings.phrases.count) Sprüche, zufällig, nie zweimal derselbe nacheinander.")
+                Text("\(settings.phrases.count) phrases, random, never the same one twice in a row.")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Standard") { settings.phrases = AppSettings.defaultPhrases }.font(.caption).buttonStyle(.bordered)
+                Button("Defaults") { settings.phrases = AppSettings.defaultPhrases }.font(.caption).buttonStyle(.bordered)
             }
         }
         .font(.callout)
@@ -1135,41 +1135,41 @@ struct EventPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Aktuell", selection: $settings.eventName) {
+            Picker("Current", selection: $settings.eventName) {
                 ForEach(settings.events, id: \.self) { Text($0).tag($0) }
             }
             .pickerStyle(.menu)
             .onChange(of: settings.eventName) { _, _ in cam.syncUploaders() }
             HStack {
-                Text("\(cam.sessionPhotos.count) Fotos").foregroundStyle(.secondary)
+                Text("\(cam.sessionPhotos.count) photos").foregroundStyle(.secondary)
                 Spacer()
-                Button { newName = ""; askNew = true } label: { Label("Neu", systemImage: "plus") }
+                Button { newName = ""; askNew = true } label: { Label("New", systemImage: "plus") }
                     .buttonStyle(.bordered)
-                Button(role: .destructive) { askDelete = true } label: { Label("Entfernen", systemImage: "trash") }
+                Button(role: .destructive) { askDelete = true } label: { Label("Remove", systemImage: "trash") }
                     .buttonStyle(.bordered).disabled(settings.events.count <= 1)
             }
             .lineLimit(1)
         }
         .font(.callout)
-        .alert("Neue Veranstaltung", isPresented: $askNew) {
-            TextField("Name, z. B. Hochzeit Anna & Paul", text: $newName)
-            Button("Anlegen") {
+        .alert("New event", isPresented: $askNew) {
+            TextField("Name, e.g. Anna & Paul’s wedding", text: $newName)
+            Button("Create") {
                 let n = newName.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !n.isEmpty else { return }
                 if !settings.events.contains(n) { settings.events.append(n) }
                 settings.eventName = n
             }
-            Button("Abbrechen", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         }
-        .alert("„\(settings.eventName)“ aus der Liste entfernen?", isPresented: $askDelete) {
-            Button("Entfernen", role: .destructive) {
+        .alert("Remove “\(settings.eventName)” from the list?", isPresented: $askDelete) {
+            Button("Remove", role: .destructive) {
                 let old = settings.eventName
                 settings.events.removeAll { $0 == old }
-                settings.eventName = settings.events.first ?? "Fotobox"
+                settings.eventName = settings.events.first ?? String(localized: "Photo Booth")
             }
-            Button("Abbrechen", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Die Fotos bleiben auf dem iPad im Ordner der Veranstaltung erhalten, nur der Eintrag verschwindet.")
+            Text("The photos stay on the iPad in the event’s folder, only the entry disappears.")
         }
     }
 }
@@ -1202,30 +1202,30 @@ struct WebDAVPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField("Basis-URL, z. B. https://cloud.example.de/remote.php/dav/files/name", text: $settings.webdavURL)
+            TextField("Base URL, e.g. https://cloud.example.com/remote.php/dav/files/name", text: $settings.webdavURL)
                 .textFieldStyle(.roundedBorder).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                 .onSubmit { cam.syncWebDAV(); runTest() }
             HStack {
-                TextField("Benutzer", text: $settings.webdavUser)
+                TextField("User", text: $settings.webdavUser)
                     .textFieldStyle(.roundedBorder).textInputAutocapitalization(.never).autocorrectionDisabled()
                     .onSubmit { cam.syncWebDAV() }
-                SecureField(pwStored ? "Passwort gespeichert, neues eingeben zum Ersetzen" : "Passwort oder App-Passwort", text: $password)
+                SecureField(pwStored ? "Password saved, enter a new one to replace it" : "Password or app password", text: $password)
                     .textFieldStyle(.roundedBorder).textInputAutocapitalization(.never).autocorrectionDisabled()
-                Button(testing ? "Prüfe …" : "Speichern") {
+                Button(testing ? "Checking…" : "Save") {
                     Keychain.set(password, for: "webdavPassword")
                     pwStored = !password.isEmpty; password = ""; cam.syncWebDAV()
                     runTest()
                 }.buttonStyle(.bordered).disabled(password.isEmpty || testing)
             }
-            Toggle("RAW-Dateien mit hochladen", isOn: $settings.webdavUploadRAW)
+            Toggle("Upload RAW files too", isOn: $settings.webdavUploadRAW)
             HStack {
-                Button(testing ? "Teste …" : "Verbindung testen") { cam.syncWebDAV(); runTest() }
+                Button(testing ? "Testing…" : "Test connection") { cam.syncWebDAV(); runTest() }
                     .buttonStyle(.bordered).disabled(testing || settings.webdavURL.isEmpty)
                 Spacer()
                 Text("Status: \(cam.webdav.lastMessage)").font(.caption).foregroundStyle(.secondary)
             }
             if !testResult.isEmpty { Text(testResult).font(.caption).foregroundStyle(testResult.hasPrefix("OK") ? .green : .red) }
-            Text("Darunter wird der Ordner „\(settings.eventName)“ angelegt. Nextcloud: remote.php/dav/files/BENUTZER, am besten mit App-Passwort. Passwort liegt im Schlüsselbund des iPads.")
+            Text("The folder “\(settings.eventName)” is created below it. Nextcloud: remote.php/dav/files/USER, preferably with an app password. The password is stored in the iPad keychain.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .font(.callout)
@@ -1248,36 +1248,36 @@ struct ImmichPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField("Server, z. B. https://immich.example.de", text: $settings.immichURL)
+            TextField("Server, e.g. https://immich.example.com", text: $settings.immichURL)
                 .textFieldStyle(.roundedBorder).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                 .onSubmit { cam.syncImmich(); runTest() }
             HStack {
-                SecureField(keyStored ? "API-Key gespeichert, neuen eingeben zum Ersetzen" : "API-Key", text: $apiKey)
+                SecureField(keyStored ? "API key saved, enter a new one to replace it" : "API key", text: $apiKey)
                     .textFieldStyle(.roundedBorder).textInputAutocapitalization(.never).autocorrectionDisabled()
-                Button(testing ? "Prüfe …" : "Speichern") {
+                Button(testing ? "Checking…" : "Save") {
                     Keychain.set(apiKey.trimmingCharacters(in: .whitespacesAndNewlines), for: "immichAPIKey")
                     keyStored = !apiKey.isEmpty; apiKey = ""; cam.syncImmich()
                     runTest()
                 }.buttonStyle(.bordered).disabled(apiKey.isEmpty || testing)
             }
-            Text("Album: „\(settings.eventName)“ (Name der Veranstaltung)").foregroundStyle(.secondary)
-            Toggle("QR-Code zum Album für Gäste anzeigen", isOn: $settings.qrEnabled)
+            Text("Album: “\(settings.eventName)” (event name)").foregroundStyle(.secondary)
+            Toggle("Show QR code to the album for guests", isOn: $settings.qrEnabled)
             if let link = cam.immich.shareURL {
-                Text("Freigabelink: \(link)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                Text("Der Link zeigt auf die Server-Adresse oben. Gäste müssen sie erreichen können, also z. B. https://immich.example.de statt einer IP im Heimnetz eintragen.")
+                Text("Share link: \(link)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                Text("The link points to the server address above. Guests must be able to reach it, so enter e.g. https://immich.example.com rather than a home-network IP.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Toggle("RAW-Dateien mit hochladen", isOn: $settings.immichUploadRAW)
-            Text("Wirkt nur, wenn die Bildqualität in den Kameraeinstellungen auf RAW oder RAW+JPEG steht. Das JPEG geht immer hoch.")
+            Toggle("Upload RAW files too", isOn: $settings.immichUploadRAW)
+            Text("Only applies when image quality in the camera settings is RAW or RAW+JPEG. The JPEG is always uploaded.")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
-                Button(testing ? "Teste …" : "Verbindung testen") { cam.syncImmich(); runTest() }
+                Button(testing ? "Testing…" : "Test connection") { cam.syncImmich(); runTest() }
                     .buttonStyle(.bordered).disabled(testing || settings.immichURL.isEmpty)
                 Spacer()
                 Text("Status: \(cam.immich.lastMessage)").font(.caption).foregroundStyle(.secondary)
             }
             if !testResult.isEmpty { Text(testResult).font(.caption).foregroundStyle(testResult.hasPrefix("OK") ? .green : .red) }
-            Text("API-Key in Immich unter Kontoeinstellungen › API-Schlüssel anlegen. Er wird im Schlüsselbund des iPads gespeichert. Upload läuft im Hintergrund mit Warteschlange, ohne Netz wird nachgeholt.")
+            Text("Create an API key in Immich under Account Settings › API Keys. It is stored in the iPad keychain. Uploads run in the background with a queue and catch up when offline.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .font(.callout)

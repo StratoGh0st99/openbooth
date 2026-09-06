@@ -38,10 +38,10 @@ final class IPadCamera: NSObject, @unchecked Sendable {
         session.outputs.forEach { session.removeOutput($0) }
         guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) ?? AVCaptureDevice.default(for: .video) else {
             session.commitConfiguration()
-            throw NSError(domain: "IPadCamera", code: 1, userInfo: [NSLocalizedDescriptionKey: "Keine iPad-Kamera gefunden"])
+            throw NSError(domain: "IPadCamera", code: 1, userInfo: [NSLocalizedDescriptionKey: "No iPad camera found"])
         }
         let input = try AVCaptureDeviceInput(device: dev)
-        guard session.canAddInput(input) else { session.commitConfiguration(); throw NSError(domain: "IPadCamera", code: 2, userInfo: [NSLocalizedDescriptionKey: "Kamera nicht nutzbar"]) }
+        guard session.canAddInput(input) else { session.commitConfiguration(); throw NSError(domain: "IPadCamera", code: 2, userInfo: [NSLocalizedDescriptionKey: "Camera not usable"]) }
         session.addInput(input)
         video.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         video.alwaysDiscardsLateVideoFrames = true
@@ -105,7 +105,7 @@ extension IPadCamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePho
         // Querformat-Orientierung: Landscape-Right (Home-Button rechts) entspricht der Fotobox-Aufstellung
         let ctx = Self.ciContext
         guard let cg = ctx.createCGImage(ci, from: ci.extent) else { return }
-        // nicht spiegeln: die Spiegelung fuer die Gaeste macht die Buehne (Einstellung "Liveview spiegeln"), wie bei der Sony
+        // nicht spiegeln: die Spiegelung fuer die Gaeste macht die Buehne (Einstellung "Mirror live view"), wie bei der Sony
         handler(UIImage(cgImage: cg, scale: 1, orientation: .up))
     }
     private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
@@ -115,7 +115,7 @@ extension IPadCamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePho
         photoContinuation = nil
         if let error { cont.resume(throwing: error); return }
         guard let data = photo.fileDataRepresentation() else {
-            cont.resume(throwing: NSError(domain: "IPadCamera", code: 3, userInfo: [NSLocalizedDescriptionKey: "Kein Bild von der iPad-Kamera"])); return
+            cont.resume(throwing: NSError(domain: "IPadCamera", code: 3, userInfo: [NSLocalizedDescriptionKey: "No image from the iPad camera"])); return
         }
         // Foto bleibt ungespiegelt, wie ein Kamerafoto (die Sony spiegelt auch nicht)
         cont.resume(returning: data)

@@ -44,7 +44,7 @@ final class ImmichUploader: ObservableObject {
 
     @Published private(set) var pending: [Item] = []
     @Published private(set) var uploaded = 0
-    @Published private(set) var lastMessage = "aus"
+    @Published private(set) var lastMessage = String(localized: "off")
     @Published private(set) var busy = false
 
     @Published private(set) var shareURL: String?   // oeffentlicher Freigabelink des Albums (fuer den QR-Code)
@@ -74,7 +74,7 @@ final class ImmichUploader: ObservableObject {
         if s != serverURL || album != albumName { albumID = nil; shareURL = nil }
         serverURL = s.hasSuffix("/") ? String(s.dropLast()) : s
         albumName = album.trimmingCharacters(in: .whitespaces)
-        lastMessage = enabled ? (pending.isEmpty ? "bereit" : "\(pending.count) ausstehend") : "aus"
+        lastMessage = enabled ? (pending.isEmpty ? String(localized: "ready") : String(localized: "\(pending.count) pending")) : String(localized: "off")
         if enabled { kick() }
     }
 
@@ -84,7 +84,7 @@ final class ImmichUploader: ObservableObject {
         let rel = fileURL.path.replacingOccurrences(of: docs.path + "/", with: "")
         pending.append(Item(path: rel, createdAt: Date()))
         saveQueue()
-        lastMessage = "\(pending.count) ausstehend"
+        lastMessage = String(localized: "\(pending.count) pending")
         kick()
     }
 
@@ -106,16 +106,16 @@ final class ImmichUploader: ObservableObject {
                 pending.removeFirst()
                 uploaded += 1
                 saveQueue()
-                lastMessage = pending.isEmpty ? "alles hochgeladen (\(uploaded))" : "\(pending.count) ausstehend"
+                lastMessage = pending.isEmpty ? String(localized: "all uploaded (\(uploaded))") : String(localized: "\(pending.count) pending")
                 backoff = 2
             } catch {
                 if (error as NSError).domain == "Immich", (error as NSError).code == 4 {
-                    log?("Immich: \(error.localizedDescription), Eintrag verworfen"); pending.removeFirst(); saveQueue(); continue
+                    log?("Immich: \(error.localizedDescription), entry dropped"); pending.removeFirst(); saveQueue(); continue
                 }
                 pending[0].attempts += 1
                 saveQueue()
-                lastMessage = "Fehler: \(error.localizedDescription)"
-                log?("Immich: \(error.localizedDescription) (Versuch \(pending[0].attempts), warte \(backoff) s)")
+                lastMessage = String(localized: "Error: \(error.localizedDescription)")
+                log?("Immich: \(error.localizedDescription) (attempt \(pending[0].attempts), waiting \(backoff) s)")
                 if pending[0].attempts >= 8 {
                     // Datei ans Ende, damit andere durchkommen
                     let it = pending.removeFirst(); pending.append(Item(path: it.path, createdAt: it.createdAt, attempts: 0)); saveQueue()
@@ -130,7 +130,7 @@ final class ImmichUploader: ObservableObject {
 
     private func request(_ path: String, method: String = "GET") throws -> URLRequest {
         guard let url = URL(string: serverURL + path), let key = Keychain.get("immichAPIKey"), !key.isEmpty else {
-            throw NSError(domain: "Immich", code: 1, userInfo: [NSLocalizedDescriptionKey: "Server oder API-Key fehlt"])
+            throw NSError(domain: "Immich", code: 1, userInfo: [NSLocalizedDescriptionKey: String(localized: "Server or API key missing")])
         }
         var r = URLRequest(url: url)
         r.httpMethod = method
@@ -147,20 +147,20 @@ final class ImmichUploader: ObservableObject {
             r.timeoutInterval = 10
             let (d, resp) = try await URLSession.shared.data(for: r)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-            guard code == 200 else { return "HTTP \(code): API-Key oder Adresse prüfen" }
+            guard code == 200 else { return "HTTP \(code): check API key or address" }
             let j = try JSONSerialization.jsonObject(with: d) as? [String: Any]
             let who = (j?["email"] as? String) ?? (j?["name"] as? String) ?? "?"
             let id = try await ensureAlbum()
             let link = try await ensureShareLink()
-            return "OK als \(who), Album „\(albumName)“ (\(id.prefix(8))…), Freigabe \(link)"
+            return "OK as \(who), album “\(albumName)” (\(id.prefix(8))…), share \(link)"
         } catch {
-            return "Fehler: \(error.localizedDescription)"
+            return String(localized: "Error: \(error.localizedDescription)")
         }
     }
 
     private func ensureAlbum() async throws -> String {
         if let albumID { return albumID }
-        guard !albumName.isEmpty else { throw NSError(domain: "Immich", code: 2, userInfo: [NSLocalizedDescriptionKey: "Kein Albumname"]) }
+        guard !albumName.isEmpty else { throw NSError(domain: "Immich", code: 2, userInfo: [NSLocalizedDescriptionKey: String(localized: "No album name")]) }
         let (d, _) = try await URLSession.shared.data(for: try request("/api/albums"))
         if let list = try JSONSerialization.jsonObject(with: d) as? [[String: Any]],
            let hit = list.first(where: { ($0["albumName"] as? String) == albumName }), let id = hit["id"] as? String {
@@ -173,10 +173,10 @@ final class ImmichUploader: ObservableObject {
         let (cd, cresp) = try await URLSession.shared.data(for: r)
         guard let code = (cresp as? HTTPURLResponse)?.statusCode, (200...201).contains(code),
               let j = try JSONSerialization.jsonObject(with: cd) as? [String: Any], let id = j["id"] as? String else {
-            throw NSError(domain: "Immich", code: 3, userInfo: [NSLocalizedDescriptionKey: "Album konnte nicht angelegt werden"])
+            throw NSError(domain: "Immich", code: 3, userInfo: [NSLocalizedDescriptionKey: String(localized: "Album could not be created")])
         }
         albumID = id
-        log?("Immich: Album „\(albumName)“ angelegt")
+        log?("Immich: album “\(albumName)” created")
         return id
     }
 
@@ -201,17 +201,17 @@ final class ImmichUploader: ObservableObject {
         let (cd, cresp) = try await URLSession.shared.data(for: r)
         guard let code = (cresp as? HTTPURLResponse)?.statusCode, (200...201).contains(code),
               let j = try JSONSerialization.jsonObject(with: cd) as? [String: Any], let key = j["key"] as? String else {
-            throw NSError(domain: "Immich", code: 5, userInfo: [NSLocalizedDescriptionKey: "Freigabelink konnte nicht angelegt werden"])
+            throw NSError(domain: "Immich", code: 5, userInfo: [NSLocalizedDescriptionKey: String(localized: "Share link could not be created")])
         }
         shareURL = base + "/share/" + key
-        log?("Immich: Freigabelink für „\(albumName)“ angelegt")
+        log?("Immich: share link for “\(albumName)” created")
         return shareURL!
     }
 
     private func upload(_ item: Item) async throws {
         let fileURL = docs.appendingPathComponent(item.path)
         guard let data = try? Data(contentsOf: fileURL) else {
-            throw NSError(domain: "Immich", code: 4, userInfo: [NSLocalizedDescriptionKey: "Datei fehlt: \(item.path)"])
+            throw NSError(domain: "Immich", code: 4, userInfo: [NSLocalizedDescriptionKey: "File missing: \(item.path)"])
         }
         let album = try await ensureAlbum()
 
@@ -248,8 +248,8 @@ final class ImmichUploader: ObservableObject {
         let (_, aresp) = try await URLSession.shared.data(for: a)
         let acode = (aresp as? HTTPURLResponse)?.statusCode ?? 0
         guard (200...201).contains(acode) else {
-            throw NSError(domain: "Immich", code: acode, userInfo: [NSLocalizedDescriptionKey: "Album-Zuordnung HTTP \(acode)"])
+            throw NSError(domain: "Immich", code: acode, userInfo: [NSLocalizedDescriptionKey: "Album assignment HTTP \(acode)"])
         }
-        log?("Immich: \(name) hochgeladen (\(data.count / 1_000_000) MB)\(j["status"] as? String == "duplicate" ? ", war schon da" : "")")
+        log?("Immich: \(name) uploaded (\(data.count / 1_000_000) MB)\(j["status"] as? String == "duplicate" ? ", already there" : "")")
     }
 }

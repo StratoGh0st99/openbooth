@@ -1,6 +1,7 @@
 name: OpenBooth
 options:
   bundleIdPrefix: de.reingruber
+  developmentLanguage: en
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -39,10 +40,10 @@ targets:
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         # Pflicht fuer PTP-Passthrough ueber ImageCaptureCore auf iPadOS
-        NSCameraUsageDescription: "OpenBooth steuert die per USB angeschlossene Kamera (Liveview und Auslösen) und nutzt die iPad-Kamera als Ersatz, wenn keine angeschlossen ist."
-        NSPhotoLibraryAddUsageDescription: "OpenBooth speichert die aufgenommenen Fotos in deine Mediathek."
-        NSPhotoLibraryUsageDescription: "OpenBooth zeigt die aufgenommenen Fotos in der Galerie."
-        NSLocalNetworkUsageDescription: "OpenBooth lädt Fotos auf Server im lokalen Netz hoch und bietet dort eine Statusseite an."
+        NSCameraUsageDescription: "OpenBooth controls the camera connected via USB (live view and shutter) and uses the iPad camera as a fallback when none is connected."
+        NSPhotoLibraryAddUsageDescription: "OpenBooth saves the captured photos to your photo library."
+        NSPhotoLibraryUsageDescription: "OpenBooth shows the captured photos in the gallery."
+        NSLocalNetworkUsageDescription: "OpenBooth uploads photos to servers on the local network and offers a status page there."
         NSBonjourServices: ["_http._tcp"]
     settings:
       base:

@@ -51,16 +51,16 @@ enum PTPNames {
         0xD241: "Sony 0xD241", 0xD242: "Sony 0xD242", 0xD243: "Sony 0xD243", 0xD244: "Sony 0xD244", 0xD245: "Sony 0xD245",
         0xD246: "Sony 0xD246", 0xD247: "Sony 0xD247", 0xD248: "Sony 0xD248", 0xD249: "Sony 0xD249", 0xD24A: "Sony 0xD24A",
         0xD24B: "Sony 0xD24B", 0xD24C: "Sony 0xD24C", 0xD24D: "Sony 0xD24D", 0xD24E: "Sony 0xD24E", 0xD24F: "Sony 0xD24F",
-        0xD250: "Sony 0xD250", 0xD251: "Sony 0xD251", 0xD252: "Sony 0xD252", 0xD253: "Sony ImageQuality (Bildqualität)",
+        0xD250: "Sony 0xD250", 0xD251: "Sony 0xD251", 0xD252: "Sony 0xD252", 0xD253: "Sony ImageQuality",
         0xD254: "Sony 0xD254", 0xD255: "Sony 0xD255", 0xD256: "Sony 0xD256", 0xD257: "Sony 0xD257", 0xD258: "Sony 0xD258",
         0xD259: "Sony 0xD259", 0xD25A: "Sony PriorityMode", 0xD25B: "Sony 0xD25B", 0xD25C: "Sony 0xD25C", 0xD25D: "Sony 0xD25D",
         0xD25E: "Sony 0xD25E", 0xD25F: "Sony 0xD25F", 0xD260: "Sony 0xD260", 0xD261: "Sony 0xD261", 0xD262: "Sony 0xD262",
         0xD263: "Sony 0xD263", 0xD264: "Sony 0xD264", 0xD265: "Sony 0xD265", 0xD266: "Sony 0xD266", 0xD267: "Sony 0xD267",
-        0xD268: "Sony PcSaveImageSize", 0xD269: "Sony PcSaveImageFormat (Übertragung an die App)", 0xD26A: "Sony 0xD26A",
+        0xD268: "Sony PcSaveImageSize", 0xD269: "Sony PcSaveImageFormat (transfer to app)", 0xD26A: "Sony 0xD26A",
         0xD2C1: "Sony Ctrl ShutterHalfRelease", 0xD2C2: "Sony Ctrl ShutterRelease", 0xD2C3: "Sony Ctrl AELButton", 0xD2C4: "Sony Ctrl 0xD2C4",
         0xD2C5: "Sony Ctrl 0xD2C5", 0xD2C7: "Sony Ctrl StillImage/Movie", 0xD2C8: "Sony Ctrl Movie", 0xD2C9: "Sony Ctrl FELButton",
         0xD2CB: "Sony Ctrl 0xD2CB", 0xD2CC: "Sony Ctrl 0xD2CC", 0xD2CD: "Sony Ctrl 0xD2CD", 0xD2CE: "Sony Ctrl 0xD2CE",
-        0xD2D1: "Sony Ctrl NearFar (Fokus manuell)", 0xD2D2: "Sony Ctrl 0xD2D2", 0xD2D3: "Sony Ctrl 0xD2D3", 0xD2D4: "Sony Ctrl 0xD2D4",
+        0xD2D1: "Sony Ctrl NearFar (manual focus)", 0xD2D2: "Sony Ctrl 0xD2D2", 0xD2D3: "Sony Ctrl 0xD2D3", 0xD2D4: "Sony Ctrl 0xD2D4",
         0xD2DB: "Sony Ctrl Zoom", 0xD2DD: "Sony Ctrl 0xD2DD", 0xD2DE: "Sony Ctrl 0xD2DE", 0xD2E0: "Sony Ctrl 0xD2E0",
     ]
     static let dataTypes: [UInt16: String] = [
@@ -78,42 +78,42 @@ extension SonyCamera {
     func capabilitiesReport() -> String {
         var out: [String] = []
         let di = deviceInfo
-        out.append("# OpenBooth Kamera-Fähigkeiten, \(DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium))")
-        out.append("Modell: \(di.manufacturer) \(di.model), Firmware \(di.deviceVersion), Seriennummer \(di.serialNumber)")
-        out.append("PTP-Standard \(di.standardVersion), VendorExtension 0x\(String(di.vendorExtensionID, radix: 16)) \(di.vendorExtensionDesc)")
-        out.append("Sony-Protokollversion 0x\(String(protocolVersion, radix: 16))")
+        out.append("# OpenBooth camera capabilities, \(DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium))")
+        out.append("Model: \(di.manufacturer) \(di.model), firmware \(di.deviceVersion), serial \(di.serialNumber)")
+        out.append("PTP standard \(di.standardVersion), vendor extension 0x\(String(di.vendorExtensionID, radix: 16)) \(di.vendorExtensionDesc)")
+        out.append("Sony protocol version 0x\(String(protocolVersion, radix: 16))")
         out.append("")
-        out.append("## Operationen (\(di.operations.count), aus GetDeviceInfo)")
+        out.append("## Operations (\(di.operations.count), from GetDeviceInfo)")
         out += di.operations.sorted().map { "  " + PTPNames.op($0) }
         out.append("")
         out.append("## Events (\(di.events.count))")
         out += di.events.sorted().map { "  " + PTPNames.ev($0) }
         out.append("")
-        out.append("## Properties laut GetDeviceInfo (\(di.properties.count))")
+        out.append("## Properties per GetDeviceInfo (\(di.properties.count))")
         out += di.properties.sorted().map { "  " + PTPNames.prop($0) }
         out.append("")
-        out.append("## Sony-Vendor-Properties aus 0x9202 (\(vendorProps.count))")
+        out.append("## Sony vendor properties from 0x9202 (\(vendorProps.count))")
         out += vendorProps.sorted().map { "  " + PTPNames.prop($0) }
         out.append("")
-        out.append("## Sony-Steuercodes aus 0x9202 (\(controlCodes.count), für ControlDevice 0x9207)")
+        out.append("## Sony control codes from 0x9202 (\(controlCodes.count), for ControlDevice 0x9207)")
         out += controlCodes.sorted().map { "  " + PTPNames.prop($0) }
         out.append("")
-        out.append("## Alle Properties aus 0x9209 mit Wert (\(props.count))")
+        out.append("## All properties from 0x9209 with value (\(props.count))")
         for code in props.keys.sorted() {
             let p = props[code]!
-            var line = "  \(PTPNames.prop(code))  typ=\(PTPNames.dataTypes[p.dataType] ?? PTPNames.hex(p.dataType)) getset=\(p.getSet) enabled=\(p.isEnabled)"
-            if let c = p.currentValue { line += " aktuell=\(c) (0x\(String(c, radix: 16)))" }
-            if let d = p.defaultValue { line += " standard=\(d)" }
+            var line = "  \(PTPNames.prop(code))  type=\(PTPNames.dataTypes[p.dataType] ?? PTPNames.hex(p.dataType)) getset=\(p.getSet) enabled=\(p.isEnabled)"
+            if let c = p.currentValue { line += " current=\(c) (0x\(String(c, radix: 16)))" }
+            if let d = p.defaultValue { line += " default=\(d)" }
             if !p.enumValues.isEmpty {
                 let shown = p.enumValues.prefix(40).map(String.init).joined(separator: ",")
-                line += " auswahl[\(p.enumValues.count)]=\(shown)\(p.enumValues.count > 40 ? ",…" : "")"
+                line += " choices[\(p.enumValues.count)]=\(shown)\(p.enumValues.count > 40 ? ",…" : "")"
             }
             out.append(line)
         }
         out.append("")
-        out.append("## Rohdaten (Hex, little endian, PTP-Datenphase ohne Container-Header)")
+        out.append("## Raw data (hex, little endian, PTP data phase without container header)")
         for (name, d) in rawDumps {
-            out.append("### \(name), \(d.count) Byte")
+            out.append("### \(name), \(d.count) bytes")
             out.append(Self.hexDump(d))
         }
         return out.joined(separator: "\n") + "\n"
@@ -138,10 +138,10 @@ enum Diagnostics {
         let dev = UIDevice.current
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-        var out = ["# OpenBooth Diagnose, \(DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium)) (\(TimeZone.current.identifier))",
-                   "App \(v) (\(b)), \(dev.systemName) \(dev.systemVersion), Gerät \(Self.modelIdentifier()), Sprache \(Locale.current.identifier)"]
+        var out = ["# OpenBooth diagnostics, \(DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium)) (\(TimeZone.current.identifier))",
+                   "App \(v) (\(b)), \(dev.systemName) \(dev.systemVersion), device \(Self.modelIdentifier()), locale \(Locale.current.identifier)"]
         if let s {
-            out.append("Einstellungen: autoConnect=\(s.autoConnect) countdown=\(s.countdownSeconds) shots=\(s.shotsPerCapture)/\(s.shotInterval)s result=\(s.resultSeconds)s idle=\(s.idleSeconds)s slideshow=\(s.slideshowInterval)s mirror=\(s.mirrorLiveView) pickupExternal=\(s.pickupExternal) motionWake=\(s.motionWake)/\(s.motionThreshold) saveToPhotos=\(s.saveToPhotos) immich=\(s.immichEnabled)(\(s.immichURL.isEmpty ? "leer" : "gesetzt"), raw=\(s.immichUploadRAW)) webdav=\(s.webdavEnabled)(\(s.webdavURL.isEmpty ? "leer" : "gesetzt"), raw=\(s.webdavUploadRAW)) sounds=\(s.soundsEnabled) maxBrightness=\(s.maxBrightness) debug=\(s.debugMode)")
+            out.append("Settings: autoConnect=\(s.autoConnect) countdown=\(s.countdownSeconds) shots=\(s.shotsPerCapture)/\(s.shotInterval)s result=\(s.resultSeconds)s idle=\(s.idleSeconds)s slideshow=\(s.slideshowInterval)s mirror=\(s.mirrorLiveView) pickupExternal=\(s.pickupExternal) motionWake=\(s.motionWake)/\(s.motionThreshold) saveToPhotos=\(s.saveToPhotos) immich=\(s.immichEnabled)(\(s.immichURL.isEmpty ? "empty" : "set"), raw=\(s.immichUploadRAW)) webdav=\(s.webdavEnabled)(\(s.webdavURL.isEmpty ? "empty" : "set"), raw=\(s.webdavUploadRAW)) sounds=\(s.soundsEnabled) maxBrightness=\(s.maxBrightness) debug=\(s.debugMode)")
         }
         return out.joined(separator: "\n") + "\n"
     }

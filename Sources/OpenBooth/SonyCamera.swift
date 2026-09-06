@@ -72,11 +72,11 @@ enum SonyError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .ptp(let op, let code): return String(format: "PTP-Fehler 0x%04X bei Operation 0x%04X", code, op)
-        case .noSession: return "Keine Kamera-Session"
-        case .timeout(let s): return "Zeitueberschreitung: \(s)"
-        case .noImage: return "Kein Bild von der Kamera erhalten"
-        case .badData(let s): return "Unerwartete Daten: \(s)"
+        case .ptp(let op, let code): return String(format: "PTP error 0x%04X in operation 0x%04X", code, op)
+        case .noSession: return "No camera session"
+        case .timeout(let s): return "Timeout: \(s)"
+        case .noImage: return "No image received from the camera"
+        case .badData(let s): return "Unexpected data: \(s)"
         }
     }
 }
@@ -128,7 +128,7 @@ actor PTPTransport {
     func run(_ op: UInt16, params: [UInt32] = [], dataOut: Data? = nil, allow: Set<UInt16> = []) async throws -> Data {
         let (resp, data) = try await transaction(op, params: params, dataOut: dataOut)
         let paramStr = params.map { String(format: "0x%X", $0) }.joined(separator: ",")
-        emit(String(format: "op 0x%04X(%@) -> %@ (%d Byte)", op, paramStr, resp.codeHex, data.count))
+        emit(String(format: "op 0x%04X(%@) -> %@ (%d bytes)", op, paramStr, resp.codeHex, data.count))
         if !resp.ok && !allow.contains(resp.code) {
             throw SonyError.ptp(op: op, code: resp.code)
         }
@@ -139,7 +139,7 @@ actor PTPTransport {
         let (resp, data) = try await transaction(op, params: params, dataOut: dataOut)
         // quiet: nur echte Fehler loggen; AccessDenied/DeviceBusy sind beim Liveview normal (zu schnell gefragt)
         if !quiet || (!resp.ok && resp.code != PTP.RC.accessDenied && resp.code != PTP.RC.deviceBusy && resp.code != PTP.RC.invalidObjectHandle) {
-            emit(String(format: "op 0x%04X -> %@ (%d Byte)", op, resp.codeHex, data.count))
+            emit(String(format: "op 0x%04X -> %@ (%d bytes)", op, resp.codeHex, data.count))
         }
         return (resp, data)
     }
@@ -306,7 +306,7 @@ final class SonyCamera {
             }
             let (resp, data) = try await transport.runWithResponse(PTP.Op.getObject, params: [SonyHandle.liveView], quiet: true)
             if resp.ok, data.count > 4 {
-                if !liveHeaderDumped { liveHeaderDumped = true; dump("Liveview 0xFFFFC002 Kopf (\(data.count) Byte)", data, limit: 96) }
+                if !liveHeaderDumped { liveHeaderDumped = true; dump("Liveview 0xFFFFC002 header (\(data.count) bytes)", data, limit: 96) }
                 return Self.extractJPEG(data)
             }
             if resp.code == PTP.RC.accessDenied || resp.code == PTP.RC.deviceBusy {
@@ -345,19 +345,19 @@ final class SonyCamera {
         // Neuere Bodies (A7 IV u. a.) brauchen ~3 s nach dem Handshake, bevor sie ausloesen koennen
         let sinceConnect = Date().timeIntervalSince(connectedAt)
         if sinceConnect < 3.0 {
-            progress?("Kamera bereit machen …")
+            progress?("Preparing camera…")
             try await Task.sleep(nanoseconds: UInt64((3.0 - sinceConnect) * 1_000_000_000))
         }
 
         // RAM leeren, falls noch ein Bild vom letzten Mal drin liegt
         try await refreshProps()
         if let inMem = currentValue(SonyProp.objectInMemory), inMem >= 0x8000 {
-            progress?("Altes Bild aus dem Kamera-RAM entfernen …")
+            progress?("Removing old image from camera RAM…")
             _ = try? await transport.run(PTP.Op.getObjectInfo, params: [SonyHandle.capturedImage])
             _ = try? await transport.run(PTP.Op.getObject, params: [SonyHandle.capturedImage])
         }
 
-        progress?("Auslösen …")
+        progress?("Releasing shutter…")
         try await control(SonyProp.shutterHalfRelease, value: 2)
         try await control(SonyProp.shutterRelease, value: 2)
 
@@ -377,7 +377,7 @@ final class SonyCamera {
 
         // Auf das Bild warten: die Kamera meldet ObjectAdded (0xC201) sofort; solange keine Events beobachtet
         // wurden, alle 100 ms pollen, sonst nur noch jede Sekunde als Sicherheitsnetz. Maximal 35 s (Langzeitbelichtung).
-        progress?("Warten auf das Bild …")
+        progress?("Waiting for the image…")
         objectAdded.reset()
         let start = Date()
         var ready = false
@@ -390,13 +390,13 @@ final class SonyCamera {
                 try await refreshProps()
                 if let inMem = currentValue(SonyProp.objectInMemory), inMem >= 0x8000 {
                     ready = true
-                    if signalled { progress?("Bild per Event gemeldet") }
+                    if signalled { progress?("Image announced by event") }
                     break
                 }
             }
             try await Task.sleep(nanoseconds: 30_000_000)
         }
-        guard ready else { throw SonyError.timeout("Kamera hat kein Bild gemeldet (kein Fokus?)") }
+        guard ready else { throw SonyError.timeout("Camera reported no image (no focus?)") }
         return try await fetchObjects(progress: progress)
     }
 
@@ -408,7 +408,7 @@ final class SonyCamera {
 
     /// Alle Objekte aus dem RAM holen (JPEG, RAW oder beide), solange 0xD215 weitere meldet.
     func fetchObjects(progress: ((String) -> Void)? = nil) async throws -> [CapturedObject] {
-        progress?("Bild abrufen …")
+        progress?("Fetching image…")
         var objects: [CapturedObject] = []
         var pending = true
         var rounds = 0
@@ -420,7 +420,7 @@ final class SonyCamera {
             let data = try await transport.run(PTP.Op.getObject, params: [SonyHandle.capturedImage])
             guard data.count > 1000 else { break }
             objects.append(CapturedObject(data: data, format: oi.objectFormat, filename: oi.filename))
-            progress?(String(format: "Erhalten: %@ Format 0x%04X (%d KB)", oi.filename, oi.objectFormat, data.count / 1024))
+            progress?(String(format: "Received: %@ format 0x%04X (%d KB)", oi.filename, oi.objectFormat, data.count / 1024))
             // Liegt noch ein Objekt im RAM (RAW+JPEG)? Kamera braucht eventuell einen Moment fuer den Zaehler.
             var mem: Int64 = 0
             for _ in 0..<4 {
@@ -429,9 +429,9 @@ final class SonyCamera {
                 if mem > 0x8000 { break }
                 try await Task.sleep(nanoseconds: 150_000_000)
             }
-            progress?(String(format: "RAM-Zähler 0xD215 nach Abruf: 0x%04llX", mem))
+            progress?(String(format: "RAM counter 0xD215 after fetch: 0x%04llX", mem))
             pending = mem > 0x8000
-            if pending { progress?("Weiteres Objekt abrufen …") }
+            if pending { progress?("Fetching further object…") }
         }
         guard !objects.isEmpty else { throw SonyError.noImage }
         return objects

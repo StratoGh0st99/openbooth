@@ -54,12 +54,10 @@ final class AppSettings: ObservableObject {
     @Published var motionWake: Bool { didSet { d.set(motionWake, forKey: "motionWake") } }
     @Published var motionThreshold: Int { didSet { d.set(motionThreshold, forKey: "motionThreshold") } }
 
-    static let defaultPhrases = ["Cheese!", "Bitte lächeln!", "Käsekuchen!", "Spaghetti!", "Sonnenschein!", "Zähne zeigen!",
-                                 "Alle zusammen!", "Und… lächeln!", "Sag Cheeeese!", "Ananas!", "Whisky!", "Strahlen!",
-                                 "Ein Lächeln bitte!", "Jetzt!", "Gummibärchen!", "Dreikäsehoch!"]
+    static let defaultPhrases = String(localized: "Cheese!|Smile!|Cheesecake!|Spaghetti!|Sunshine!|Show your teeth!|Everyone together!|And… smile!|Say cheeeese!|Pineapple!|Whisky!|Shine!|A smile please!|Now!|Gummy bears!|Big cheese!").components(separatedBy: "|")
 
     init() {
-        let name = d.string(forKey: "eventName") ?? d.string(forKey: "immichAlbum") ?? "Fotobox"
+        let name = d.string(forKey: "eventName") ?? d.string(forKey: "immichAlbum") ?? String(localized: "Photo Booth")
         var ev = d.stringArray(forKey: "events") ?? []
         if !ev.contains(name) { ev.append(name) }
         eventName = name
@@ -80,8 +78,8 @@ final class AppSettings: ObservableObject {
         slideshowInterval = d.object(forKey: "slideshowInterval") as? Int ?? 7
         mirrorLiveView = d.object(forKey: "mirrorLiveView") as? Bool ?? true
         showHistogram = d.object(forKey: "showHistogram") as? Bool ?? false
-        welcomeTitle = d.string(forKey: "welcomeTitle") ?? "📸 Fotobox"
-        welcomeText = d.string(forKey: "welcomeText") ?? "Stellt euch vor die Kamera\nund drückt auf den Knopf!"
+        welcomeTitle = d.string(forKey: "welcomeTitle") ?? String(localized: "📸 Photo Booth")
+        welcomeText = d.string(forKey: "welcomeText") ?? String(localized: "Step in front of the camera\nand press the button!")
         guestGallery = d.object(forKey: "guestGallery") as? Bool ?? true
         gallerySeconds = d.object(forKey: "gallerySeconds") as? Int ?? 30
         shotsPerCapture = d.object(forKey: "shotsPerCapture") as? Int ?? 1
