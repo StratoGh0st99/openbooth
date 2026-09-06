@@ -9,6 +9,7 @@
 
 import Foundation
 import Network
+import UIKit
 
 struct WebStatus: Encodable {
     var event: String
@@ -69,14 +70,20 @@ final class LocalWebServer: @unchecked Sendable {
         listener?.cancel(); listener = nil; running = false
     }
 
-    /// mDNS-Name des iPads (z. B. Pauls-iPad.local), funktioniert von Apple-Geraeten und den meisten Browsern im selben WLAN
-    static func localHostname() -> String? {
+    /// mDNS-Name des iPads (z. B. Pauls-iPad.local). iOS gibt den Hostnamen nicht mehr an Apps heraus, bildet ihn aber
+    /// aus dem Geraetenamen: Leerzeichen zu Bindestrichen, Umlaute vereinfacht, Sonderzeichen entfernt.
+    @MainActor static func localHostname() -> String? {
         var buf = [CChar](repeating: 0, count: 256)
-        guard gethostname(&buf, buf.count) == 0 else { return nil }
-        var name = String(cString: buf)
-        guard !name.isEmpty, name != "localhost" else { return nil }
-        if !name.hasSuffix(".local") { name += ".local" }
-        return name
+        if gethostname(&buf, buf.count) == 0 {
+            let h = String(cString: buf)
+            if !h.isEmpty, h != "localhost", !h.hasPrefix("iPad-") || h.count > 12, h.contains("-") || h.contains(".") { return h.hasSuffix(".local") ? h : h + ".local" }
+        }
+        let name = UIDevice.current.name.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .replacingOccurrences(of: "ß", with: "ss").replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "’", with: "")
+        let dashed = name.replacingOccurrences(of: " ", with: "-")
+        let cleaned = dashed.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) || $0 == "-" }.map { String($0) }.joined()
+        guard !cleaned.isEmpty else { return nil }
+        return cleaned + ".local"
     }
 
     /// IPv4-Adressen des iPads (WLAN), fuer die Anzeige der URL im Admin

@@ -628,13 +628,24 @@ struct AdminPanel: View {
             Toggle("Statusseite im WLAN", isOn: $settings.webEnabled)
                 .onChange(of: settings.webEnabled) { _, _ in cam.syncWeb() }
             if settings.webEnabled {
-                if let host = LocalWebServer.localHostname() {
-                    LabeledContent("Name") { Text("http://\(host):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
+                let ips = LocalWebServer.localAddresses()
+                HStack(alignment: .top, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let host = LocalWebServer.localHostname() {
+                            LabeledContent("Name") { Text("http://\(host):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
+                        }
+                        ForEach(ips, id: \.self) { ip in
+                            LabeledContent("Adresse") { Text("http://\(ip):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
+                        }
+                        if ips.isEmpty { Text("Kein WLAN verbunden").foregroundStyle(.secondary) }
+                        Text("Der Name ist aus dem Gerätenamen abgeleitet (Einstellungen › Allgemein › Info) und funktioniert von Apple-Geräten und den meisten Browsern; die IP immer.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let ip = ips.first {
+                        QRCodeView(text: "http://\(ip):\(LocalWebServer.port)").frame(width: 120, height: 120)
+                            .padding(6).background(.white, in: RoundedRectangle(cornerRadius: 8))
+                    }
                 }
-                ForEach(LocalWebServer.localAddresses(), id: \.self) { ip in
-                    LabeledContent("Adresse") { Text("http://\(ip):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
-                }
-                if LocalWebServer.localAddresses().isEmpty { Text("Kein WLAN verbunden").foregroundStyle(.secondary) }
             }
         } header: { Text("Fernzugriff") } footer: {
             Text("Nur lesend: Kamera, Bildrate, Fotos, Speicherziele, Protokoll, Diagnose senden. Anmeldung mit der Admin-PIN, nach fünf Fehlversuchen eine Minute Sperre. Nur im selben WLAN erreichbar, solange die App im Vordergrund läuft.")
