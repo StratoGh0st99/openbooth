@@ -19,6 +19,8 @@ final class AppSettings: ObservableObject {
     @Published var debugMode: Bool { didSet { d.set(debugMode, forKey: "debugMode") } }
     @Published var autoReports: Bool { didSet { d.set(autoReports, forKey: "autoReports") } }
     @Published var webEnabled: Bool { didSet { d.set(webEnabled, forKey: "webEnabled") } }
+    @Published var ipadFallback: Bool { didSet { d.set(ipadFallback, forKey: "ipadFallback") } }
+    @Published var ipadFrontCamera: Bool { didSet { d.set(ipadFrontCamera, forKey: "ipadFrontCamera") } }
     @Published var restoreCameraSettings: Bool { didSet { d.set(restoreCameraSettings, forKey: "restoreCameraSettings") } }
     /// Zuletzt in der App gesetzte Kamerawerte je Modell: [Modell: [Code(hex): Wert]]
     @Published var rememberedCamera: [String: [String: Int]] { didSet { d.set(rememberedCamera, forKey: "rememberedCamera") } }
@@ -67,6 +69,8 @@ final class AppSettings: ObservableObject {
         debugMode = d.object(forKey: "debugMode") as? Bool ?? false
         autoReports = d.object(forKey: "autoReports") as? Bool ?? false
         webEnabled = d.object(forKey: "webEnabled") as? Bool ?? false
+        ipadFallback = d.object(forKey: "ipadFallback") as? Bool ?? true
+        ipadFrontCamera = d.object(forKey: "ipadFrontCamera") as? Bool ?? true
         restoreCameraSettings = d.object(forKey: "restoreCameraSettings") as? Bool ?? true
         rememberedCamera = d.dictionary(forKey: "rememberedCamera") as? [String: [String: Int]] ?? [:]
         autoConnect = d.object(forKey: "autoConnect") as? Bool ?? true

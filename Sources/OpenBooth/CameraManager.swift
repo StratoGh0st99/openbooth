@@ -33,7 +33,73 @@ final class CameraManager: NSObject, ObservableObject {
     /// Nach Aenderung von Eventname oder Zielen: Fotoordner wechseln und alle Upload-Ziele neu konfigurieren.
     func syncUploaders() {
         if let s = settingsRef { switchEvent(to: Self.safeName(s.eventName)) }
-        syncImmich(); syncWebDAV(); syncWeb()
+        syncImmich(); syncWebDAV(); syncWeb(); syncFallback()
+    }
+
+    // MARK: Ersatz: iPad-Kamera, wenn keine Kamera per USB da ist
+
+    private(set) var ipadCam: IPadCamera?
+    @Published private(set) var usingIPadCamera = false
+    private var fallbackTimer: Task<Void, Never>?
+
+    /// Nach 4 s ohne USB-Kamera die iPad-Kamera starten (wenn eingeschaltet); bei USB-Kamera sofort stoppen.
+    private func scheduleFallback() {
+        fallbackTimer?.cancel()
+        guard settingsRef?.ipadFallback ?? true, sony == nil, device == nil, devices.isEmpty else { return }
+        fallbackTimer = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard !Task.isCancelled, let self, self.sony == nil, self.device == nil, self.devices.isEmpty else { return }
+            await self.startIPadCamera()
+        }
+    }
+    private func startIPadCamera() async {
+        guard ipadCam == nil, settingsRef?.ipadFallback ?? true else { return }
+        guard await IPadCamera.authorized() else { appendLog("iPad-Kamera: kein Zugriff (Einstellungen › OpenBooth › Kamera)"); return }
+        let cam = IPadCamera()
+        do {
+            try cam.start(front: settingsRef?.ipadFrontCamera ?? true) { [weak self] img in
+                Task { @MainActor in self?.ingestFallbackFrame(img) }
+            }
+        } catch { appendLog("iPad-Kamera: \(error.localizedDescription)"); return }
+        ipadCam = cam
+        usingIPadCamera = true
+        state = .connected
+        status = "iPad-Kamera (Ersatz)"
+        liveRunning = true
+        lastFrame = Date()
+        banner = nil
+        appendLog("iPad-Kamera als Ersatz gestartet (\(settingsRef?.ipadFrontCamera ?? true ? "Front" : "Rück")kamera)")
+    }
+    func stopIPadCamera(reason: String) {
+        fallbackTimer?.cancel(); fallbackTimer = nil
+        guard let cam = ipadCam else { return }
+        cam.stop(); ipadCam = nil
+        usingIPadCamera = false
+        liveRunning = false
+        liveFrame = nil
+        liveHistogram = nil
+        if sony == nil { state = .browsing; status = "Suche Kamera …" }
+        appendLog("iPad-Kamera gestoppt (\(reason))")
+    }
+    /// Einstellungen geaendert: Ersatzkamera an/aus oder Front/Rueck wechseln
+    func syncFallback() {
+        guard let s = settingsRef else { return }
+        if !s.ipadFallback { stopIPadCamera(reason: "ausgeschaltet"); return }
+        if let cam = ipadCam, cam.position == (s.ipadFrontCamera ? .front : .back) { return }
+        if ipadCam != nil { stopIPadCamera(reason: "Kamerawechsel") }
+        scheduleFallback()
+    }
+    private var fallbackMotion = MotionDetector()
+    private var fallbackFrames = 0
+    private func ingestFallbackFrame(_ img: UIImage) {
+        guard ipadCam != nil else { return }
+        liveFrame = img; lastFrame = Date(); frameCount += 1
+        fallbackFrames += 1
+        if motionArmed {
+            let hit = fallbackMotion.feed(img, threshold: motionThreshold)
+            motionResult(level: fallbackMotion.level, hit: hit, noise: fallbackMotion.noiseLevel, global: fallbackMotion.globalLevel)
+        } else { fallbackMotion.reset() }
+        if wantHistogram, fallbackFrames % 3 == 0 { liveHistogram = Histogram.compute(img) } else if !wantHistogram, liveHistogram != nil { liveHistogram = nil }
     }
 
     // MARK: Fernzugriff (Statusseite im WLAN)
@@ -64,7 +130,7 @@ final class CameraManager: NSObject, ObservableObject {
         let up = Int(Date().timeIntervalSince(startedAt))
         let stateName: String = { switch state { case .connected: return "connected"; case .error: return "error"; default: return "\(state)" } }()
         return WebStatus(event: s?.eventName ?? "",
-                         camera: sony?.deviceInfo.model.isEmpty == false ? sony!.deviceInfo.model : (devices.first?.name ?? "keine"),
+                         camera: sony?.deviceInfo.model.isEmpty == false ? sony!.deviceInfo.model : (ipadCam != nil ? "iPad-Kamera (Ersatz)" : (devices.first?.name ?? "keine")),
                          state: stateName, status: status, fps: lastFPS, idle: idle, photos: sessionPhotos.count,
                          lastPhoto: sessionPhotos.first.flatMap { (try? $0.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate }.map { f.string(from: $0) },
                          immich: s?.immichEnabled == true ? immich.lastMessage : nil,
@@ -219,13 +285,13 @@ final class CameraManager: NSObject, ObservableObject {
         // Ausloeser, Menue offen), erst nach 20 s: dann ist der Liveview wirklich haengen geblieben.
         let stalled = Date().timeIntervalSince(lastFrame)
         let eventsRecently = Date().timeIntervalSince(lastEventAt) < 8
-        if state == .connected, liveRunning, !capturing, stalled > (eventsRecently ? 20 : 8) {
+        if state == .connected, liveRunning, !capturing, ipadCam == nil, stalled > (eventsRecently ? 20 : 8) {
             appendLog(String(format: "Liveview liefert seit %.0f s nichts mehr%@, Neustart", stalled, eventsRecently ? " (Kamera meldet Events)" : ""))
             stopLiveView()
             startLiveView()
         }
         // Verbunden, aber Liveview aus (z. B. nach Fehlern) -> wieder an
-        if state == .connected, !liveRunning, !capturing, !settingsBusy, autoConnect, sony != nil {
+        if state == .connected, !liveRunning, !capturing, !settingsBusy, autoConnect, sony != nil, ipadCam == nil {
             startLiveView()
         }
         // Fremdausloesung: mit Events nur noch alle 30 s als Sicherheitsnetz, sonst alle 2 s
@@ -425,6 +491,7 @@ final class CameraManager: NSObject, ObservableObject {
                     self.banner = Banner(kind: .error, text: "Kein Zugriff auf die Kamera", detail: "Einstellungen › OpenBooth › Kamera erlauben")
                 } else if self.devices.isEmpty {
                     self.banner = Banner(kind: .info, text: "Kamera anschließen", detail: "Sony im Modus „PC-Fernbedienung“ per USB-C")
+                    self.scheduleFallback()
                 }
             }
         }
@@ -597,6 +664,7 @@ final class CameraManager: NSObject, ObservableObject {
     // MARK: Liveview
 
     func startLiveView() {
+        if ipadCam != nil { liveRunning = true; return }
         guard let cam = sony, liveTask == nil else { return }
         liveRunning = true
         lastFrame = Date()
@@ -684,7 +752,8 @@ final class CameraManager: NSObject, ObservableObject {
 
     /// Fotobox-Ablauf: Countdown, ein oder mehrere Bilder mit Pause, grosse Vorschau, speichern.
     func capture(withCountdown seconds: Int = 3) {
-        guard let cam = sony, !capturing else { return }
+        guard sony != nil || ipadCam != nil, !capturing else { return }
+        let cam = sony
         noteInteraction()
         dismissResult()
         let shots = max(1, settingsRef?.shotsPerCapture ?? 1)
@@ -713,9 +782,16 @@ final class CameraManager: NSObject, ObservableObject {
                 countdown = nil
                 stopLiveView()
                 do {
-                    let objects = try await cam.capture { [weak self] msg in
-                        Task { @MainActor in self?.status = msg; self?.appendLog(msg) }
-                    }
+                    let objects: [CapturedObject]
+                    if let cam {
+                        objects = try await cam.capture { [weak self] msg in
+                            Task { @MainActor in self?.status = msg; self?.appendLog(msg) }
+                        }
+                    } else if let ip = ipadCam {
+                        let o = try await ip.capture()
+                        appendLog("iPad-Kamera: \(o.filename) (\(o.data.count / 1024) KB)")
+                        objects = [o]
+                    } else { throw SonyError.noSession }
                     if let (img, url) = try await store(objects) { taken.append(img); takenURLs.append(url) }
                 } catch {
                     appendLog("AUFNAHME FEHLER (Bild \(shot)/\(shots)): \(error.localizedDescription)")
@@ -1024,6 +1100,7 @@ extension CameraManager: ICDeviceBrowserDelegate {
         Task { @MainActor in
             guard let cam = device as? ICCameraDevice else { return }
             appendLog("Kamera gefunden: \(cam.name ?? "?")  Modell: \(cam.productKind ?? "?")  Transport: \(cam.transportType ?? "?")")
+            stopIPadCamera(reason: "USB-Kamera gefunden")
             if !devices.contains(where: { $0 === cam }) { devices.append(cam) }
             state = .deviceFound
             status = "Kamera gefunden"
@@ -1048,6 +1125,7 @@ extension CameraManager: ICDeviceBrowserDelegate {
                 liveFrame = nil
                 state = .browsing
                 status = "Kamera getrennt"
+                scheduleFallback()
                 banner = Banner(kind: .warning, text: "Kamera getrennt", detail: "Sobald sie wieder angeschlossen ist, geht es automatisch weiter")
             }
         }

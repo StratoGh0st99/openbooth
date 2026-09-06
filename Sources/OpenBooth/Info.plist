@@ -27,7 +27,7 @@
 		<string>_http._tcp</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>OpenBooth steuert die per USB angeschlossene Kamera (Liveview und Ausloesen).</string>
+	<string>OpenBooth steuert die per USB angeschlossene Kamera (Liveview und Auslösen) und nutzt die iPad-Kamera als Ersatz, wenn keine angeschlossen ist.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>OpenBooth lädt Fotos auf Server im lokalen Netz hoch und bietet dort eine Statusseite an.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

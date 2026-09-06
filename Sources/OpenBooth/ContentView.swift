@@ -504,6 +504,14 @@ struct AdminPanel: View {
             }
             Toggle("Automatisch verbinden", isOn: $settings.autoConnect)
             Toggle("Kameraeinstellungen aus der App beim Anstecken wiederherstellen", isOn: $settings.restoreCameraSettings)
+            Toggle("iPad-Kamera als Ersatz, wenn keine Kamera per USB da ist", isOn: $settings.ipadFallback)
+                .onChange(of: settings.ipadFallback) { _, _ in cam.syncFallback() }
+            if settings.ipadFallback {
+                Picker("iPad-Kamera", selection: $settings.ipadFrontCamera) { Text("Frontkamera").tag(true); Text("Rückkamera").tag(false) }
+                    .pickerStyle(.segmented)
+                    .onChange(of: settings.ipadFrontCamera) { _, _ in cam.syncFallback() }
+                if cam.usingIPadCamera { Label("iPad-Kamera aktiv", systemImage: "ipad.and.arrow.forward").foregroundStyle(.orange) }
+            }
             LabeledContent("Akku", value: "iPad \(cam.batteryText(cam.iPadBattery()))" + (cam.cameraBattery().map { ", Kamera \($0) %" } ?? ""))
             Toggle("Liveview spiegeln", isOn: $settings.mirrorLiveView)
             Toggle("Histogramm in Liveview und Rückschau", isOn: $settings.showHistogram)

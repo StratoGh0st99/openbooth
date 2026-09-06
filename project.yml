@@ -39,7 +39,7 @@ targets:
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         # Pflicht fuer PTP-Passthrough ueber ImageCaptureCore auf iPadOS
-        NSCameraUsageDescription: "OpenBooth steuert die per USB angeschlossene Kamera (Liveview und Ausloesen)."
+        NSCameraUsageDescription: "OpenBooth steuert die per USB angeschlossene Kamera (Liveview und Auslösen) und nutzt die iPad-Kamera als Ersatz, wenn keine angeschlossen ist."
         NSPhotoLibraryAddUsageDescription: "OpenBooth speichert die aufgenommenen Fotos in deine Mediathek."
         NSPhotoLibraryUsageDescription: "OpenBooth zeigt die aufgenommenen Fotos in der Galerie."
         NSLocalNetworkUsageDescription: "OpenBooth lädt Fotos auf Server im lokalen Netz hoch und bietet dort eine Statusseite an."
