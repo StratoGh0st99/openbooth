@@ -78,7 +78,7 @@ extension SonyCamera {
     func capabilitiesReport() -> String {
         var out: [String] = []
         let di = deviceInfo
-        out.append("# OpenBooth Kamera-Fähigkeiten, \(Date())")
+        out.append("# OpenBooth Kamera-Fähigkeiten, \(DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium))")
         out.append("Modell: \(di.manufacturer) \(di.model), Firmware \(di.deviceVersion), Seriennummer \(di.serialNumber)")
         out.append("PTP-Standard \(di.standardVersion), VendorExtension 0x\(String(di.vendorExtensionID, radix: 16)) \(di.vendorExtensionDesc)")
         out.append("Sony-Protokollversion 0x\(String(protocolVersion, radix: 16))")
@@ -138,7 +138,7 @@ enum Diagnostics {
         let dev = UIDevice.current
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-        var out = ["# OpenBooth Diagnose, \(Date())",
+        var out = ["# OpenBooth Diagnose, \(DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium)) (\(TimeZone.current.identifier))",
                    "App \(v) (\(b)), \(dev.systemName) \(dev.systemVersion), Gerät \(Self.modelIdentifier()), Sprache \(Locale.current.identifier)"]
         if let s {
             out.append("Einstellungen: autoConnect=\(s.autoConnect) countdown=\(s.countdownSeconds) shots=\(s.shotsPerCapture)/\(s.shotInterval)s result=\(s.resultSeconds)s idle=\(s.idleSeconds)s slideshow=\(s.slideshowInterval)s mirror=\(s.mirrorLiveView) pickupExternal=\(s.pickupExternal) motionWake=\(s.motionWake)/\(s.motionThreshold) saveToPhotos=\(s.saveToPhotos) immich=\(s.immichEnabled)(\(s.immichURL.isEmpty ? "leer" : "gesetzt"), raw=\(s.immichUploadRAW)) webdav=\(s.webdavEnabled)(\(s.webdavURL.isEmpty ? "leer" : "gesetzt"), raw=\(s.webdavUploadRAW)) sounds=\(s.soundsEnabled) maxBrightness=\(s.maxBrightness) debug=\(s.debugMode)")
