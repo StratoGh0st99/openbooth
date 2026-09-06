@@ -50,14 +50,32 @@ final class IPadCamera: NSObject, @unchecked Sendable {
         if session.canAddOutput(photo) { session.addOutput(photo) }
         photo.maxPhotoQualityPrioritization = .quality
         session.commitConfiguration()
-        if let c = video.connection(with: .video) {
-            if #available(iOS 17, *) { if c.isVideoRotationAngleSupported(0) { c.videoRotationAngle = 0 } }
-            c.isVideoMirrored = false
-        }
+        if let c = video.connection(with: .video) { c.isVideoMirrored = false }
+        applyRotation()
+        NotificationCenter.default.addObserver(self, selector: #selector(orientationChanged), name: UIDevice.orientationDidChangeNotification, object: nil)
         queue.async { [session] in session.startRunning() }
     }
 
+    /// Bilddrehung an die Lage des iPads anpassen (Querformat links oder rechts), fuer Liveview und Foto.
+    @objc private func orientationChanged() { applyRotation() }
+    private func applyRotation() {
+        let angle: CGFloat
+        switch UIDevice.current.orientation {
+        case .landscapeLeft: angle = 0        // USB-C rechts
+        case .landscapeRight: angle = 180     // USB-C links
+        case .portrait: angle = 90
+        case .portraitUpsideDown: angle = 270
+        default: angle = lastAngle
+        }
+        lastAngle = angle
+        for c in [video.connection(with: .video), photo.connection(with: .video)].compactMap({ $0 }) {
+            if c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
+        }
+    }
+    private var lastAngle: CGFloat = 0
+
     func stop() {
+        NotificationCenter.default.removeObserver(self)
         frameHandler = nil
         queue.async { [session] in if session.isRunning { session.stopRunning() } }
     }
@@ -69,7 +87,6 @@ final class IPadCamera: NSObject, @unchecked Sendable {
                 self.photoContinuation = cont
                 let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
                 s.photoQualityPrioritization = .quality
-                if let c = self.photo.connection(with: .video), #available(iOS 17, *), c.isVideoRotationAngleSupported(0) { c.videoRotationAngle = 0 }
                 self.photo.capturePhoto(with: s, delegate: self)
             }
         }
@@ -88,7 +105,8 @@ extension IPadCamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePho
         // Querformat-Orientierung: Landscape-Right (Home-Button rechts) entspricht der Fotobox-Aufstellung
         let ctx = Self.ciContext
         guard let cg = ctx.createCGImage(ci, from: ci.extent) else { return }
-        handler(UIImage(cgImage: cg, scale: 1, orientation: position == .front ? .downMirrored : .up))
+        // Frontkamera wie ein Spiegel (horizontal), nicht ueber Kopf
+        handler(UIImage(cgImage: cg, scale: 1, orientation: position == .front ? .upMirrored : .up))
     }
     private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
