@@ -94,6 +94,7 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var idle = false {   // Leerlauf: Collage anzeigen
         didSet {
             guard idle != oldValue else { return }
+            lastNoiseLog = Date()   // Ruhepegel erst 30 s nach Leerlaufbeginn protokollieren
             updateBrightness()
             if !idle, settingsRef?.soundsEnabled ?? true, settingsRef?.soundWelcome ?? true { Sounds.shared.play("welcome") }
         }
@@ -195,8 +196,8 @@ final class CameraManager: NSObject, ObservableObject {
     private var lastNoiseLog = Date.distantPast
     private func motionResult(level: Double, hit: Bool, noise: Double = 0, global: Double = 0) {
         motionLevel = level
-        // alle 30 s im Leerlauf: Ruhepegel und gelerntes Rauschen, um die Schwelle mit Daten zu setzen
-        if Date().timeIntervalSince(lastNoiseLog) > 30 {
+        // alle 30 s im Leerlauf (erst nach Einschwingen, nicht direkt beim Leerlaufbeginn): Ruhepegel und Rauschen
+        if noise > 0, Date().timeIntervalSince(lastNoiseLog) > 30 {
             lastNoiseLog = Date()
             appendLog(String(format: "Bewegung Ruhepegel: Feld %.1f, global %.1f, Rauschen %.1f, Schwelle %d", level, global, noise, settingsRef?.motionThreshold ?? 8))
         }
