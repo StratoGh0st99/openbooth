@@ -99,6 +99,9 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
     @Published var motionLevel: Double = 0    // letzte Bildaenderung im Leerlauf (Debug)
+    @Published var liveHistogram: Histogram?  // alle 3 Liveview-Bilder, wenn im Admin eingeschaltet
+    @Published var resultHistogram: Histogram?
+    private var wantHistogram: Bool { settingsRef?.showHistogram ?? false }
     /// Bewegungserkennung aktiv? Wird vom Liveview-Task gelesen (laeuft dort im Hintergrund, nicht auf dem Main-Thread).
     private var motionArmed: Bool { idle && (settingsRef?.motionWake ?? true) }
     private var motionThreshold: Double { Double(settingsRef?.motionThreshold ?? 8) }
@@ -501,16 +504,20 @@ final class CameraManager: NSObject, ObservableObject {
         lastFrame = Date()
         liveTask = Task { [weak self] in
             var failures = 0
+            var histCounter = 0
             var motion = MotionDetector()
             while !Task.isCancelled {
                 do {
                     if let jpeg = try await cam.liveViewFrame(), let raw = UIImage(data: jpeg) {
                         // JPEG hier im Hintergrund dekodieren, damit der Main-Thread nur noch anzeigt
                         let img = raw.preparingForDisplay() ?? raw
-                        let (armed, threshold) = await MainActor.run { (self?.motionArmed ?? false, self?.motionThreshold ?? 8) }
+                        let (armed, threshold, wantHist) = await MainActor.run { (self?.motionArmed ?? false, self?.motionThreshold ?? 8, self?.wantHistogram ?? false) }
                         var level = 0.0, hit = false
                         if armed { hit = motion.feed(img, threshold: threshold); level = motion.level } else { motion.reset() }
+                        histCounter += 1
+                        let hist: Histogram? = (wantHist && histCounter % 3 == 0) ? Histogram.compute(img) : nil
                         await MainActor.run {
+                            if let hist { self?.liveHistogram = hist } else if !wantHist, self?.liveHistogram != nil { self?.liveHistogram = nil }
                             self?.liveFrame = img; self?.lastFrame = Date(); self?.frameCount += 1
                             if self?.banner != nil { self?.banner = nil }
                             if armed { self?.motionResult(level: level, hit: hit) } else if self?.motionLevel != 0 { self?.motionLevel = 0 }
@@ -733,6 +740,13 @@ final class CameraManager: NSObject, ObservableObject {
     func showResult(_ imgs: [UIImage], urls: [URL] = []) {
         resultPhotos = imgs
         resultURLs = urls
+        resultHistogram = nil
+        if wantHistogram, let first = imgs.first {
+            Task.detached(priority: .userInitiated) { [weak self] in
+                let h = Histogram.compute(first)
+                await MainActor.run { self?.resultHistogram = h }
+            }
+        }
         resultPhoto = imgs.first
         resultShownAt = Date()
         resultTask?.cancel()

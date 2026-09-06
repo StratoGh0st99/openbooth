@@ -24,6 +24,7 @@ final class AppSettings: ObservableObject {
     @Published var idleSeconds: Int { didSet { d.set(idleSeconds, forKey: "idleSeconds") } }
     @Published var slideshowInterval: Int { didSet { d.set(slideshowInterval, forKey: "slideshowInterval") } }
     @Published var mirrorLiveView: Bool { didSet { d.set(mirrorLiveView, forKey: "mirrorLiveView") } }
+    @Published var showHistogram: Bool { didSet { d.set(showHistogram, forKey: "showHistogram") } }
     @Published var welcomeTitle: String { didSet { d.set(welcomeTitle, forKey: "welcomeTitle") } }
     @Published var welcomeText: String { didSet { d.set(welcomeText, forKey: "welcomeText") } }
     @Published var guestGallery: Bool { didSet { d.set(guestGallery, forKey: "guestGallery") } }
@@ -67,6 +68,7 @@ final class AppSettings: ObservableObject {
         idleSeconds = d.object(forKey: "idleSeconds") as? Int ?? 120
         slideshowInterval = d.object(forKey: "slideshowInterval") as? Int ?? 7
         mirrorLiveView = d.object(forKey: "mirrorLiveView") as? Bool ?? true
+        showHistogram = d.object(forKey: "showHistogram") as? Bool ?? false
         welcomeTitle = d.string(forKey: "welcomeTitle") ?? "📸 Fotobox"
         welcomeText = d.string(forKey: "welcomeText") ?? "Stellt euch vor die Kamera\nund drückt auf den Knopf!"
         guestGallery = d.object(forKey: "guestGallery") as? Bool ?? true

@@ -150,6 +150,12 @@ struct ContentView: View {
                     .transition(.scale.combined(with: .opacity))
             }
 
+            // Histogramm zum Liveview (Admin-Option), unten links ueber der Leiste
+            if settings.showHistogram, !cam.idle, cam.resultPhotos.isEmpty, cam.countdown == nil, let h = cam.liveHistogram {
+                VStack { Spacer(); HStack { HistogramView(histogram: h).frame(width: 220, height: 90).padding(.leading, 20).padding(.bottom, 110); Spacer() } }
+                    .allowsHitTesting(false)
+            }
+
             // Bedienleiste unten
             VStack {
                 Spacer()
@@ -242,6 +248,11 @@ struct ContentView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .shadow(radius: 20)
                                 .padding(.horizontal, 40)
+                                .overlay(alignment: .bottomLeading) {
+                                    if settings.showHistogram, let h = cam.resultHistogram {
+                                        HistogramView(histogram: h).frame(width: 220, height: 90).padding(56)
+                                    }
+                                }
                         } else {
                             let cols = cam.resultPhotos.count <= 4 ? 2 : 3
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: cols), spacing: 14) {
@@ -493,6 +504,7 @@ struct AdminPanel: View {
             }
             Toggle("Automatisch verbinden", isOn: $settings.autoConnect)
             Toggle("Liveview spiegeln", isOn: $settings.mirrorLiveView)
+            Toggle("Histogramm in Liveview und Rückschau", isOn: $settings.showHistogram)
             HStack {
                 Button("PTP-Test") { cam.probe() }
                     .disabled(!(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected))
