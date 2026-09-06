@@ -621,21 +621,16 @@ struct AdminPanel: View {
 
     @ViewBuilder private var logSection: some View {
         SwiftUI.Section {
-            if let url = diagnosticsURL {
-                ShareLink(item: url, subject: Text("OpenBooth Diagnose"),
-                          message: Text("Diagnose aus OpenBooth: Kamera-Fähigkeiten, Rohdaten und Protokoll.")) {
-                    Label("Diagnose teilen …", systemImage: "square.and.arrow.up")
-                }
-                Button("Neu erstellen") { diagnosticsURL = cam.makeDiagnosticsFile() }.font(.caption)
-            } else {
-                Button { diagnosticsURL = cam.makeDiagnosticsFile() } label: { Label("Diagnose erstellen", systemImage: "stethoscope") }
-            }
-            HStack {
+            HStack(spacing: 16) {
+                // Datei wird beim Antippen frisch erzeugt, dann Teilen-Menue (AirDrop, Mail, …)
+                Button { diagnosticsURL = cam.makeDiagnosticsFile() } label: { Label("Diagnose teilen …", systemImage: "square.and.arrow.up") }
+                    .buttonStyle(.bordered)
                 Button { Task { await cam.sendDiagnostics(reason: "manuell") } } label: { Label("An OpenBooth senden", systemImage: "paperplane") }
-                    .disabled(cam.reportStatus == "Sende …")
+                    .buttonStyle(.bordered).disabled(cam.reportStatus == "Sende …")
                 Spacer()
                 if !cam.reportStatus.isEmpty { Text(cam.reportStatus).font(.caption).foregroundStyle(.secondary) }
             }
+            .sheet(item: $diagnosticsURL) { url in ShareSheet(items: [url]) }
             Toggle("Fehlerberichte automatisch senden", isOn: $settings.autoReports)
         } header: { Text("Diagnose") } footer: {
             Text("Eine Textdatei mit iPad- und App-Version, allen Operationen, Events und Properties der Kamera samt Rohdaten (Hex) und dem vollständigen Protokoll. Reicht, um ein neues Kameramodell ohne Zugriff auf die Kamera zu unterstützen. Enthält keine Passwörter, API-Keys oder Server-Adressen, die Kamera-Seriennummer wird gekürzt. „An OpenBooth senden“ schickt genau diese Datei an die Entwickler. „Automatisch“ tut das bei Aufnahmefehlern und Verbindungsabbrüchen, höchstens alle 10 Minuten, sonst nie.")
@@ -1077,6 +1072,15 @@ struct SettingPicker: View {
         }
     }
 }
+
+/// Systemweites Teilen-Menue (UIActivityViewController) fuer eine Datei.
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController { UIActivityViewController(activityItems: items, applicationActivities: nil) }
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
+}
+
+extension URL: @retroactive Identifiable { public var id: String { absoluteString } }
 
 struct EventPanel: View {
     @EnvironmentObject var cam: CameraManager
