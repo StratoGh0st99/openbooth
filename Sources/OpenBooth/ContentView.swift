@@ -1169,13 +1169,28 @@ struct LayoutsPanel: View {
         }
     }
 
-    /// Picker direkt in der Form-Zeile (in LabeledContent verschachtelt liess er sich nicht antippen)
+    /// Auswahl als Menue-Knopf (SwiftUI-Picker in dieser Form-Zeile reagierte auf dem iPad nicht auf Tipps)
     private func sourcePicker(_ title: String, _ sel: Binding<String>) -> some View {
-        Picker(title, selection: sel) {
-            Text("Original").tag(FixedLayout.originalID)
-            ForEach(FixedLayout.allCases) { Text($0.label).tag($0.rawValue) }
+        HStack {
+            Text(title)
+            Spacer()
+            Menu {
+                Button { sel.wrappedValue = FixedLayout.originalID } label: {
+                    if sel.wrappedValue == FixedLayout.originalID { Label("Original", systemImage: "checkmark") } else { Text("Original") }
+                }
+                ForEach(FixedLayout.allCases) { l in
+                    Button { sel.wrappedValue = l.rawValue } label: {
+                        if sel.wrappedValue == l.rawValue { Label(l.label, systemImage: "checkmark") } else { Text(l.label) }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(FixedLayout.from(sel.wrappedValue)?.label ?? "Original")
+                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                }
+            }
+            .buttonStyle(.bordered)
         }
-        .pickerStyle(.menu)
     }
 
     private func render() {
