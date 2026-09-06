@@ -1,0 +1,12 @@
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+build/
+.DS_Store
+*.ipa
+*.dSYM.zip
+logs/
+# lokal, nie einchecken: Signing-Team und Geraete-ID
+Local.xcconfig
+.device

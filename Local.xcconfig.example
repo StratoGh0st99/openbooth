@@ -1,0 +1,5 @@
+// Kopie als Local.xcconfig anlegen (wird nicht eingecheckt) und eigenes Team eintragen.
+// Team-ID: Xcode > Settings > Accounts, oder developer.apple.com/account > Membership.
+DEVELOPMENT_TEAM = XXXXXXXXXX
+// Optional eigene Bundle-ID, falls de.reingruber.openbooth im eigenen Team nicht frei ist:
+// PRODUCT_BUNDLE_IDENTIFIER = tld.name.openbooth
