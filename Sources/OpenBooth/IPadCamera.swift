@@ -105,8 +105,8 @@ extension IPadCamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePho
         // Querformat-Orientierung: Landscape-Right (Home-Button rechts) entspricht der Fotobox-Aufstellung
         let ctx = Self.ciContext
         guard let cg = ctx.createCGImage(ci, from: ci.extent) else { return }
-        // Frontkamera wie ein Spiegel (horizontal), nicht ueber Kopf
-        handler(UIImage(cgImage: cg, scale: 1, orientation: position == .front ? .upMirrored : .up))
+        // nicht spiegeln: die Spiegelung fuer die Gaeste macht die Buehne (Einstellung "Liveview spiegeln"), wie bei der Sony
+        handler(UIImage(cgImage: cg, scale: 1, orientation: .up))
     }
     private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
@@ -114,20 +114,11 @@ extension IPadCamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePho
         guard let cont = photoContinuation else { return }
         photoContinuation = nil
         if let error { cont.resume(throwing: error); return }
-        guard var data = photo.fileDataRepresentation() else {
+        guard let data = photo.fileDataRepresentation() else {
             cont.resume(throwing: NSError(domain: "IPadCamera", code: 3, userInfo: [NSLocalizedDescriptionKey: "Kein Bild von der iPad-Kamera"])); return
         }
-        // Frontkamera spiegeln, damit das Foto so aussieht wie der Liveview
-        if position == .front, let img = UIImage(data: data), let cg = img.cgImage {
-            let m = UIImage(cgImage: cg, scale: 1, orientation: Self.mirrored(img.imageOrientation))
-            let fmt = UIGraphicsImageRendererFormat(); fmt.scale = 1
-            let flat = UIGraphicsImageRenderer(size: m.size, format: fmt).image { _ in m.draw(at: .zero) }
-            if let d = flat.jpegData(compressionQuality: 0.92) { data = d }
-        }
+        // Foto bleibt ungespiegelt, wie ein Kamerafoto (die Sony spiegelt auch nicht)
         cont.resume(returning: data)
     }
-    private static func mirrored(_ o: UIImage.Orientation) -> UIImage.Orientation {
-        switch o { case .up: .upMirrored; case .down: .downMirrored; case .left: .rightMirrored; case .right: .leftMirrored
-        case .upMirrored: .up; case .downMirrored: .down; case .leftMirrored: .right; case .rightMirrored: .left; @unknown default: o }
-    }
+
 }
