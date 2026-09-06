@@ -1101,9 +1101,9 @@ struct LayoutsPanel: View {
     var body: some View {
         Group {
             SwiftUI.Section {
-                LabeledContent("Rückschau") { sourcePicker($settings.sourceReview) }
-                LabeledContent("Immich") { sourcePicker($settings.sourceImmich) }.disabled(!settings.immichEnabled)
-                LabeledContent("WebDAV") { sourcePicker($settings.sourceWebDAV) }.disabled(!settings.webdavEnabled)
+                sourcePicker("Rückschau", $settings.sourceReview)
+                sourcePicker("Immich", $settings.sourceImmich).disabled(!settings.immichEnabled)
+                sourcePicker("WebDAV", $settings.sourceWebDAV).disabled(!settings.webdavEnabled)
             } header: { Text("Was bekommt welches Ziel?") } footer: {
                 Text("„Original“ ist das unveränderte Kamerabild. Bei „4 Bilder“ macht die Fotobox automatisch vier Aufnahmen, wenn die Rückschau darauf steht. App-Galerie und Mediathek bekommen immer die Originale.")
             }
@@ -1169,12 +1169,13 @@ struct LayoutsPanel: View {
         }
     }
 
-    private func sourcePicker(_ sel: Binding<String>) -> some View {
-        Picker("", selection: sel) {
+    /// Picker direkt in der Form-Zeile (in LabeledContent verschachtelt liess er sich nicht antippen)
+    private func sourcePicker(_ title: String, _ sel: Binding<String>) -> some View {
+        Picker(title, selection: sel) {
             Text("Original").tag(FixedLayout.originalID)
             ForEach(FixedLayout.allCases) { Text($0.label).tag($0.rawValue) }
         }
-        .labelsHidden()
+        .pickerStyle(.menu)
     }
 
     private func render() {
