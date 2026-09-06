@@ -99,7 +99,9 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
     @Published var motionLevel: Double = 0    // letzte Bildaenderung im Leerlauf (Debug)
-    private var motion = MotionDetector()
+    /// Bewegungserkennung aktiv? Wird vom Liveview-Task gelesen (laeuft dort im Hintergrund, nicht auf dem Main-Thread).
+    private var motionArmed: Bool { idle && (settingsRef?.motionWake ?? true) }
+    private var motionThreshold: Double { Double(settingsRef?.motionThreshold ?? 8) }
 
     /// Rueckmeldung fuer Gaeste, klar und ohne Technik.
     struct Banner: Equatable {
@@ -180,13 +182,11 @@ final class CameraManager: NSObject, ObservableObject {
         pollExternalCapture()
     }
 
-    /// Im Leerlauf: Bewegung vor der Kamera beendet die Collage.
-    private func checkMotion(_ img: UIImage) {
-        guard idle, settingsRef?.motionWake ?? true else { motion.reset(); motionLevel = 0; return }
-        let hit = motion.feed(img, threshold: Double(settingsRef?.motionThreshold ?? 8))
-        motionLevel = motion.level
-        if hit {
-            appendLog(String(format: "Bewegung erkannt (%.1f), Collage aus", motion.level))
+    /// Ergebnis der Bewegungserkennung aus dem Liveview-Task.
+    private func motionResult(level: Double, hit: Bool) {
+        motionLevel = level
+        if hit, idle {
+            appendLog(String(format: "Bewegung erkannt (%.1f), Collage aus", level))
             noteInteraction()
         }
     }
@@ -430,13 +430,19 @@ final class CameraManager: NSObject, ObservableObject {
         lastFrame = Date()
         liveTask = Task { [weak self] in
             var failures = 0
+            var motion = MotionDetector()
             while !Task.isCancelled {
                 do {
-                    if let jpeg = try await cam.liveViewFrame(), let img = UIImage(data: jpeg) {
+                    if let jpeg = try await cam.liveViewFrame(), let raw = UIImage(data: jpeg) {
+                        // JPEG hier im Hintergrund dekodieren, damit der Main-Thread nur noch anzeigt
+                        let img = raw.preparingForDisplay() ?? raw
+                        let (armed, threshold) = await MainActor.run { (self?.motionArmed ?? false, self?.motionThreshold ?? 8) }
+                        var level = 0.0, hit = false
+                        if armed { hit = motion.feed(img, threshold: threshold); level = motion.level } else { motion.reset() }
                         await MainActor.run {
                             self?.liveFrame = img; self?.lastFrame = Date(); self?.frameCount += 1
                             if self?.banner != nil { self?.banner = nil }
-                            self?.checkMotion(img)
+                            if armed { self?.motionResult(level: level, hit: hit) } else if self?.motionLevel != 0 { self?.motionLevel = 0 }
                         }
                         failures = 0
                     } else {
