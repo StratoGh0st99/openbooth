@@ -1169,27 +1169,12 @@ struct LayoutsPanel: View {
         }
     }
 
-    /// Auswahl als Menue-Knopf (SwiftUI-Picker in dieser Form-Zeile reagierte auf dem iPad nicht auf Tipps)
+    /// Auswahl wie bei den Kamerawerten: Knopf oeffnet ein Popover mit Liste (Menue und Picker reagierten hier nicht)
     private func sourcePicker(_ title: String, _ sel: Binding<String>) -> some View {
         HStack {
             Text(title)
             Spacer()
-            Menu {
-                Button { sel.wrappedValue = FixedLayout.originalID } label: {
-                    if sel.wrappedValue == FixedLayout.originalID { Label("Original", systemImage: "checkmark") } else { Text("Original") }
-                }
-                ForEach(FixedLayout.allCases) { l in
-                    Button { sel.wrappedValue = l.rawValue } label: {
-                        if sel.wrappedValue == l.rawValue { Label(l.label, systemImage: "checkmark") } else { Text(l.label) }
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(FixedLayout.from(sel.wrappedValue)?.label ?? "Original")
-                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                }
-            }
-            .buttonStyle(.bordered)
+            SourceChoice(title: title, selection: sel) { v in cam.appendLog("Quelle \(title) = \(v)") }
         }
     }
 
@@ -1205,6 +1190,46 @@ struct LayoutsPanel: View {
                 let d = LayoutRenderer.render(photos: Array(datas.prefix(l.slots)), layout: l, frame: frame, text: text, logo: lg, maxEdge: 1200, quality: 0.8)
                 if let img = d.flatMap(UIImage.init(data:)) { await MainActor.run { previews[l] = img } }
             }
+        }
+    }
+}
+
+/// Quelle eines Ziels waehlen: Original oder eines der festen Layouts, im Popover.
+struct SourceChoice: View {
+    let title: String
+    @Binding var selection: String
+    var onChange: (String) -> Void = { _ in }
+    @State private var open = false
+
+    private var options: [(String, String)] {
+        [(FixedLayout.originalID, "Original")] + FixedLayout.allCases.map { ($0.rawValue, $0.label) }
+    }
+
+    var body: some View {
+        Button { open = true } label: {
+            HStack(spacing: 6) {
+                Text(FixedLayout.from(selection)?.label ?? "Original")
+                Image(systemName: "chevron.up.chevron.down").font(.caption2)
+            }
+        }
+        .buttonStyle(.bordered)
+        .popover(isPresented: $open) {
+            List(options, id: \.0) { key, label in
+                Button {
+                    selection = key
+                    onChange(key)
+                    open = false
+                } label: {
+                    HStack {
+                        Text(label)
+                        Spacer()
+                        if key == selection { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .frame(width: 300, height: CGFloat(options.count) * 46 + 16)
+            .presentationCompactAdaptation(.popover)
         }
     }
 }
