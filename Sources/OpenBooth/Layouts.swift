@@ -79,9 +79,10 @@ enum LayoutRenderer {
         let margin = short * 0.04
         let bandH = short * 0.14
         let cols = CGFloat(layout.columns), rows = CGFloat(layout.rows)
-        let tileW = (W - margin * (cols + 1)) / cols
-        let tileH = (H - margin * (rows + 1) - bandH) / rows
-        let tilePx = Int(max(tileW, tileH) * 1.05)
+        // Zellen, die zur Verfuegung stehen; die Kacheln darin behalten das Seitenverhaeltnis der Fotos (3:2), kein Beschnitt
+        let cellW = (W - margin * (cols + 1)) / cols
+        let cellH = (H - margin * (rows + 1) - bandH) / rows
+        let tilePx = Int(max(cellW, cellH) * 1.05)
         let images: [UIImage] = photos.compactMap { d in
             guard let src = CGImageSourceCreateWithData(d as CFData, nil),
                   let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, [
@@ -96,9 +97,15 @@ enum LayoutRenderer {
             frame.background.setFill(); g.fill(CGRect(origin: .zero, size: canvas))
             drawDecoration(frame, canvas: canvas, margin: margin)
 
+            // Kachelgroesse: Fotoformat in die Zelle einpassen, Raster mittig im freien Bereich ueber der Textleiste
+            let photoAspect = images.first.map { $0.size.width / max(1, $0.size.height) } ?? 1.5
+            let tileW = min(cellW, cellH * photoAspect), tileH = tileW / photoAspect
+            let gridW = cols * tileW + (cols - 1) * margin, gridH = rows * tileH + (rows - 1) * margin
+            let x0 = (W - gridW) / 2, y0 = margin + ((H - margin * 2 - bandH) - gridH) / 2
+
             for i in 0..<layout.slots {
                 let c = CGFloat(i % layout.columns), r = CGFloat(i / layout.columns)
-                let rect = CGRect(x: margin + c * (tileW + margin), y: margin + r * (tileH + margin), width: tileW, height: tileH)
+                let rect = CGRect(x: x0 + c * (tileW + margin), y: y0 + r * (tileH + margin), width: tileW, height: tileH)
                 // weisser Passepartout-Rand wie ein Abzug
                 let border = short * 0.006
                 UIColor.white.setFill(); g.fill(rect.insetBy(dx: -border, dy: -border))
