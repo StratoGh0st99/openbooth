@@ -69,6 +69,16 @@ final class LocalWebServer: @unchecked Sendable {
         listener?.cancel(); listener = nil; running = false
     }
 
+    /// mDNS-Name des iPads (z. B. Pauls-iPad.local), funktioniert von Apple-Geraeten und den meisten Browsern im selben WLAN
+    static func localHostname() -> String? {
+        var buf = [CChar](repeating: 0, count: 256)
+        guard gethostname(&buf, buf.count) == 0 else { return nil }
+        var name = String(cString: buf)
+        guard !name.isEmpty, name != "localhost" else { return nil }
+        if !name.hasSuffix(".local") { name += ".local" }
+        return name
+    }
+
     /// IPv4-Adressen des iPads (WLAN), fuer die Anzeige der URL im Admin
     static func localAddresses() -> [String] {
         var out: [String] = []

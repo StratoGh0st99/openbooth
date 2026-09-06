@@ -628,6 +628,9 @@ struct AdminPanel: View {
             Toggle("Statusseite im WLAN", isOn: $settings.webEnabled)
                 .onChange(of: settings.webEnabled) { _, _ in cam.syncWeb() }
             if settings.webEnabled {
+                if let host = LocalWebServer.localHostname() {
+                    LabeledContent("Name") { Text("http://\(host):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
+                }
                 ForEach(LocalWebServer.localAddresses(), id: \.self) { ip in
                     LabeledContent("Adresse") { Text("http://\(ip):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
                 }
