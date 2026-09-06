@@ -71,7 +71,7 @@ struct ContentView: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $showGallery) { GalleryView(photos: cam.galleryPhotos(for: settings.sourceReview), autoClose: settings.gallerySeconds, onActivity: { cam.noteInteraction() }) }
+        .fullScreenCover(isPresented: $showGallery) { GalleryView(photos: cam.galleryPhotos(for: settings.sourceReview), tileAspect: FixedLayout.from(settings.sourceReview)?.aspect ?? 1.5, autoClose: settings.gallerySeconds, onActivity: { cam.noteInteraction() }) }
         // Leerlauf beginnt oder endet: Galerie und QR-Seite schliessen, die Buehne gehoert wieder der Fotobox
         .onChange(of: cam.idle) { _, _ in showGallery = false; showQR = false; cam.qrShown = false }
         .overlay {
@@ -132,7 +132,8 @@ struct ContentView: View {
 
             // Leerlauf-Collage ueber dem Liveview
             if cam.idle && !cam.galleryPhotos(for: settings.sourceReview).isEmpty {
-                CollageView(photos: cam.galleryPhotos(for: settings.sourceReview), interval: settings.slideshowInterval, title: settings.welcomeTitle)
+                CollageView(photos: cam.galleryPhotos(for: settings.sourceReview), aspect: FixedLayout.from(settings.sourceReview)?.aspect ?? 1.5,
+                            interval: settings.slideshowInterval, title: settings.welcomeTitle)
                     .transition(.opacity)
                     .onTapGesture { cam.noteInteraction() }
             }
@@ -729,6 +730,7 @@ struct PinPadView: View {
 
 struct CollageView: View {
     let photos: [URL]
+    var aspect: CGFloat = 1.5
     let interval: Int
     let title: String
     @State private var picks: [URL] = []
@@ -740,8 +742,8 @@ struct CollageView: View {
             GeometryReader { geo in
                 ZStack {
                     ForEach(Array(picks.enumerated()), id: \.element) { i, url in
-                        CollageCard(url: url)
-                            .frame(width: geo.size.width * 0.42)
+                        CollageCard(url: url, aspect: aspect)
+                            .frame(width: aspect < 1 ? geo.size.height * 0.75 * aspect : geo.size.width * 0.42)
                             .rotationEffect(.degrees(Double((i * 7 + seed) % 15) - 7))
                             .position(position(i, in: geo.size))
                             .transition(.scale.combined(with: .opacity))
@@ -780,14 +782,16 @@ struct CollageView: View {
 
 struct CollageCard: View {
     let url: URL
+    var aspect: CGFloat = 1.5
     @State private var image: UIImage?
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
                 Color.gray.opacity(0.3)
-                if let image { Image(uiImage: image).resizable().scaledToFill() }
+                // fertige Layouts (Streifen, Collage) unbeschnitten zeigen
+                if let image { Image(uiImage: image).resizable().scaledToFit() }
             }
-            .aspectRatio(3/2, contentMode: .fit)
+            .aspectRatio(aspect, contentMode: .fit)
             .clipped()
             .padding(10)
             Color.white.frame(height: 26)
@@ -802,6 +806,7 @@ struct CollageCard: View {
 
 struct GalleryView: View {
     let photos: [URL]
+    var tileAspect: CGFloat = 1.5
     var autoClose: Int = 30
     var onActivity: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
@@ -823,9 +828,10 @@ struct GalleryView: View {
     private var galleryBody: some View {
         NavigationStack {
             ScrollView {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
+                // Streifen hochkant: mehr Spalten, damit die Kacheln nicht riesig werden
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: tileAspect < 1 ? 6 : 3), spacing: 12) {
                     ForEach(photos, id: \.self) { url in
-                        Thumb(url: url).onTapGesture { selected = url }
+                        Thumb(url: url, aspect: tileAspect).onTapGesture { selected = url }
                     }
                 }
                 .padding()
@@ -890,13 +896,14 @@ struct GalleryView: View {
 
     struct Thumb: View {
         let url: URL
+        var aspect: CGFloat = 1.5
         @State private var image: UIImage?
         var body: some View {
             ZStack {
                 Color.gray.opacity(0.2)
-                if let image { Image(uiImage: image).resizable().scaledToFill() }
+                if let image { Image(uiImage: image).resizable().scaledToFit() }
             }
-            .aspectRatio(3/2, contentMode: .fit)
+            .aspectRatio(aspect, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .task { image = await ThumbnailStore.thumbnail(for: url) }
         }
