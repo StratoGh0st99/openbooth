@@ -2,8 +2,7 @@
 //  Branding.swift
 //  OpenBooth
 //
-//  Optionales Logo und/oder Schriftzug auf einer Kopie des Fotos. Das Original bleibt immer unberuehrt
-//  (App-Galerie, Mediathek); die Kopie geht an die Upload-Ziele und damit an die Gaeste.
+//  Globales Branding (Logo, Schriftzug, Position, Groesse), verwendet vom LayoutRenderer. Das Original bleibt unberuehrt.
 //
 
 import UIKit
@@ -37,49 +36,4 @@ enum Branding {
         return (try? png.write(to: logoURL, options: .atomic)) != nil
     }
     static func removeLogo() { try? FileManager.default.removeItem(at: logoURL) }
-
-    /// Kopie mit Branding rendern. Lange Kante auf `maxEdge` begrenzt (Gaeste-Kopie, spart Upload und Speicher).
-    nonisolated static func render(jpeg: Data, text: String, logo: UIImage?, position: BrandingPosition, size: BrandingSize,
-                                   maxEdge: CGFloat = 4000, quality: CGFloat = 0.9) -> Data? {
-        guard let src = CGImageSourceCreateWithData(jpeg as CFData, nil),
-              let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, [
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceCreateThumbnailWithTransform: true,
-                kCGImageSourceThumbnailMaxPixelSize: Int(maxEdge)] as CFDictionary) else { return nil }
-        let base = UIImage(cgImage: cg)
-        let W = base.size.width, H = base.size.height
-        let fmt = UIGraphicsImageRendererFormat(); fmt.scale = 1; fmt.opaque = true
-        let img = UIGraphicsImageRenderer(size: base.size, format: fmt).image { ctx in
-            base.draw(at: .zero)
-            let blockH = H * size.fraction
-            let margin = H * 0.03
-            let gap = blockH * 0.25
-            // Logo (Hoehe = Block) und Text (Hoehe ~60 % des Blocks) nebeneinander
-            var logoW: CGFloat = 0
-            if let logo { logoW = blockH * logo.size.width / max(1, logo.size.height) }
-            let font = UIFont.systemFont(ofSize: blockH * 0.55, weight: .semibold)
-            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.white]
-            let textSize = text.isEmpty ? .zero : (text as NSString).size(withAttributes: attrs)
-            let totalW = logoW + (logoW > 0 && !text.isEmpty ? gap : 0) + textSize.width
-            guard totalW > 0 else { return }
-            var x: CGFloat, y: CGFloat
-            switch position {
-            case .bottomRight: x = W - margin - totalW; y = H - margin - blockH
-            case .bottomLeft: x = margin; y = H - margin - blockH
-            case .bottomCenter: x = (W - totalW) / 2; y = H - margin - blockH
-            case .topRight: x = W - margin - totalW; y = margin
-            case .topLeft: x = margin; y = margin
-            }
-            // weicher Schatten fuer Lesbarkeit auf hellem Grund
-            ctx.cgContext.setShadow(offset: CGSize(width: 0, height: blockH * 0.04), blur: blockH * 0.18, color: UIColor.black.withAlphaComponent(0.7).cgColor)
-            if let logo {
-                logo.draw(in: CGRect(x: x, y: y, width: logoW, height: blockH))
-                x += logoW + gap
-            }
-            if !text.isEmpty {
-                (text as NSString).draw(at: CGPoint(x: x, y: y + (blockH - textSize.height) / 2), withAttributes: attrs)
-            }
-        }
-        return img.jpegData(compressionQuality: quality)
-    }
 }

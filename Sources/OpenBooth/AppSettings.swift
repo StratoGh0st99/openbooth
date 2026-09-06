@@ -39,7 +39,12 @@ final class AppSettings: ObservableObject {
     @Published var webdavURL: String { didSet { d.set(webdavURL, forKey: "webdavURL") } }
     @Published var webdavUser: String { didSet { d.set(webdavUser, forKey: "webdavUser") } }
     @Published var webdavUploadRAW: Bool { didSet { d.set(webdavUploadRAW, forKey: "webdavUploadRAW") } }
-    @Published var brandingEnabled: Bool { didSet { d.set(brandingEnabled, forKey: "brandingEnabled") } }
+    @Published var brandingDark: Bool { didSet { d.set(brandingDark, forKey: "brandingDark") } }
+    /// Layouts (JSON) und Quellen je Ziel: "original" oder die UUID eines Layouts
+    @Published var layouts: [PhotoLayout] { didSet { if let j = try? JSONEncoder().encode(layouts) { d.set(j, forKey: "layouts") } } }
+    @Published var sourceReview: String { didSet { d.set(sourceReview, forKey: "sourceReview") } }
+    @Published var sourceImmich: String { didSet { d.set(sourceImmich, forKey: "sourceImmich") } }
+    @Published var sourceWebDAV: String { didSet { d.set(sourceWebDAV, forKey: "sourceWebDAV") } }
     @Published var brandingText: String { didSet { d.set(brandingText, forKey: "brandingText") } }
     @Published var brandingPosition: String { didSet { d.set(brandingPosition, forKey: "brandingPosition") } }
     @Published var brandingSize: String { didSet { d.set(brandingSize, forKey: "brandingSize") } }
@@ -85,7 +90,16 @@ final class AppSettings: ObservableObject {
         webdavURL = d.string(forKey: "webdavURL") ?? ""
         webdavUser = d.string(forKey: "webdavUser") ?? ""
         webdavUploadRAW = d.object(forKey: "webdavUploadRAW") as? Bool ?? false
-        brandingEnabled = d.object(forKey: "brandingEnabled") as? Bool ?? false
+        brandingDark = d.object(forKey: "brandingDark") as? Bool ?? false
+        var ls = (d.data(forKey: "layouts")).flatMap { try? JSONDecoder().decode([PhotoLayout].self, from: $0) } ?? []
+        if ls.isEmpty { ls = [PhotoLayout.defaultSingle(), PhotoLayout.defaultCollage(), PhotoLayout.defaultStrip()] }
+        layouts = ls
+        // Migration: altes "Branding auf der Gaeste-Kopie" -> Uploads bekommen das Einzelbild-Layout
+        let legacyBranding = d.object(forKey: "brandingEnabled") as? Bool ?? false
+        let firstSingle = ls.first { $0.kind == .single }?.id.uuidString ?? PhotoLayout.originalID
+        sourceReview = d.string(forKey: "sourceReview") ?? PhotoLayout.originalID
+        sourceImmich = d.string(forKey: "sourceImmich") ?? (legacyBranding ? firstSingle : PhotoLayout.originalID)
+        sourceWebDAV = d.string(forKey: "sourceWebDAV") ?? (legacyBranding ? firstSingle : PhotoLayout.originalID)
         brandingText = d.string(forKey: "brandingText") ?? ""
         brandingPosition = d.string(forKey: "brandingPosition") ?? BrandingPosition.bottomRight.rawValue
         brandingSize = d.string(forKey: "brandingSize") ?? BrandingSize.medium.rawValue
@@ -95,5 +109,22 @@ final class AppSettings: ObservableObject {
         maxBrightness = d.object(forKey: "maxBrightness") as? Bool ?? false
         motionWake = d.object(forKey: "motionWake") as? Bool ?? true
         motionThreshold = d.object(forKey: "motionThreshold") as? Int ?? 8
+    }
+
+    // MARK: Layout-Hilfen
+
+    func layout(for source: String) -> PhotoLayout? {
+        guard source != PhotoLayout.originalID, let id = UUID(uuidString: source) else { return nil }
+        return layouts.first { $0.id == id }
+    }
+    /// Layout der Rueckschau bestimmt die Serienlaenge, wenn es mehrere Slots hat.
+    var seriesLayout: PhotoLayout? { layout(for: sourceReview).flatMap { $0.kind.slots > 1 ? $0 : nil } }
+    var effectiveShots: Int { seriesLayout?.kind.slots ?? max(1, shotsPerCapture) }
+    var usedSources: [String] { [sourceReview, sourceImmich, sourceWebDAV] }
+
+    func brandingStyle() -> BrandingStyle {
+        BrandingStyle(text: brandingText, logo: Branding.loadLogo(),
+                      position: BrandingPosition(rawValue: brandingPosition) ?? .bottomRight,
+                      size: BrandingSize(rawValue: brandingSize) ?? .medium, dark: brandingDark)
     }
 }

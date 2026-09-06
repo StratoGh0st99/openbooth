@@ -59,6 +59,17 @@ struct ContentView: View {
             cam.settingsRef = settings
             cam.start()
             cam.updateBrightness()
+            // Entwicklung: -renderLayoutsPreview 1 rendert alle Layouts mit den vorhandenen Fotos nach Documents/preview-*.jpg
+            if UserDefaults.standard.bool(forKey: "renderLayoutsPreview") {
+                Task {
+                    for l in settings.layouts {
+                        if let u = await cam.renderLayout(l, originals: Array(cam.sessionPhotos.prefix(l.kind.slots).reversed()), stamp: "preview") {
+                            let dst = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("preview-\(l.name).jpg")
+                            try? FileManager.default.removeItem(at: dst); try? FileManager.default.copyItem(at: u, to: dst)
+                        }
+                    }
+                }
+            }
         }
         .fullScreenCover(isPresented: $showGallery) { GalleryView(photos: cam.sessionPhotos, autoClose: settings.gallerySeconds, onActivity: { cam.noteInteraction() }) }
         // Leerlauf beginnt oder endet: Galerie und QR-Seite schliessen, die Buehne gehoert wieder der Fotobox
@@ -269,7 +280,7 @@ struct ContentView: View {
                                 Button(role: .destructive) {
                                     cam.deleteResult(at: 0)
                                 } label: {
-                                    Label("Löschen", systemImage: "trash").frame(width: 160, height: 56)
+                                    Label(cam.resultIsLayout && cam.resultURLs.count > 1 ? "Serie löschen" : "Löschen", systemImage: "trash").frame(width: 180, height: 56)
                                 }
                                 .buttonStyle(.bordered)
                             }
@@ -373,13 +384,14 @@ struct AdminPanel: View {
     @EnvironmentObject var cam: CameraManager
     @EnvironmentObject var settings: AppSettings
     @Binding var adminUnlocked: Bool
-    @State private var section: Section = .event
+    // Startabschnitt per Startargument waehlbar (-adminSection "Layouts & Branding"), fuer Screenshots im Simulator
+    @State private var section: Section = Section(rawValue: UserDefaults.standard.string(forKey: "adminSection") ?? "") ?? .event
     @State private var newPin = ""
     @State private var diagnosticsURL: URL?
 
     enum Section: String, CaseIterable, Identifiable {
         case event = "Veranstaltung", camera = "Kamera", flow = "Ablauf", screen = "Anzeige & Töne",
-             branding = "Logo & Schriftzug", storage = "Speicherorte", phrases = "Sprüche", access = "Zugang", log = "Protokoll"
+             branding = "Layouts & Branding", storage = "Speicherorte", phrases = "Sprüche", access = "Zugang", log = "Protokoll"
         var id: String { rawValue }
         var icon: String {
             switch self {
@@ -442,7 +454,7 @@ struct AdminPanel: View {
                 case .camera: cameraSection
                 case .flow: flowSection
                 case .screen: screenSection
-                case .branding: BrandingPanel()
+                case .branding: LayoutsPanel()
                 case .storage: storageSection
                 case .phrases: phrasesSection
                 case .access: accessSection
@@ -528,9 +540,14 @@ struct AdminPanel: View {
     @ViewBuilder private var flowSection: some View {
         SwiftUI.Section("Aufnahme") {
             Stepper("Countdown: \(settings.countdownSeconds) s", value: $settings.countdownSeconds, in: 0...10)
-            Stepper("Bilder pro Auslösung: \(settings.shotsPerCapture)", value: $settings.shotsPerCapture, in: 1...5, step: 2)
-            if settings.shotsPerCapture > 1 {
+            if let l = settings.seriesLayout {
+                LabeledContent("Bilder pro Auslösung", value: "\(l.kind.slots), durch Layout „\(l.name)“")
                 Stepper("Pause zwischen Bildern: \(settings.shotInterval) s", value: $settings.shotInterval, in: 0...10)
+            } else {
+                Stepper("Bilder pro Auslösung: \(settings.shotsPerCapture)", value: $settings.shotsPerCapture, in: 1...5, step: 2)
+                if settings.shotsPerCapture > 1 {
+                    Stepper("Pause zwischen Bildern: \(settings.shotInterval) s", value: $settings.shotInterval, in: 0...10)
+                }
             }
             Stepper("Rückschau: \(settings.resultSeconds) s", value: $settings.resultSeconds, in: 3...60)
             Toggle("Fotos vom Kamera-Auslöser übernehmen", isOn: $settings.pickupExternal)
@@ -1072,98 +1089,224 @@ struct SettingPicker: View {
     }
 }
 
-/// Logo und Schriftzug fuer die Gaeste-Kopie, mit Vorschau auf dem letzten Foto.
-struct BrandingPanel: View {
+/// Layouts & Branding: globales Branding, Liste der Layouts mit Editor, Zuordnung je Ziel.
+struct LayoutsPanel: View {
     @EnvironmentObject var cam: CameraManager
     @EnvironmentObject var settings: AppSettings
     @State private var logo: UIImage? = Branding.loadLogo()
     @State private var pick: PhotosPickerItem?
-    @State private var preview: UIImage?
+    @State private var editing: PhotoLayout?
 
     var body: some View {
         Group {
-            sections
-        }
-        .onAppear { renderPreview() }
-        .onChange(of: settings.brandingEnabled) { _, _ in renderPreview() }
-        .onChange(of: settings.brandingText) { _, _ in renderPreview() }
-        .onChange(of: settings.brandingPosition) { _, _ in renderPreview() }
-        .onChange(of: settings.brandingSize) { _, _ in renderPreview() }
-        .onChange(of: cam.sessionPhotos.first) { _, _ in renderPreview() }
-        .onChange(of: pick) { _, item in
-            guard let item else { return }
-            Task {
-                if let data = try? await item.loadTransferable(type: Data.self), Branding.saveLogo(data) {
-                    logo = Branding.loadLogo()
-                    cam.appendLog("Branding: Logo gesetzt")
-                } else {
-                    cam.appendLog("Branding: Logo konnte nicht geladen werden")
-                }
-                pick = nil
-                renderPreview()
+            SwiftUI.Section {
+                LabeledContent("Rückschau") { sourcePicker($settings.sourceReview) }
+                LabeledContent("Immich") { sourcePicker($settings.sourceImmich) }.disabled(!settings.immichEnabled)
+                LabeledContent("WebDAV") { sourcePicker($settings.sourceWebDAV) }.disabled(!settings.webdavEnabled)
+            } header: { Text("Zuordnung: Was bekommt welches Ziel?") } footer: {
+                Text("„Original“ ist das unveränderte Kamerabild. Ein Layout wird einmal pro Auslösung gerendert. Hat das Layout der Rückschau mehrere Bilder, bestimmt es die Serienlänge. App-Galerie und Mediathek bekommen immer die Originale.")
             }
-        }
-    }
 
-    @ViewBuilder private var sections: some View {
-        SwiftUI.Section {
-            Toggle("Logo oder Schriftzug auf die Gäste-Kopie", isOn: $settings.brandingEnabled)
-        } footer: {
-            Text("Das Original bleibt immer unberührt (App-Galerie, Mediathek). Nur die Kopie für Immich und WebDAV, also das, was Gäste über den QR-Code sehen, bekommt Logo und Schriftzug. Lange Kante 4000 px.")
-        }
-        if settings.brandingEnabled {
-            SwiftUI.Section("Schriftzug") {
-                TextField("z. B. Anna & Paul · 12. Juni 2027", text: $settings.brandingText)
+            SwiftUI.Section {
+                ForEach(settings.layouts) { l in
+                    Button { editing = l } label: {
+                        HStack(spacing: 14) {
+                            LayoutThumb(layout: l).frame(width: 72, height: 48)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(l.name).foregroundStyle(.primary)
+                                Text("\(l.kind.label) · \(l.format.label) · \(l.background.label)\(l.branding ? " · Branding" : "")")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if settings.usedSources.contains(l.id.uuidString) {
+                                Text("in Benutzung").font(.caption2).padding(.horizontal, 6).padding(.vertical, 2).background(.quaternary, in: Capsule())
+                            }
+                            Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                Button {
+                    let l = PhotoLayout(name: "Neues Layout", kind: .collage2x2, format: .r3x2, margin: 3, branding: true)
+                    settings.layouts.append(l); editing = l
+                } label: { Label("Layout hinzufügen", systemImage: "plus") }
+            } header: { Text("Layouts") } footer: {
+                Text("Antippen zum Bearbeiten. Ein Layout beschreibt Anordnung, Format, Hintergrund und ob das Branding darauf liegt.")
             }
-            SwiftUI.Section("Logo") {
+
+            SwiftUI.Section {
+                TextField("Schriftzug, z. B. Anna & Paul · 12. Juni 2027", text: $settings.brandingText)
                 HStack(spacing: 16) {
                     if let logo {
-                        Image(uiImage: logo).resizable().scaledToFit().frame(height: 60)
+                        Image(uiImage: logo).resizable().scaledToFit().frame(height: 48)
                             .padding(6).background(Color.gray.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
-                    } else {
-                        Text("Kein Logo").foregroundStyle(.secondary)
-                    }
+                    } else { Text("Kein Logo").foregroundStyle(.secondary) }
                     Spacer()
-                    PhotosPicker(selection: $pick, matching: .images) { Label(logo == nil ? "Aus Mediathek wählen" : "Ersetzen", systemImage: "photo") }
+                    PhotosPicker(selection: $pick, matching: .images) { Label(logo == nil ? "Logo wählen" : "Ersetzen", systemImage: "photo") }
                         .buttonStyle(.bordered)
                     if logo != nil {
-                        Button(role: .destructive) { Branding.removeLogo(); logo = nil; renderPreview() } label: { Label("Entfernen", systemImage: "trash") }
+                        Button(role: .destructive) { Branding.removeLogo(); logo = nil } label: { Label("Entfernen", systemImage: "trash") }
                             .buttonStyle(.bordered)
                     }
                 }
-                Text("Am besten PNG mit transparentem Hintergrund, weiß oder hell. Wird auf 1200 px verkleinert.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            SwiftUI.Section("Platzierung") {
-                Picker("Position", selection: $settings.brandingPosition) {
+                Picker("Position (Einzelbild)", selection: $settings.brandingPosition) {
                     ForEach(BrandingPosition.allCases) { Text($0.rawValue).tag($0.rawValue) }
                 }
                 Picker("Größe", selection: $settings.brandingSize) {
                     ForEach(BrandingSize.allCases) { Text($0.rawValue).tag($0.rawValue) }
-                }
-                .pickerStyle(.segmented)
+                }.pickerStyle(.segmented)
+                Toggle("Dunkle Schrift auf hellen Collagen", isOn: $settings.brandingDark)
+            } header: { Text("Branding (gilt für alle Layouts)") } footer: {
+                Text("Beim Einzelbild liegt das Branding mit Schatten auf dem Foto. Bei Collagen und Streifen bekommt es eine eigene Leiste unten. Logo am besten als PNG mit Transparenz, wird auf 1200 px verkleinert.")
             }
-            SwiftUI.Section("Vorschau") {
-                if let preview {
-                    Image(uiImage: preview).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 8))
-                } else if cam.lastPhoto == nil && cam.sessionPhotos.isEmpty {
-                    Text("Erst ein Foto machen, dann erscheint hier die Vorschau.").foregroundStyle(.secondary)
-                } else {
-                    ProgressView()
+        }
+        .sheet(item: $editing) { l in
+            LayoutEditor(layout: l) { updated in
+                if let i = settings.layouts.firstIndex(where: { $0.id == l.id }) { settings.layouts[i] = updated }
+            } onDelete: {
+                settings.layouts.removeAll { $0.id == l.id }
+                for kp in [\AppSettings.sourceReview, \AppSettings.sourceImmich, \AppSettings.sourceWebDAV] where settings[keyPath: kp] == l.id.uuidString {
+                    settings[keyPath: kp] = PhotoLayout.originalID
                 }
+                try? FileManager.default.removeItem(at: l.backgroundImageURL)
+            }
+            .environmentObject(cam).environmentObject(settings)
+        }
+        .onChange(of: pick) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self), Branding.saveLogo(data) {
+                    logo = Branding.loadLogo(); cam.appendLog("Branding: Logo gesetzt")
+                } else { cam.appendLog("Branding: Logo konnte nicht geladen werden") }
+                pick = nil
             }
         }
     }
 
-    func renderPreview() {
-        guard settings.brandingEnabled else { preview = nil; return }
-        // Quelle: letztes Foto der Veranstaltung
-        guard let url = cam.sessionPhotos.first, let jpeg = try? Data(contentsOf: url) else { preview = nil; return }
-        let text = settings.brandingText, lg = logo
-        let pos = BrandingPosition(rawValue: settings.brandingPosition) ?? .bottomRight
-        let size = BrandingSize(rawValue: settings.brandingSize) ?? .medium
+    private func sourcePicker(_ sel: Binding<String>) -> some View {
+        Picker("", selection: sel) {
+            Text("Original").tag(PhotoLayout.originalID)
+            ForEach(settings.layouts) { Text($0.name).tag($0.id.uuidString) }
+        }
+        .labelsHidden()
+    }
+}
+
+/// Schematische Mini-Vorschau eines Layouts (nur Kacheln, ohne Fotos).
+struct LayoutThumb: View {
+    let layout: PhotoLayout
+    var body: some View {
+        GeometryReader { g in
+            let a = layout.format.aspect
+            let w = min(g.size.width, g.size.height * a), h = w / a
+            let cols = CGFloat(layout.kind.columns), rows = CGFloat(layout.kind.rows)
+            let m: CGFloat = layout.margin == 0 ? 0 : 2
+            ZStack {
+                RoundedRectangle(cornerRadius: 2).fill(Color(layout.background.color))
+                VStack(spacing: m) {
+                    ForEach(0..<Int(rows), id: \.self) { _ in
+                        HStack(spacing: m) {
+                            ForEach(0..<Int(cols), id: \.self) { _ in Rectangle().fill(Color.gray.opacity(0.6)) }
+                        }
+                    }
+                    if layout.branding && layout.kind != .single { Rectangle().fill(.clear).frame(height: h * 0.12) }
+                }
+                .padding(m)
+            }
+            .frame(width: w, height: h)
+            .frame(width: g.size.width, height: g.size.height)
+        }
+    }
+}
+
+/// Editor fuer ein Layout mit grosser Vorschau auf den letzten Fotos der Veranstaltung.
+struct LayoutEditor: View {
+    @EnvironmentObject var cam: CameraManager
+    @EnvironmentObject var settings: AppSettings
+    @Environment(\.dismiss) private var dismiss
+    @State var layout: PhotoLayout
+    let onSave: (PhotoLayout) -> Void
+    let onDelete: () -> Void
+    @State private var preview: UIImage?
+    @State private var bgPick: PhotosPickerItem?
+    @State private var askDelete = false
+
+    var body: some View {
+        NavigationStack {
+            HStack(spacing: 0) {
+                Form {
+                    SwiftUI.Section("Layout") {
+                        TextField("Name", text: $layout.name)
+                        Picker("Anordnung", selection: $layout.kind) { ForEach(LayoutKind.allCases) { Text($0.label).tag($0) } }
+                        Picker("Format", selection: $layout.format) { ForEach(LayoutFormat.allCases) { Text($0.label).tag($0) } }
+                        Picker("Hintergrund", selection: $layout.background) { ForEach(LayoutBackground.allCases) { Text($0.label).tag($0) } }
+                            .pickerStyle(.segmented)
+                        Stepper("Rand: \(layout.margin) %", value: $layout.margin, in: 0...12)
+                        Toggle("Branding auf diesem Layout", isOn: $layout.branding)
+                    }
+                    SwiftUI.Section {
+                        HStack {
+                            PhotosPicker(selection: $bgPick, matching: .images) {
+                                Label(layout.hasBackgroundImage ? "Hintergrundbild ersetzen" : "Hintergrundbild wählen", systemImage: "photo.artframe")
+                            }.buttonStyle(.bordered)
+                            if layout.hasBackgroundImage {
+                                Button(role: .destructive) {
+                                    try? FileManager.default.removeItem(at: layout.backgroundImageURL); layout.hasBackgroundImage = false
+                                } label: { Label("Entfernen", systemImage: "trash") }.buttonStyle(.bordered)
+                            }
+                        }
+                    } header: { Text("Eigener Hintergrund") } footer: {
+                        Text("Ein Bild im Format des Layouts, das hinter den Fotos liegt. Damit lassen sich Rahmen, Muster und aufwendige Gestaltung als PNG vorbereiten.")
+                    }
+                    SwiftUI.Section {
+                        Button(role: .destructive) { askDelete = true } label: { Label("Layout löschen", systemImage: "trash") }
+                            .disabled(settings.layouts.count <= 1)
+                    }
+                }
+                .formStyle(.grouped)
+                .frame(width: 420)
+                Divider()
+                VStack {
+                    Text("Vorschau mit den letzten Fotos").font(.caption).foregroundStyle(.secondary).padding(.top, 12)
+                    if let preview {
+                        Image(uiImage: preview).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 8)).padding(20)
+                    } else if cam.sessionPhotos.isEmpty {
+                        Spacer(); Text("Noch keine Fotos in dieser Veranstaltung.").foregroundStyle(.secondary); Spacer()
+                    } else { Spacer(); ProgressView(); Spacer() }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground).opacity(0.4))
+            }
+            .navigationTitle(layout.name.isEmpty ? "Layout" : layout.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Fertig") { onSave(layout); dismiss() } }
+            }
+        }
+        .onAppear { render() }
+        .onChange(of: layout) { _, _ in render() }
+        .onChange(of: bgPick) { _, item in
+            guard let item else { return }
+            Task {
+                if let d = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: d), let png = img.pngData() {
+                    try? png.write(to: layout.backgroundImageURL, options: .atomic); layout.hasBackgroundImage = true
+                }
+                bgPick = nil
+            }
+        }
+        .alert("Layout „\(layout.name)“ löschen?", isPresented: $askDelete) {
+            Button("Löschen", role: .destructive) { onDelete(); dismiss() }
+            Button("Abbrechen", role: .cancel) {}
+        } message: { Text("Ziele, die dieses Layout nutzen, bekommen wieder das Original.") }
+    }
+
+    private func render() {
+        let urls = Array(cam.sessionPhotos.prefix(layout.kind.slots).reversed())   // aelteste zuerst = Aufnahmereihenfolge
+        guard !urls.isEmpty else { preview = nil; return }
+        let datas = urls.compactMap { try? Data(contentsOf: $0) }
+        let l = layout, style = settings.brandingStyle()
         Task.detached(priority: .userInitiated) {
-            let d = Branding.render(jpeg: jpeg, text: text, logo: lg, position: pos, size: size, maxEdge: 1400, quality: 0.8)
+            let d = LayoutRenderer.render(photos: datas, layout: l, branding: style, maxEdge: 1600, quality: 0.8)
             let img = d.flatMap(UIImage.init(data:))
             await MainActor.run { preview = img }
         }

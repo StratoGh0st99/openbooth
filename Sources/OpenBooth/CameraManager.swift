@@ -75,30 +75,55 @@ final class CameraManager: NSObject, ObservableObject {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: "\\", with: "-")
         return t.isEmpty ? "Fotobox" : t
     }
-    /// Kopie mit Branding unter Fotos/<Event>/branded/, nil wenn aus oder nichts zu zeichnen.
-    private func brandedCopy(of jpeg: Data, stamp: String) async -> URL? {
-        guard let s = settingsRef, s.brandingEnabled else { return nil }
-        let text = s.brandingText.trimmingCharacters(in: .whitespaces)
-        let logo = Branding.loadLogo()
-        guard !text.isEmpty || logo != nil else { return nil }
-        let pos = BrandingPosition(rawValue: s.brandingPosition) ?? .bottomRight
-        let size = BrandingSize(rawValue: s.brandingSize) ?? .medium
-        let data = await Task.detached(priority: .userInitiated) { Branding.render(jpeg: jpeg, text: text, logo: logo, position: pos, size: size) }.value
-        guard let data else { appendLog("Branding: Kopie konnte nicht erzeugt werden"); return nil }
-        let dir = Self.photosDir.appendingPathComponent("branded", isDirectory: true)
+    // MARK: Layouts und Zustellung
+
+    /// Eine Serie ist abgeschlossen: jedes Ziel bekommt seine Quelle (Original je Foto oder ein gerendertes Layout).
+    /// Liefert das Bild fuer die Rueckschau (Layout) oder nil, wenn die Rueckschau die Originale zeigt.
+    private func deliver(originals: [URL], stamp: String) async -> UIImage? {
+        guard let s = settingsRef, !originals.isEmpty else { return nil }
+        var rendered: [UUID: URL] = [:]
+        func output(for source: String) async -> [URL] {
+            guard let layout = s.layout(for: source) else { return originals }
+            if let url = rendered[layout.id] { return [url] }
+            guard let url = await renderLayout(layout, originals: originals, stamp: stamp) else { return originals }
+            rendered[layout.id] = url
+            return [url]
+        }
+        if s.immichEnabled { for u in await output(for: s.sourceImmich) { immich.enqueue(u) } }
+        if s.webdavEnabled { for u in await output(for: s.sourceWebDAV) { webdav.enqueue(u) } }
+        if s.layout(for: s.sourceReview) != nil {
+            let urls = await output(for: s.sourceReview)
+            if let u = urls.first, u != originals.first, let img = await Self.previewImage(from: (try? Data(contentsOf: u)) ?? Data()) {
+                lastLayoutURL = u
+                return img
+            }
+        }
+        return nil
+    }
+    private(set) var lastLayoutURL: URL?
+
+    /// Layout rendern und unter Fotos/<Event>/layouts/ ablegen.
+    func renderLayout(_ layout: PhotoLayout, originals: [URL], stamp: String) async -> URL? {
+        guard let s = settingsRef else { return nil }
+        let style = s.brandingStyle()
+        let datas = originals.compactMap { try? Data(contentsOf: $0) }
+        let out = await Task.detached(priority: .userInitiated) { LayoutRenderer.render(photos: datas, layout: layout, branding: style) }.value
+        guard let out else { appendLog("Layout „\(layout.name)“: Rendern fehlgeschlagen"); return nil }
+        let dir = Self.photosDir.appendingPathComponent("layouts", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let url = dir.appendingPathComponent("openbooth-\(stamp).jpg")
-            try data.write(to: url)
-            appendLog("Branding: Kopie \(url.lastPathComponent) (\(data.count / 1_000_000) MB)")
+            let safe = layout.name.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: " ", with: "_")
+            let url = dir.appendingPathComponent("openbooth-\(stamp)-\(safe).jpg")
+            try out.write(to: url)
+            appendLog("Layout „\(layout.name)“: \(url.lastPathComponent) aus \(datas.count) Fotos (\(out.count / 1_000_000) MB)")
             return url
-        } catch { appendLog("Branding: \(error.localizedDescription)"); return nil }
+        } catch { appendLog("Layout: \(error.localizedDescription)"); return nil }
     }
 
-    /// Datei an alle aktiven Upload-Ziele geben.
-    private func upload(_ url: URL, isRAW: Bool) {
-        if !isRAW || settingsRef?.immichUploadRAW == true { immich.enqueue(url) }
-        if !isRAW || settingsRef?.webdavUploadRAW == true { webdav.enqueue(url) }
+    /// RAW-Datei an die Ziele geben, die RAW wollen (JPEG/Layouts laufen ueber deliver()).
+    private func uploadRAW(_ url: URL) {
+        if settingsRef?.immichUploadRAW == true { immich.enqueue(url) }
+        if settingsRef?.webdavUploadRAW == true { webdav.enqueue(url) }
     }
 
     func syncImmich() {
@@ -571,7 +596,7 @@ final class CameraManager: NSObject, ObservableObject {
         guard let cam = sony, !capturing else { return }
         noteInteraction()
         dismissResult()
-        let shots = max(1, settingsRef?.shotsPerCapture ?? 1)
+        let shots = settingsRef?.effectiveShots ?? 1
         let interval = max(0, settingsRef?.shotInterval ?? 3)
         if seconds > 0 { countdown = seconds }
         capturing = true
@@ -615,7 +640,12 @@ final class CameraManager: NSObject, ObservableObject {
             }
             shotNumber = 0
             if !taken.isEmpty {
-                showResult(taken, urls: takenURLs)
+                status = "Wird zusammengestellt …"
+                if let layoutImage = await deliver(originals: takenURLs, stamp: Self.stamp()) {
+                    showResult([layoutImage], urls: takenURLs, isLayout: true)
+                } else {
+                    showResult(taken, urls: takenURLs)
+                }
                 status = taken.count == 1 ? "Foto gespeichert" : "\(taken.count) Fotos gespeichert"
             }
             capturing = false
@@ -634,14 +664,12 @@ final class CameraManager: NSObject, ObservableObject {
         if let raw = rawObj {
             rawURL = try Self.saveRAW(raw.data, stamp: stamp)
             appendLog("RAW gesichert: \(rawURL!.lastPathComponent) (\(raw.data.count / 1_000_000) MB)")
-            upload(rawURL!, isRAW: true)
+            uploadRAW(rawURL!)
         }
         if let jpeg = jpegObj?.data {
             let url = try Self.saveToDocuments(jpeg, stamp: stamp)
             ThumbnailStore.prepare(url)
             sessionPhotos.insert(url, at: 0)
-            // Upload-Ziele bekommen die Kopie mit Logo/Schriftzug, wenn eingeschaltet; das Original bleibt unberuehrt
-            if let branded = await brandedCopy(of: jpeg, stamp: stamp) { upload(branded, isRAW: false) } else { upload(url, isRAW: false) }
             if settingsRef?.saveToPhotos ?? true {
                 Self.saveToPhotos(jpeg, raw: rawObj?.data) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
             }
@@ -688,7 +716,11 @@ final class CameraManager: NSObject, ObservableObject {
             do {
                 let objects = try await cam.fetchObjects { [weak self] msg in Task { @MainActor in self?.appendLog(msg) } }
                 if let (img, url) = try await self.store(objects) {
-                    self.showResult([img], urls: [url])
+                    if let layoutImage = await self.deliver(originals: [url], stamp: Self.stamp()) {
+                        self.showResult([layoutImage], urls: [url], isLayout: true)
+                    } else {
+                        self.showResult([img], urls: [url])
+                    }
                     self.status = "Foto von der Kamera übernommen"
                 }
             } catch {
@@ -699,7 +731,9 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    func showResult(_ imgs: [UIImage], urls: [URL] = []) {
+    @Published var resultIsLayout = false      // Rueckschau zeigt ein gerendertes Layout statt der Originale
+    func showResult(_ imgs: [UIImage], urls: [URL] = [], isLayout: Bool = false) {
+        resultIsLayout = isLayout
         resultPhotos = imgs
         resultURLs = urls
         resultPhoto = imgs.first
@@ -782,6 +816,18 @@ final class CameraManager: NSObject, ObservableObject {
 
     /// Loescht ein Bild der Rueckschau aus der App-Galerie. Die Apple-Mediathek bleibt unveraendert.
     func deleteResult(at index: Int) {
+        if resultIsLayout {
+            // Layout-Rueckschau: die ganze Serie samt gerendertem Bild verwerfen
+            for url in resultURLs {
+                try? FileManager.default.removeItem(at: url)
+                ThumbnailStore.remove(url)
+                sessionPhotos.removeAll { $0 == url }
+            }
+            if let l = lastLayoutURL { try? FileManager.default.removeItem(at: l); lastLayoutURL = nil }
+            appendLog("Serie aus App-Galerie gelöscht (\(resultURLs.count) Fotos)")
+            dismissResult()
+            return
+        }
         guard resultPhotos.indices.contains(index) else { return }
         if resultURLs.indices.contains(index) {
             let url = resultURLs[index]
