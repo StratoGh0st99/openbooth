@@ -192,8 +192,14 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     /// Ergebnis der Bewegungserkennung aus dem Liveview-Task.
-    private func motionResult(level: Double, hit: Bool) {
+    private var lastNoiseLog = Date.distantPast
+    private func motionResult(level: Double, hit: Bool, noise: Double = 0, global: Double = 0) {
         motionLevel = level
+        // alle 30 s im Leerlauf: Ruhepegel und gelerntes Rauschen, um die Schwelle mit Daten zu setzen
+        if Date().timeIntervalSince(lastNoiseLog) > 30 {
+            lastNoiseLog = Date()
+            appendLog(String(format: "Bewegung Ruhepegel: Feld %.1f, global %.1f, Rauschen %.1f, Schwelle %d", level, global, noise, settingsRef?.motionThreshold ?? 8))
+        }
         if hit, idle {
             appendLog(String(format: "Bewegung erkannt (%.1f), Collage aus", level))
             noteInteraction()
@@ -512,15 +518,15 @@ final class CameraManager: NSObject, ObservableObject {
                         // JPEG hier im Hintergrund dekodieren, damit der Main-Thread nur noch anzeigt
                         let img = raw.preparingForDisplay() ?? raw
                         let (armed, threshold, wantHist) = await MainActor.run { (self?.motionArmed ?? false, self?.motionThreshold ?? 8, self?.wantHistogram ?? false) }
-                        var level = 0.0, hit = false
-                        if armed { hit = motion.feed(img, threshold: threshold); level = motion.level } else { motion.reset() }
+                        var level = 0.0, hit = false, noise = 0.0, global = 0.0
+                        if armed { hit = motion.feed(img, threshold: threshold); level = motion.level; noise = motion.noiseLevel; global = motion.globalLevel } else { motion.reset() }
                         histCounter += 1
                         let hist: Histogram? = (wantHist && histCounter % 3 == 0) ? Histogram.compute(img) : nil
                         await MainActor.run {
                             if let hist { self?.liveHistogram = hist } else if !wantHist, self?.liveHistogram != nil { self?.liveHistogram = nil }
                             self?.liveFrame = img; self?.lastFrame = Date(); self?.frameCount += 1
                             if self?.banner != nil { self?.banner = nil }
-                            if armed { self?.motionResult(level: level, hit: hit) } else if self?.motionLevel != 0 { self?.motionLevel = 0 }
+                            if armed { self?.motionResult(level: level, hit: hit, noise: noise, global: global) } else if self?.motionLevel != 0 { self?.motionLevel = 0 }
                         }
                         failures = 0
                     } else {

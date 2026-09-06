@@ -556,7 +556,7 @@ struct AdminPanel: View {
                     .foregroundStyle(.secondary)
             }
         } header: { Text("Leerlauf") } footer: {
-            Text("Kleinere Schwelle reagiert früher. Bewegung, Tipp oder Aufnahme beenden die Collage.")
+            Text("Gemessen wird das stärkste von 16 Bildfeldern nach Abzug von Helligkeitswechseln im ganzen Bild (Licht an/aus, fremder Blitz). Kleinere Schwelle reagiert früher. Bewegung, Tipp oder Aufnahme beenden die Collage.")
         }
         SwiftUI.Section("Galerie") {
             Toggle("Galerie für Gäste", isOn: $settings.guestGallery)
