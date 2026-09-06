@@ -7,7 +7,6 @@
 //
 
 import SwiftUI
-import PhotosUI
 import CoreImage.CIFilterBuiltins
 import ImageCaptureCore
 
@@ -59,19 +58,8 @@ struct ContentView: View {
             cam.settingsRef = settings
             cam.start()
             cam.updateBrightness()
-            // Entwicklung: -renderLayoutsPreview 1 rendert alle Layouts mit den vorhandenen Fotos nach Documents/preview-*.jpg
-            if UserDefaults.standard.bool(forKey: "renderLayoutsPreview") {
-                Task {
-                    for l in FixedLayout.allCases {
-                        if let u = await cam.renderLayout(l, originals: Array(cam.sessionPhotos.prefix(l.slots).reversed()), stamp: "preview") {
-                            let dst = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("preview-\(l.rawValue).jpg")
-                            try? FileManager.default.removeItem(at: dst); try? FileManager.default.copyItem(at: u, to: dst)
-                        }
-                    }
-                }
-            }
         }
-        .fullScreenCover(isPresented: $showGallery) { GalleryView(photos: cam.galleryPhotos(for: settings.sourceReview), tileAspect: FixedLayout.from(settings.sourceReview)?.aspect ?? 1.5, autoClose: settings.gallerySeconds, onActivity: { cam.noteInteraction() }) }
+        .fullScreenCover(isPresented: $showGallery) { GalleryView(photos: cam.sessionPhotos, autoClose: settings.gallerySeconds, onActivity: { cam.noteInteraction() }) }
         // Leerlauf beginnt oder endet: Galerie und QR-Seite schliessen, die Buehne gehoert wieder der Fotobox
         .onChange(of: cam.idle) { _, _ in showGallery = false; showQR = false; cam.qrShown = false }
         .overlay {
@@ -131,9 +119,8 @@ struct ContentView: View {
             }
 
             // Leerlauf-Collage ueber dem Liveview
-            if cam.idle && !cam.galleryPhotos(for: settings.sourceReview).isEmpty {
-                CollageView(photos: cam.galleryPhotos(for: settings.sourceReview), aspect: FixedLayout.from(settings.sourceReview)?.aspect ?? 1.5,
-                            interval: settings.slideshowInterval, title: settings.welcomeTitle)
+            if cam.idle && !cam.sessionPhotos.isEmpty {
+                CollageView(photos: cam.sessionPhotos, interval: settings.slideshowInterval, title: settings.welcomeTitle)
                     .transition(.opacity)
                     .onTapGesture { cam.noteInteraction() }
             }
@@ -175,7 +162,7 @@ struct ContentView: View {
                             Label("Galerie", systemImage: "photo.on.rectangle").frame(width: 160, height: 56)
                         }
                         .buttonStyle(.borderedProminent).tint(Color(white: 0.22))
-                        .disabled(cam.galleryPhotos(for: settings.sourceReview).isEmpty)
+                        .disabled(cam.sessionPhotos.isEmpty)
                         .padding()
                     } else {
                         Color.clear.frame(width: 160, height: 56).padding()
@@ -281,7 +268,7 @@ struct ContentView: View {
                                 Button(role: .destructive) {
                                     cam.deleteResult(at: 0)
                                 } label: {
-                                    Label(cam.resultIsLayout && cam.resultURLs.count > 1 ? "Serie löschen" : "Löschen", systemImage: "trash").frame(width: 180, height: 56)
+                                    Label("Löschen", systemImage: "trash").frame(width: 160, height: 56)
                                 }
                                 .buttonStyle(.bordered)
                             }
@@ -385,19 +372,19 @@ struct AdminPanel: View {
     @EnvironmentObject var cam: CameraManager
     @EnvironmentObject var settings: AppSettings
     @Binding var adminUnlocked: Bool
-    // Startabschnitt per Startargument waehlbar (-adminSection "Layouts & Branding"), fuer Screenshots im Simulator
+    // Startabschnitt per Startargument waehlbar (-adminSection "Kamera"), fuer Screenshots im Simulator
     @State private var section: Section = Section(rawValue: UserDefaults.standard.string(forKey: "adminSection") ?? "") ?? .event
     @State private var newPin = ""
     @State private var diagnosticsURL: URL?
 
     enum Section: String, CaseIterable, Identifiable {
         case event = "Veranstaltung", camera = "Kamera", flow = "Ablauf", screen = "Anzeige & Töne",
-             branding = "Layouts & Branding", storage = "Speicherorte", phrases = "Sprüche", access = "Zugang", log = "Protokoll"
+             storage = "Speicherorte", phrases = "Sprüche", access = "Zugang", log = "Protokoll"
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .event: "calendar"; case .camera: "camera"; case .flow: "timer"; case .screen: "display"
-            case .branding: "signature"; case .storage: "externaldrive"; case .phrases: "text.bubble"; case .access: "lock"; case .log: "doc.text.magnifyingglass"
+            case .storage: "externaldrive"; case .phrases: "text.bubble"; case .access: "lock"; case .log: "doc.text.magnifyingglass"
             }
         }
     }
@@ -455,7 +442,6 @@ struct AdminPanel: View {
                 case .camera: cameraSection
                 case .flow: flowSection
                 case .screen: screenSection
-                case .branding: LayoutsPanel()
                 case .storage: storageSection
                 case .phrases: phrasesSection
                 case .access: accessSection
@@ -541,14 +527,9 @@ struct AdminPanel: View {
     @ViewBuilder private var flowSection: some View {
         SwiftUI.Section("Aufnahme") {
             Stepper("Countdown: \(settings.countdownSeconds) s", value: $settings.countdownSeconds, in: 0...10)
-            if let l = settings.seriesLayout {
-                LabeledContent("Bilder pro Auslösung", value: "\(l.slots), durch Layout „\(l.label)“")
+            Stepper("Bilder pro Auslösung: \(settings.shotsPerCapture)", value: $settings.shotsPerCapture, in: 1...5, step: 2)
+            if settings.shotsPerCapture > 1 {
                 Stepper("Pause zwischen Bildern: \(settings.shotInterval) s", value: $settings.shotInterval, in: 0...10)
-            } else {
-                Stepper("Bilder pro Auslösung: \(settings.shotsPerCapture)", value: $settings.shotsPerCapture, in: 1...5, step: 2)
-                if settings.shotsPerCapture > 1 {
-                    Stepper("Pause zwischen Bildern: \(settings.shotInterval) s", value: $settings.shotInterval, in: 0...10)
-                }
             }
             Stepper("Rückschau: \(settings.resultSeconds) s", value: $settings.resultSeconds, in: 3...60)
             Toggle("Fotos vom Kamera-Auslöser übernehmen", isOn: $settings.pickupExternal)
@@ -730,7 +711,6 @@ struct PinPadView: View {
 
 struct CollageView: View {
     let photos: [URL]
-    var aspect: CGFloat = 1.5
     let interval: Int
     let title: String
     @State private var picks: [URL] = []
@@ -742,8 +722,8 @@ struct CollageView: View {
             GeometryReader { geo in
                 ZStack {
                     ForEach(Array(picks.enumerated()), id: \.element) { i, url in
-                        CollageCard(url: url, aspect: aspect)
-                            .frame(width: aspect < 1 ? geo.size.height * 0.75 * aspect : geo.size.width * 0.42)
+                        CollageCard(url: url)
+                            .frame(width: geo.size.width * 0.42)
                             .rotationEffect(.degrees(Double((i * 7 + seed) % 15) - 7))
                             .position(position(i, in: geo.size))
                             .transition(.scale.combined(with: .opacity))
@@ -782,16 +762,14 @@ struct CollageView: View {
 
 struct CollageCard: View {
     let url: URL
-    var aspect: CGFloat = 1.5
     @State private var image: UIImage?
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
                 Color.gray.opacity(0.3)
-                // fertige Layouts (Streifen, Collage) unbeschnitten zeigen
-                if let image { Image(uiImage: image).resizable().scaledToFit() }
+                if let image { Image(uiImage: image).resizable().scaledToFill() }
             }
-            .aspectRatio(aspect, contentMode: .fit)
+            .aspectRatio(3/2, contentMode: .fit)
             .clipped()
             .padding(10)
             Color.white.frame(height: 26)
@@ -806,7 +784,6 @@ struct CollageCard: View {
 
 struct GalleryView: View {
     let photos: [URL]
-    var tileAspect: CGFloat = 1.5
     var autoClose: Int = 30
     var onActivity: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
@@ -828,10 +805,9 @@ struct GalleryView: View {
     private var galleryBody: some View {
         NavigationStack {
             ScrollView {
-                // Streifen hochkant: mehr Spalten, damit die Kacheln nicht riesig werden
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: tileAspect < 1 ? 6 : 3), spacing: 12) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
                     ForEach(photos, id: \.self) { url in
-                        Thumb(url: url, aspect: tileAspect).onTapGesture { selected = url }
+                        Thumb(url: url).onTapGesture { selected = url }
                     }
                 }
                 .padding()
@@ -896,14 +872,13 @@ struct GalleryView: View {
 
     struct Thumb: View {
         let url: URL
-        var aspect: CGFloat = 1.5
         @State private var image: UIImage?
         var body: some View {
             ZStack {
                 Color.gray.opacity(0.2)
-                if let image { Image(uiImage: image).resizable().scaledToFit() }
+                if let image { Image(uiImage: image).resizable().scaledToFill() }
             }
-            .aspectRatio(aspect, contentMode: .fit)
+            .aspectRatio(3/2, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .task { image = await ThumbnailStore.thumbnail(for: url) }
         }
@@ -1091,157 +1066,6 @@ struct SettingPicker: View {
                 .frame(width: 280, height: min(520, CGFloat(setting.options.count) * 44 + 16))
                 .onAppear { if let c = setting.current { proxy.scrollTo(c, anchor: .center) } }
             }
-            .presentationCompactAdaptation(.popover)
-        }
-    }
-}
-
-/// Layouts & Branding: drei feste Layouts, drei Rahmen, ein Schriftzug, optional ein Logo.
-struct LayoutsPanel: View {
-    @EnvironmentObject var cam: CameraManager
-    @EnvironmentObject var settings: AppSettings
-    @State private var logo: UIImage? = Branding.loadLogo()
-    @State private var pick: PhotosPickerItem?
-    @State private var previews: [FixedLayout: UIImage] = [:]
-    @State private var renderTask: Task<Void, Never>?
-
-    var body: some View {
-        Group {
-            SwiftUI.Section {
-                sourcePicker("Rückschau und Galerie", $settings.sourceReview)
-                sourcePicker("Immich", $settings.sourceImmich).disabled(!settings.immichEnabled)
-                if settings.immichEnabled, FixedLayout.from(settings.sourceImmich) != nil {
-                    Toggle("Immich: zusätzlich das Original", isOn: $settings.immichAlsoOriginal).padding(.leading, 20)
-                }
-                sourcePicker("WebDAV", $settings.sourceWebDAV).disabled(!settings.webdavEnabled)
-                if settings.webdavEnabled, FixedLayout.from(settings.sourceWebDAV) != nil {
-                    Toggle("WebDAV: zusätzlich das Original", isOn: $settings.webdavAlsoOriginal).padding(.leading, 20)
-                }
-            } header: { Text("Was bekommt welches Ziel?") } footer: {
-                Text("„Original“ ist das unveränderte Kamerabild in voller Größe. Layouts sind die gerahmte Web-Version mit 2000 px Breite. Steht die Rückschau auf einem Layout, zeigen auch Galerie und Collage die fertigen Bilder, und bei „4 Bilder“ macht die Fotobox vier Aufnahmen. Die Mediathek bekommt immer die Originale.")
-            }
-
-            SwiftUI.Section {
-                Picker("Rahmen", selection: $settings.frameStyle) {
-                    ForEach(FrameStyle.allCases) { Text($0.label).tag($0.rawValue) }
-                }
-                .pickerStyle(.segmented)
-                Text(settings.frame.description).font(.caption).foregroundStyle(.secondary)
-                TextField("Schriftzug, z. B. Anna & Paul · 12. Juni 2027", text: $settings.brandingText)
-                HStack(spacing: 16) {
-                    if let logo {
-                        Image(uiImage: logo).resizable().scaledToFit().frame(height: 44)
-                            .padding(6).background(Color.gray.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
-                    } else { Text("Kein Logo").foregroundStyle(.secondary) }
-                    Spacer()
-                    PhotosPicker(selection: $pick, matching: .images) { Label(logo == nil ? "Logo wählen" : "Ersetzen", systemImage: "photo") }
-                        .buttonStyle(.bordered)
-                    if logo != nil {
-                        Button(role: .destructive) { Branding.removeLogo(); logo = nil; render() } label: { Label("Entfernen", systemImage: "trash") }
-                            .buttonStyle(.bordered)
-                    }
-                }
-            } header: { Text("Rahmen und Schriftzug (auf allen Layouts)") } footer: {
-                Text("Der Schriftzug steht in der Leiste unten auf jedem Layout, ein Logo links daneben. Logo am besten als PNG mit Transparenz.")
-            }
-
-            SwiftUI.Section {
-                if cam.sessionPhotos.isEmpty {
-                    Text("Erst ein Foto machen, dann erscheinen hier die Layouts mit echten Bildern.").foregroundStyle(.secondary)
-                } else {
-                    HStack(alignment: .top, spacing: 16) {
-                        ForEach(FixedLayout.allCases) { l in
-                            VStack(spacing: 6) {
-                                if let img = previews[l] {
-                                    Image(uiImage: img).resizable().scaledToFit()
-                                        .clipShape(RoundedRectangle(cornerRadius: 6)).shadow(radius: 4)
-                                } else { ProgressView().frame(height: 120) }
-                                Text(l.label).font(.caption).foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: l == .strip4 ? 300 : nil)
-                        }
-                    }
-                    .frame(height: 320)
-                }
-            } header: { Text("Vorschau mit den letzten Fotos") }
-        }
-        .onAppear { render() }
-        .onChange(of: settings.frameStyle) { _, _ in render() }
-        .onChange(of: settings.brandingText) { _, _ in render() }
-        .onChange(of: cam.sessionPhotos.first) { _, _ in render() }
-        .onChange(of: pick) { _, item in
-            guard let item else { return }
-            Task {
-                if let data = try? await item.loadTransferable(type: Data.self), Branding.saveLogo(data) {
-                    logo = Branding.loadLogo(); cam.appendLog("Branding: Logo gesetzt")
-                } else { cam.appendLog("Branding: Logo konnte nicht geladen werden") }
-                pick = nil
-                render()
-            }
-        }
-    }
-
-    /// Auswahl wie bei den Kamerawerten: Knopf oeffnet ein Popover mit Liste (Menue und Picker reagierten hier nicht)
-    private func sourcePicker(_ title: String, _ sel: Binding<String>) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            SourceChoice(title: title, selection: sel) { v in cam.appendLog("Quelle \(title) = \(v)") }
-        }
-    }
-
-    private func render() {
-        renderTask?.cancel()
-        let urls = Array(cam.sessionPhotos.prefix(4).reversed())
-        guard !urls.isEmpty else { previews = [:]; return }
-        let datas = urls.compactMap { try? Data(contentsOf: $0) }
-        let frame = settings.frame, text = settings.brandingText, lg = logo
-        renderTask = Task.detached(priority: .userInitiated) {
-            for l in FixedLayout.allCases {
-                if Task.isCancelled { return }
-                let d = LayoutRenderer.render(photos: Array(datas.prefix(l.slots)), layout: l, frame: frame, text: text, logo: lg, maxEdge: 1200, quality: 0.8)
-                if let img = d.flatMap(UIImage.init(data:)) { await MainActor.run { previews[l] = img } }
-            }
-        }
-    }
-}
-
-/// Quelle eines Ziels waehlen: Original oder eines der festen Layouts, im Popover.
-struct SourceChoice: View {
-    let title: String
-    @Binding var selection: String
-    var onChange: (String) -> Void = { _ in }
-    @State private var open = false
-
-    private var options: [(String, String)] {
-        [(FixedLayout.originalID, "Original")] + FixedLayout.allCases.map { ($0.rawValue, $0.label) }
-    }
-
-    var body: some View {
-        Button { open = true } label: {
-            HStack(spacing: 6) {
-                Text(FixedLayout.from(selection)?.label ?? "Original")
-                Image(systemName: "chevron.up.chevron.down").font(.caption2)
-            }
-        }
-        .buttonStyle(.bordered)
-        .popover(isPresented: $open) {
-            List(options, id: \.0) { key, label in
-                Button {
-                    selection = key
-                    onChange(key)
-                    open = false
-                } label: {
-                    HStack {
-                        Text(label)
-                        Spacer()
-                        if key == selection { Image(systemName: "checkmark").foregroundStyle(.tint) }
-                    }
-                }
-            }
-            .listStyle(.plain)
-            .frame(width: 300, height: CGFloat(options.count) * 46 + 16)
             .presentationCompactAdaptation(.popover)
         }
     }

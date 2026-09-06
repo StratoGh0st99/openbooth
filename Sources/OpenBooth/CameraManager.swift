@@ -44,7 +44,6 @@ final class CameraManager: NSObject, ObservableObject {
         Self.currentEvent = name
         dismissResult()
         sessionPhotos = Self.loadSessionPhotos()
-        renderedLayouts = Self.loadRenderedLayouts()
         lastPhoto = nil
         appendLog("Veranstaltung „\(name)“: \(sessionPhotos.count) Fotos")
     }
@@ -76,74 +75,10 @@ final class CameraManager: NSObject, ObservableObject {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: "\\", with: "-")
         return t.isEmpty ? "Fotobox" : t
     }
-    // MARK: Layouts und Zustellung
-
-    /// Eine Serie ist abgeschlossen: jedes Ziel bekommt seine Quelle (Original je Foto oder ein gerendertes Layout).
-    /// Liefert das Bild fuer die Rueckschau (Layout) oder nil, wenn die Rueckschau die Originale zeigt.
-    private func deliver(originals: [URL], stamp: String) async -> UIImage? {
-        guard let s = settingsRef, !originals.isEmpty else { return nil }
-        var rendered: [FixedLayout: URL] = [:]
-        func output(for source: String) async -> [URL] {
-            guard let layout = s.layout(for: source) else { return originals }
-            if let url = rendered[layout] { return [url] }
-            guard let url = await renderLayout(layout, originals: originals, stamp: stamp) else { return originals }
-            rendered[layout] = url
-            return [url]
-        }
-        if s.immichEnabled {
-            for u in await output(for: s.sourceImmich) { immich.enqueue(u) }
-            if s.immichAlsoOriginal, s.layout(for: s.sourceImmich) != nil { originals.forEach { immich.enqueue($0) } }
-        }
-        if s.webdavEnabled {
-            for u in await output(for: s.sourceWebDAV) { webdav.enqueue(u) }
-            if s.webdavAlsoOriginal, s.layout(for: s.sourceWebDAV) != nil { originals.forEach { webdav.enqueue($0) } }
-        }
-        if s.layout(for: s.sourceReview) != nil {
-            let urls = await output(for: s.sourceReview)
-            if let u = urls.first, u != originals.first, let img = await Self.previewImage(from: (try? Data(contentsOf: u)) ?? Data()) {
-                lastLayoutURL = u
-                return img
-            }
-        }
-        return nil
-    }
-    private(set) var lastLayoutURL: URL?
-    /// Alle gerenderten Layouts der Veranstaltung, neueste zuerst (Galerie und Collage, wenn die Rueckschau ein Layout zeigt)
-    @Published var renderedLayouts: [URL] = []
-    static var layoutsDir: URL { photosDir.appendingPathComponent("layouts", isDirectory: true) }
-    static func loadRenderedLayouts() -> [URL] {
-        let urls = (try? FileManager.default.contentsOfDirectory(at: layoutsDir, includingPropertiesForKeys: nil)) ?? []
-        return urls.filter { $0.pathExtension.lowercased() == "jpg" && !$0.lastPathComponent.contains("-preview-") }
-            .sorted { $0.lastPathComponent > $1.lastPathComponent }
-    }
-    /// Galerie-Inhalt: Layouts des Rueckschau-Layouts oder die Originale
-    func galleryPhotos(for source: String) -> [URL] {
-        guard let l = FixedLayout.from(source) else { return sessionPhotos }
-        return renderedLayouts.filter { $0.lastPathComponent.hasSuffix("-\(l.rawValue).jpg") }
-    }
-
-    /// Layout rendern und unter Fotos/<Event>/layouts/ ablegen.
-    func renderLayout(_ layout: FixedLayout, originals: [URL], stamp: String) async -> URL? {
-        guard let s = settingsRef else { return nil }
-        let frame = s.frame, text = s.brandingText, logo = Branding.loadLogo()
-        let datas = originals.compactMap { try? Data(contentsOf: $0) }
-        let out = await Task.detached(priority: .userInitiated) { LayoutRenderer.render(photos: datas, layout: layout, frame: frame, text: text, logo: logo) }.value
-        guard let out else { appendLog("Layout „\(layout.label)“: Rendern fehlgeschlagen"); return nil }
-        let dir = Self.photosDir.appendingPathComponent("layouts", isDirectory: true)
-        do {
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let url = dir.appendingPathComponent("openbooth-\(stamp)-\(layout.rawValue).jpg")
-            try out.write(to: url)
-            if stamp != "preview" { renderedLayouts.insert(url, at: 0); ThumbnailStore.prepare(url) }
-            appendLog("Layout „\(layout.label)“: \(url.lastPathComponent) aus \(datas.count) Fotos (\(out.count / 1_000_000) MB)")
-            return url
-        } catch { appendLog("Layout: \(error.localizedDescription)"); return nil }
-    }
-
-    /// RAW-Datei an die Ziele geben, die RAW wollen (JPEG/Layouts laufen ueber deliver()).
-    private func uploadRAW(_ url: URL) {
-        if settingsRef?.immichUploadRAW == true { immich.enqueue(url) }
-        if settingsRef?.webdavUploadRAW == true { webdav.enqueue(url) }
+    /// Datei an alle aktiven Upload-Ziele geben.
+    private func upload(_ url: URL, isRAW: Bool) {
+        if !isRAW || settingsRef?.immichUploadRAW == true { immich.enqueue(url) }
+        if !isRAW || settingsRef?.webdavUploadRAW == true { webdav.enqueue(url) }
     }
 
     func syncImmich() {
@@ -216,7 +151,6 @@ final class CameraManager: NSObject, ObservableObject {
         super.init()
         browser.delegate = self
         sessionPhotos = Self.loadSessionPhotos()
-        renderedLayouts = Self.loadRenderedLayouts()
         UIApplication.shared.isIdleTimerDisabled = true   // iPad bleibt an
         watchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
@@ -617,7 +551,7 @@ final class CameraManager: NSObject, ObservableObject {
         guard let cam = sony, !capturing else { return }
         noteInteraction()
         dismissResult()
-        let shots = settingsRef?.effectiveShots ?? 1
+        let shots = max(1, settingsRef?.shotsPerCapture ?? 1)
         let interval = max(0, settingsRef?.shotInterval ?? 3)
         if seconds > 0 { countdown = seconds }
         capturing = true
@@ -661,12 +595,7 @@ final class CameraManager: NSObject, ObservableObject {
             }
             shotNumber = 0
             if !taken.isEmpty {
-                status = "Wird zusammengestellt …"
-                if let layoutImage = await deliver(originals: takenURLs, stamp: Self.stamp()) {
-                    showResult([layoutImage], urls: takenURLs, isLayout: true)
-                } else {
-                    showResult(taken, urls: takenURLs)
-                }
+                showResult(taken, urls: takenURLs)
                 status = taken.count == 1 ? "Foto gespeichert" : "\(taken.count) Fotos gespeichert"
             }
             capturing = false
@@ -685,12 +614,13 @@ final class CameraManager: NSObject, ObservableObject {
         if let raw = rawObj {
             rawURL = try Self.saveRAW(raw.data, stamp: stamp)
             appendLog("RAW gesichert: \(rawURL!.lastPathComponent) (\(raw.data.count / 1_000_000) MB)")
-            uploadRAW(rawURL!)
+            upload(rawURL!, isRAW: true)
         }
         if let jpeg = jpegObj?.data {
             let url = try Self.saveToDocuments(jpeg, stamp: stamp)
             ThumbnailStore.prepare(url)
             sessionPhotos.insert(url, at: 0)
+            upload(url, isRAW: false)
             if settingsRef?.saveToPhotos ?? true {
                 Self.saveToPhotos(jpeg, raw: rawObj?.data) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
             }
@@ -737,11 +667,7 @@ final class CameraManager: NSObject, ObservableObject {
             do {
                 let objects = try await cam.fetchObjects { [weak self] msg in Task { @MainActor in self?.appendLog(msg) } }
                 if let (img, url) = try await self.store(objects) {
-                    if let layoutImage = await self.deliver(originals: [url], stamp: Self.stamp()) {
-                        self.showResult([layoutImage], urls: [url], isLayout: true)
-                    } else {
-                        self.showResult([img], urls: [url])
-                    }
+                    self.showResult([img], urls: [url])
                     self.status = "Foto von der Kamera übernommen"
                 }
             } catch {
@@ -752,9 +678,7 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    @Published var resultIsLayout = false      // Rueckschau zeigt ein gerendertes Layout statt der Originale
-    func showResult(_ imgs: [UIImage], urls: [URL] = [], isLayout: Bool = false) {
-        resultIsLayout = isLayout
+    func showResult(_ imgs: [UIImage], urls: [URL] = []) {
         resultPhotos = imgs
         resultURLs = urls
         resultPhoto = imgs.first
@@ -837,18 +761,6 @@ final class CameraManager: NSObject, ObservableObject {
 
     /// Loescht ein Bild der Rueckschau aus der App-Galerie. Die Apple-Mediathek bleibt unveraendert.
     func deleteResult(at index: Int) {
-        if resultIsLayout {
-            // Layout-Rueckschau: die ganze Serie samt gerendertem Bild verwerfen
-            for url in resultURLs {
-                try? FileManager.default.removeItem(at: url)
-                ThumbnailStore.remove(url)
-                sessionPhotos.removeAll { $0 == url }
-            }
-            if let l = lastLayoutURL { try? FileManager.default.removeItem(at: l); ThumbnailStore.remove(l); renderedLayouts.removeAll { $0 == l }; lastLayoutURL = nil }
-            appendLog("Serie aus App-Galerie gelöscht (\(resultURLs.count) Fotos)")
-            dismissResult()
-            return
-        }
         guard resultPhotos.indices.contains(index) else { return }
         if resultURLs.indices.contains(index) {
             let url = resultURLs[index]

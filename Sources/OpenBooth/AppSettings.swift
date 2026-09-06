@@ -39,14 +39,6 @@ final class AppSettings: ObservableObject {
     @Published var webdavURL: String { didSet { d.set(webdavURL, forKey: "webdavURL") } }
     @Published var webdavUser: String { didSet { d.set(webdavUser, forKey: "webdavUser") } }
     @Published var webdavUploadRAW: Bool { didSet { d.set(webdavUploadRAW, forKey: "webdavUploadRAW") } }
-    /// Rahmen fuer alle Layouts und Quellen je Ziel: "original", "single", "grid4" oder "strip4"
-    @Published var frameStyle: String { didSet { d.set(frameStyle, forKey: "frameStyle") } }
-    @Published var sourceReview: String { didSet { d.set(sourceReview, forKey: "sourceReview") } }
-    @Published var sourceImmich: String { didSet { d.set(sourceImmich, forKey: "sourceImmich") } }
-    @Published var sourceWebDAV: String { didSet { d.set(sourceWebDAV, forKey: "sourceWebDAV") } }
-    @Published var immichAlsoOriginal: Bool { didSet { d.set(immichAlsoOriginal, forKey: "immichAlsoOriginal") } }
-    @Published var webdavAlsoOriginal: Bool { didSet { d.set(webdavAlsoOriginal, forKey: "webdavAlsoOriginal") } }
-    @Published var brandingText: String { didSet { d.set(brandingText, forKey: "brandingText") } }
     @Published var soundsEnabled: Bool { didSet { d.set(soundsEnabled, forKey: "soundsEnabled") } }
     @Published var soundWelcome: Bool { didSet { d.set(soundWelcome, forKey: "soundWelcome") } }
     @Published var soundCountdown: Bool { didSet { d.set(soundCountdown, forKey: "soundCountdown") } }
@@ -89,17 +81,6 @@ final class AppSettings: ObservableObject {
         webdavURL = d.string(forKey: "webdavURL") ?? ""
         webdavUser = d.string(forKey: "webdavUser") ?? ""
         webdavUploadRAW = d.object(forKey: "webdavUploadRAW") as? Bool ?? false
-        frameStyle = d.string(forKey: "frameStyle") ?? FrameStyle.wedding.rawValue
-        // Quellen: nur noch feste Kennungen; alles andere (alte UUIDs) faellt auf Original zurueck
-        let ud = UserDefaults.standard
-        let src: (String) -> String = { key in
-            let v = ud.string(forKey: key) ?? FixedLayout.originalID
-            return FixedLayout.from(v) != nil ? v : FixedLayout.originalID
-        }
-        sourceReview = src("sourceReview"); sourceImmich = src("sourceImmich"); sourceWebDAV = src("sourceWebDAV")
-        immichAlsoOriginal = d.object(forKey: "immichAlsoOriginal") as? Bool ?? false
-        webdavAlsoOriginal = d.object(forKey: "webdavAlsoOriginal") as? Bool ?? false
-        brandingText = d.string(forKey: "brandingText") ?? ""
         soundsEnabled = d.object(forKey: "soundsEnabled") as? Bool ?? true
         soundWelcome = d.object(forKey: "soundWelcome") as? Bool ?? true
         soundCountdown = d.object(forKey: "soundCountdown") as? Bool ?? true
@@ -107,12 +88,4 @@ final class AppSettings: ObservableObject {
         motionWake = d.object(forKey: "motionWake") as? Bool ?? true
         motionThreshold = d.object(forKey: "motionThreshold") as? Int ?? 8
     }
-
-    // MARK: Layout-Hilfen
-
-    func layout(for source: String) -> FixedLayout? { FixedLayout.from(source) }
-    /// Layout der Rueckschau bestimmt die Serienlaenge, wenn es mehrere Bilder hat.
-    var seriesLayout: FixedLayout? { layout(for: sourceReview).flatMap { $0.slots > 1 ? $0 : nil } }
-    var effectiveShots: Int { seriesLayout?.slots ?? max(1, shotsPerCapture) }
-    var frame: FrameStyle { FrameStyle(rawValue: frameStyle) ?? .wedding }
 }
