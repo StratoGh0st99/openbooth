@@ -162,6 +162,7 @@ final class CameraManager: NSObject, ObservableObject {
     /// Alle 2 s: Leerlauf erkennen, Liveview ueberwachen, Log-Kopie schreiben.
     private func tick() {
         tickCount += 1
+        sampleUserBrightness()
         if tickCount % 3 == 0 { Self.logFile.snapshot() }
         if tickCount % 15 == 0, liveRunning { appendLog("Liveview: \(frameCount / 30) Bilder/s"); frameCount = 0 }
         let idleFor = Date().timeIntervalSince(lastInteraction)
@@ -205,24 +206,37 @@ final class CameraManager: NSObject, ObservableObject {
 
     /// QR-Seite sichtbar (setzt ContentView), erzwingt volle Helligkeit.
     @Published var qrShown = false { didSet { updateBrightness() } }
-    private var savedBrightness: CGFloat?   // Wert vor dem Hochdrehen, wird bei Collage/Beenden zurueckgesetzt
+    private var forcingBrightness = false                        // wir halten gerade volle Helligkeit
+    private var userBrightness: CGFloat = UIScreen.main.brightness // Wert des Nutzers, nur gemessen, wenn wir nicht eingreifen
 
     /// Volle Helligkeit bei QR-Seite oder Option "dauerhaft", nicht waehrend der Leerlauf-Collage.
+    /// Der Nutzerwert wird laufend im tick() gemessen, solange wir nicht eingreifen. So kann er nie versehentlich
+    /// mit 1.0 ueberschrieben werden (frueher: Wert beim Hochdrehen gemerkt, war er da schon 1.0, blieb es dabei).
     func updateBrightness() {
         let wantFull = qrShown || ((settingsRef?.maxBrightness ?? false) && !idle)
         let screen = UIScreen.main
-        if wantFull {
-            if savedBrightness == nil { savedBrightness = screen.brightness }
-            if screen.brightness < 0.999 { screen.brightness = 1.0 }
-        } else if let saved = savedBrightness {
-            screen.brightness = saved
-            savedBrightness = nil
+        if wantFull, !forcingBrightness {
+            sampleUserBrightness()
+            forcingBrightness = true
+            screen.brightness = 1.0
+            appendLog(String(format: "Helligkeit voll (vorher %.2f)", userBrightness))
+        } else if !wantFull, forcingBrightness {
+            forcingBrightness = false
+            screen.brightness = userBrightness
+            appendLog(String(format: "Helligkeit zurück auf %.2f", userBrightness))
         }
+    }
+
+    /// Nutzerwert merken, aber nie einen Wert, den wir selbst gesetzt haben.
+    private func sampleUserBrightness() {
+        guard !forcingBrightness else { return }
+        let b = UIScreen.main.brightness
+        if b < 0.98 { userBrightness = b }
     }
 
     /// Beim Verlassen der App die Helligkeit des Nutzers wiederherstellen.
     func restoreBrightness() {
-        if let saved = savedBrightness { UIScreen.main.brightness = saved; savedBrightness = nil }
+        if forcingBrightness { UIScreen.main.brightness = userBrightness; forcingBrightness = false }
     }
 
     func noteInteraction() {
