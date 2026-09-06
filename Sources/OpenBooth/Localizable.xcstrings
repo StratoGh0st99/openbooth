@@ -62,16 +62,6 @@
         }
       }
     },
-    "A text file with iPad and app version, all camera operations, events and properties including raw data (hex) and the full log. Enough to support a new camera model without access to the camera. Contains no passwords, API keys or server addresses; the camera serial number is shortened. “Send to OpenBooth” sends exactly this file to the developers. “Automatically” does so on capture errors and connection failures, at most every 10 minutes, never otherwise.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eine Textdatei mit iPad- und App-Version, allen Operationen, Events und Properties der Kamera samt Rohdaten (Hex) und dem vollständigen Protokoll. Reicht, um ein neues Kameramodell ohne Zugriff auf die Kamera zu unterstützen. Enthält keine Passwörter, API-Keys oder Server-Adressen, die Kamera-Seriennummer wird gekürzt. „An OpenBooth senden“ schickt genau diese Datei an die Entwickler. „Automatisch“ tut das bei Aufnahmefehlern und Verbindungsabbrüchen, höchstens alle 10 Minuten, sonst nie."
-          }
-        }
-      }
-    },
     "API key": {
       "localizations": {
         "de": {
@@ -132,6 +122,16 @@
         }
       }
     },
+    "Admin: two-finger swipe down, then PIN.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Admin: mit zwei Fingern nach unten wischen, dann PIN."
+          }
+        }
+      }
+    },
     "Album could not be created": {
       "localizations": {
         "de": {
@@ -168,6 +168,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Einstellungen › OpenBooth › Kamera erlauben"
+          }
+        }
+      }
+    },
+    "Also used as Immich album and WebDAV folder.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zugleich Immich-Album und WebDAV-Ordner."
           }
         }
       }
@@ -258,6 +268,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kamera-RAM"
+          }
+        }
+      }
+    },
+    "Camera capabilities and log, no credentials.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera-Fähigkeiten und Protokoll, keine Zugangsdaten."
           }
         }
       }
@@ -512,16 +532,6 @@
         }
       }
     },
-    "Create an API key in Immich under Account Settings › API Keys. It is stored in the iPad keychain. Uploads run in the background with a queue and catch up when offline.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "API-Key in Immich unter Kontoeinstellungen › API-Schlüssel anlegen. Er wird im Schlüsselbund des iPads gespeichert. Upload läuft im Hintergrund mit Warteschlange, ohne Netz wird nachgeholt."
-          }
-        }
-      }
-    },
     "Current": {
       "localizations": {
         "de": {
@@ -612,6 +622,16 @@
         }
       }
     },
+    "Dims during the idle collage.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wird während der Leerlauf-Collage gedimmt."
+          }
+        }
+      }
+    },
     "Display": {
       "localizations": {
         "de": {
@@ -638,16 +658,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fertig"
-          }
-        }
-      }
-    },
-    "During the idle collage the brightness returns to the previous value and goes back up on motion or capture. The QR page is always at full brightness.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Während der Leerlauf-Collage geht die Helligkeit auf den vorherigen Wert zurück, bei Bewegung oder Aufnahme wieder hoch. Die QR-Seite ist immer voll hell."
           }
         }
       }
@@ -718,16 +728,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Frontkamera"
-          }
-        }
-      }
-    },
-    "Full log in Documents/openbooth.log, fetch with tools/pull-log.sh. Camera capabilities in openbooth-capabilities.log.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vollständig in Documents/openbooth.log, holen mit tools/pull-log.sh. Kamera-Fähigkeiten in openbooth-capabilities.log."
           }
         }
       }
@@ -852,16 +852,6 @@
         }
       }
     },
-    "In debug mode the admin opens at launch and the swipe gesture needs no PIN.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Im Debug-Modus öffnet der Admin beim Start und die Wischgeste braucht keine PIN."
-          }
-        }
-      }
-    },
     "It continues automatically once reconnected": {
       "localizations": {
         "de": {
@@ -942,6 +932,16 @@
         }
       }
     },
+    "Lower threshold reacts earlier.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kleinere Schwelle reagiert früher."
+          }
+        }
+      }
+    },
     "Manual": {
       "localizations": {
         "de": {
@@ -958,16 +958,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Manuell (umgekehrt)"
-          }
-        }
-      }
-    },
-    "Measures the strongest of 16 image cells after subtracting brightness changes across the whole frame (lights on/off, someone else’s flash). A lower threshold reacts earlier. Motion, a tap or a capture end the collage.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gemessen wird das stärkste von 16 Bildfeldern nach Abzug von Helligkeitswechseln im ganzen Bild (Licht an/aus, fremder Blitz). Kleinere Schwelle reagiert früher. Bewegung, Tipp oder Aufnahme beenden die Collage."
           }
         }
       }
@@ -1148,16 +1138,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nach dem Countdown erscheint zufällig einer davon."
-          }
-        }
-      }
-    },
-    "Only applies when image quality in the camera settings is RAW or RAW+JPEG. The JPEG is always uploaded.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wirkt nur, wenn die Bildqualität in den Kameraeinstellungen auf RAW oder RAW+JPEG steht. Das JPEG geht immer hoch."
           }
         }
       }
@@ -1412,12 +1392,12 @@
         }
       }
     },
-    "Read-only: camera, frame rate, photos, destinations, log, send diagnostics. Sign in with the admin PIN; five failed attempts lock for one minute. Reachable only on the same Wi‑Fi while the app is in the foreground.": {
+    "Read-only status page, same Wi‑Fi, admin PIN.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nur lesend: Kamera, Bildrate, Fotos, Speicherziele, Protokoll, Diagnose senden. Anmeldung mit der Admin-PIN, nach fünf Fehlversuchen eine Minute Sperre. Nur im selben WLAN erreichbar, solange die App im Vordergrund läuft."
+            "value": "Statusseite nur lesend, gleiches WLAN, Admin-PIN."
           }
         }
       }
@@ -1732,16 +1712,6 @@
         }
       }
     },
-    "Shown above the live view, and large in the center when no camera is connected.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Steht über dem Liveview und ohne Kamera groß in der Mitte."
-          }
-        }
-      }
-    },
     "Shutter speed": {
       "localizations": {
         "de": {
@@ -1922,16 +1892,6 @@
         }
       }
     },
-    "The app gallery feeds review, gallery and collage and is always on.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Die App-Galerie ist die Quelle für Rückschau, Galerie und Collage und bleibt immer an."
-          }
-        }
-      }
-    },
     "The camera didn’t take a picture. Maybe no focus? Please try again.": {
       "localizations": {
         "de": {
@@ -1958,36 +1918,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Die Kamera hat zu lange gebraucht. Bitte noch einmal."
-          }
-        }
-      }
-    },
-    "The folder “%@” is created below it. Nextcloud: remote.php/dav/files/USER, preferably with an app password. The password is stored in the iPad keychain.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Darunter wird der Ordner „%@“ angelegt. Nextcloud: remote.php/dav/files/BENUTZER, am besten mit App-Passwort. Passwort liegt im Schlüsselbund des iPads."
-          }
-        }
-      }
-    },
-    "The link points to the server address above. Guests must be able to reach it, so enter e.g. https://immich.example.com rather than a home-network IP.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Der Link zeigt auf die Server-Adresse oben. Gäste müssen sie erreichen können, also z. B. https://immich.example.de statt einer IP im Heimnetz eintragen."
-          }
-        }
-      }
-    },
-    "The name is used as the Immich album and the WebDAV folder. Each event keeps its own photos on the iPad.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Der Name ist Immich-Album und WebDAV-Ordner zugleich. Fotos jeder Veranstaltung liegen getrennt auf dem iPad."
           }
         }
       }
@@ -2088,16 +2018,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Benutzer"
-          }
-        }
-      }
-    },
-    "Values are set directly in the camera. Image quality RAW or RAW+JPEG also delivers the ARW file.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Werte werden direkt in der Kamera gesetzt. Bildqualität RAW oder RAW+JPEG liefert zusätzlich die ARW-Datei."
           }
         }
       }

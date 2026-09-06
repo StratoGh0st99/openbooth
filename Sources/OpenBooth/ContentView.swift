@@ -487,9 +487,7 @@ struct AdminPanel: View {
     private var eventSection: some View {
         SwiftUI.Section {
             EventPanel()
-        } header: { Text("Event") } footer: {
-            Text("The name is used as the Immich album and the WebDAV folder. Each event keeps its own photos on the iPad.")
-        }
+        } header: { Text("Event") } footer: { Text("Also used as Immich album and WebDAV folder.") }
     }
 
     @ViewBuilder private var cameraSection: some View {
@@ -540,8 +538,6 @@ struct AdminPanel: View {
                 }
             } header: {
                 HStack { Text("Camera settings"); Spacer(); Button("Reload") { cam.reloadSettings() }.font(.caption) }
-            } footer: {
-                Text("Values are set directly in the camera. Image quality RAW or RAW+JPEG also delivers the ARW file.")
             }
         }
     }
@@ -565,9 +561,7 @@ struct AdminPanel: View {
                 LabeledContent("Current image change", value: cam.idle ? String(format: "%.1f", cam.motionLevel) : "only during the collage")
                     .foregroundStyle(.secondary)
             }
-        } header: { Text("Idle") } footer: {
-            Text("Measures the strongest of 16 image cells after subtracting brightness changes across the whole frame (lights on/off, someone else’s flash). A lower threshold reacts earlier. Motion, a tap or a capture end the collage.")
-        }
+        } header: { Text("Idle") } footer: { Text("Lower threshold reacts earlier.") }
         SwiftUI.Section("Gallery") {
             Toggle("Gallery for guests", isOn: $settings.guestGallery)
             if settings.guestGallery {
@@ -580,13 +574,11 @@ struct AdminPanel: View {
         SwiftUI.Section {
             TextField("Title", text: $settings.welcomeTitle)
             TextField("Text", text: $settings.welcomeText, axis: .vertical).lineLimit(2...4)
-        } header: { Text("Welcome") } footer: { Text("Shown above the live view, and large in the center when no camera is connected.") }
+        } header: { Text("Welcome") }
         SwiftUI.Section {
             Toggle("Keep display at full brightness", isOn: $settings.maxBrightness)
                 .onChange(of: settings.maxBrightness) { _, _ in cam.updateBrightness() }
-        } header: { Text("Display") } footer: {
-            Text("During the idle collage the brightness returns to the previous value and goes back up on motion or capture. The QR page is always at full brightness.")
-        }
+        } header: { Text("Display") } footer: { Text("Dims during the idle collage.") }
         SwiftUI.Section("Sounds") {
             Toggle("Sounds", isOn: $settings.soundsEnabled)
             if settings.soundsEnabled {
@@ -609,9 +601,7 @@ struct AdminPanel: View {
                 .onChange(of: settings.immichEnabled) { _, _ in cam.syncImmich() }
             Toggle(isOn: $settings.webdavEnabled) { Label("WebDAV folder (Nextcloud, NAS, Storage Box)", systemImage: "externaldrive.connected.to.line.below") }
                 .onChange(of: settings.webdavEnabled) { _, _ in cam.syncWebDAV() }
-        } header: { Text("Targets") } footer: {
-            Text("The app gallery feeds review, gallery and collage and is always on.")
-        }
+        } header: { Text("Targets") }
         if settings.immichEnabled {
             SwiftUI.Section("Immich server") { ImmichPanel() }
         }
@@ -623,7 +613,7 @@ struct AdminPanel: View {
     private var phrasesSection: some View {
         SwiftUI.Section {
             PhraseEditor()
-        } header: { Text("Phrases at the shutter") } footer: { Text("One of them appears at random after the countdown.") }
+        } header: { Text("Phrases at the shutter") }
     }
 
     @ViewBuilder private var accessSection: some View {
@@ -633,7 +623,7 @@ struct AdminPanel: View {
                 Button("Set") { if newPin.count >= 4 { settings.pin = newPin; newPin = "" } }
                     .buttonStyle(.bordered).disabled(newPin.count < 4)
             }
-        } header: { Text("PIN") } footer: { Text("Open admin: swipe down with two fingers, then enter the PIN.") }
+        } header: { Text("PIN") } footer: { Text("Admin: two-finger swipe down, then PIN.") }
         SwiftUI.Section {
             Toggle("Status page on Wi‑Fi", isOn: $settings.webEnabled)
                 .onChange(of: settings.webEnabled) { _, _ in cam.syncWeb() }
@@ -653,14 +643,10 @@ struct AdminPanel: View {
                     }
                 }
             }
-        } header: { Text("Remote access") } footer: {
-            Text("Read-only: camera, frame rate, photos, destinations, log, send diagnostics. Sign in with the admin PIN; five failed attempts lock for one minute. Reachable only on the same Wi‑Fi while the app is in the foreground.")
-        }
+        } header: { Text("Remote access") } footer: { Text("Read-only status page, same Wi‑Fi, admin PIN.") }
         SwiftUI.Section {
             Toggle("Debug mode", isOn: $settings.debugMode)
-        } header: { Text("Development") } footer: {
-            Text("In debug mode the admin opens at launch and the swipe gesture needs no PIN.")
-        }
+        } header: { Text("Development") }
     }
 
     @ViewBuilder private var logSection: some View {
@@ -676,9 +662,7 @@ struct AdminPanel: View {
             }
             .sheet(item: $diagnosticsURL) { url in ShareSheet(items: [url]) }
             Toggle("Send error reports automatically", isOn: $settings.autoReports)
-        } header: { Text("Diagnostics") } footer: {
-            Text("A text file with iPad and app version, all camera operations, events and properties including raw data (hex) and the full log. Enough to support a new camera model without access to the camera. Contains no passwords, API keys or server addresses; the camera serial number is shortened. “Send to OpenBooth” sends exactly this file to the developers. “Automatically” does so on capture errors and connection failures, at most every 10 minutes, never otherwise.")
-        }
+        } header: { Text("Diagnostics") } footer: { Text("Camera capabilities and log, no credentials.") }
         if let e = cam.lastError {
             SwiftUI.Section("Last error") { Text(e).foregroundStyle(.red).font(.callout) }
         }
@@ -697,9 +681,7 @@ struct AdminPanel: View {
             }
             .frame(minHeight: 420)
             .listRowInsets(EdgeInsets())
-        } header: { Text("Log (\(cam.log.count) lines)") } footer: {
-            Text("Full log in Documents/openbooth.log, fetch with tools/pull-log.sh. Camera capabilities in openbooth-capabilities.log.")
-        }
+        } header: { Text("Log (\(cam.log.count) lines)") }
     }
 }
 
@@ -1225,8 +1207,6 @@ struct WebDAVPanel: View {
                 Text("Status: \(cam.webdav.lastMessage)").font(.caption).foregroundStyle(.secondary)
             }
             if !testResult.isEmpty { Text(testResult).font(.caption).foregroundStyle(testResult.hasPrefix("OK") ? .green : .red) }
-            Text("The folder “\(settings.eventName)” is created below it. Nextcloud: remote.php/dav/files/USER, preferably with an app password. The password is stored in the iPad keychain.")
-                .font(.caption).foregroundStyle(.secondary)
         }
         .font(.callout)
     }
@@ -1264,12 +1244,8 @@ struct ImmichPanel: View {
             Toggle("Show QR code to the album for guests", isOn: $settings.qrEnabled)
             if let link = cam.immich.shareURL {
                 Text("Share link: \(link)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                Text("The link points to the server address above. Guests must be able to reach it, so enter e.g. https://immich.example.com rather than a home-network IP.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
             Toggle("Upload RAW files too", isOn: $settings.immichUploadRAW)
-            Text("Only applies when image quality in the camera settings is RAW or RAW+JPEG. The JPEG is always uploaded.")
-                .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button(testing ? "Testing…" : "Test connection") { cam.syncImmich(); runTest() }
                     .buttonStyle(.bordered).disabled(testing || settings.immichURL.isEmpty)
@@ -1277,8 +1253,6 @@ struct ImmichPanel: View {
                 Text("Status: \(cam.immich.lastMessage)").font(.caption).foregroundStyle(.secondary)
             }
             if !testResult.isEmpty { Text(testResult).font(.caption).foregroundStyle(testResult.hasPrefix("OK") ? .green : .red) }
-            Text("Create an API key in Immich under Account Settings › API Keys. It is stored in the iPad keychain. Uploads run in the background with a queue and catch up when offline.")
-                .font(.caption).foregroundStyle(.secondary)
         }
         .font(.callout)
     }
