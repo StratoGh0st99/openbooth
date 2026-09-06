@@ -630,8 +630,15 @@ struct AdminPanel: View {
             } else {
                 Button { diagnosticsURL = cam.makeDiagnosticsFile() } label: { Label("Diagnose erstellen", systemImage: "stethoscope") }
             }
+            HStack {
+                Button { Task { await cam.sendDiagnostics(reason: "manuell") } } label: { Label("An OpenBooth senden", systemImage: "paperplane") }
+                    .disabled(cam.reportStatus == "Sende …")
+                Spacer()
+                if !cam.reportStatus.isEmpty { Text(cam.reportStatus).font(.caption).foregroundStyle(.secondary) }
+            }
+            Toggle("Fehlerberichte automatisch senden", isOn: $settings.autoReports)
         } header: { Text("Diagnose") } footer: {
-            Text("Eine Textdatei mit iPad- und App-Version, allen Operationen, Events und Properties der Kamera samt Rohdaten (Hex) und dem vollständigen Protokoll. Reicht, um ein neues Kameramodell ohne Zugriff auf die Kamera zu unterstützen. Enthält keine Passwörter oder API-Keys.")
+            Text("Eine Textdatei mit iPad- und App-Version, allen Operationen, Events und Properties der Kamera samt Rohdaten (Hex) und dem vollständigen Protokoll. Reicht, um ein neues Kameramodell ohne Zugriff auf die Kamera zu unterstützen. Enthält keine Passwörter, API-Keys oder Server-Adressen, die Kamera-Seriennummer wird gekürzt. „An OpenBooth senden“ schickt genau diese Datei an die Entwickler. „Automatisch“ tut das bei Aufnahmefehlern und Verbindungsabbrüchen, höchstens alle 10 Minuten, sonst nie.")
         }
         if let e = cam.lastError {
             SwiftUI.Section("Letzter Fehler") { Text(e).foregroundStyle(.red).font(.callout) }

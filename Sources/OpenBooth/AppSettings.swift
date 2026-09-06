@@ -17,6 +17,7 @@ final class AppSettings: ObservableObject {
     @Published var qrEnabled: Bool { didSet { d.set(qrEnabled, forKey: "qrEnabled") } }
     @Published var pin: String { didSet { d.set(pin, forKey: "pin") } }
     @Published var debugMode: Bool { didSet { d.set(debugMode, forKey: "debugMode") } }
+    @Published var autoReports: Bool { didSet { d.set(autoReports, forKey: "autoReports") } }
     @Published var autoConnect: Bool { didSet { d.set(autoConnect, forKey: "autoConnect") } }
     @Published var countdownSeconds: Int { didSet { d.set(countdownSeconds, forKey: "countdownSeconds") } }
     @Published var resultSeconds: Int { didSet { d.set(resultSeconds, forKey: "resultSeconds") } }
@@ -59,6 +60,7 @@ final class AppSettings: ObservableObject {
         qrEnabled = d.object(forKey: "qrEnabled") as? Bool ?? true
         pin = d.string(forKey: "pin") ?? "0000"
         debugMode = d.object(forKey: "debugMode") as? Bool ?? false
+        autoReports = d.object(forKey: "autoReports") as? Bool ?? false
         autoConnect = d.object(forKey: "autoConnect") as? Bool ?? true
         countdownSeconds = d.object(forKey: "countdownSeconds") as? Int ?? 3
         resultSeconds = d.object(forKey: "resultSeconds") as? Int ?? 10

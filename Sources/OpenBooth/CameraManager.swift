@@ -245,6 +245,31 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     /// Diagnosedatei zum Teilen: Umgebung, aktueller Faehigkeitsbericht mit Rohdaten, komplettes Protokoll.
+    /// Diagnose an den OpenBooth-Endpunkt schicken. Liefert die Kennung des Servers.
+    @Published private(set) var reportStatus = ""
+    private var lastAutoReport = Date.distantPast
+    func sendDiagnostics(reason: String) async -> String? {
+        guard let url = makeDiagnosticsFile() else { return nil }
+        let v = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") + "-" + (Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?")
+        reportStatus = "Sende …"
+        do {
+            let id = try await ReportSender.send(fileURL: url, appVersion: v)
+            reportStatus = "Gesendet, Kennung \(id)"
+            appendLog("Diagnose gesendet (\(reason)), Kennung \(id)")
+            return id
+        } catch {
+            reportStatus = "Senden fehlgeschlagen: \(error.localizedDescription)"
+            appendLog("Diagnose senden: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    /// Bei Fehlern automatisch, wenn eingeschaltet, hoechstens alle 10 Minuten.
+    private func autoReport(_ reason: String) {
+        guard settingsRef?.autoReports == true, Date().timeIntervalSince(lastAutoReport) > 600 else { return }
+        lastAutoReport = Date()
+        Task { await sendDiagnostics(reason: "automatisch: \(reason)") }
+    }
+
     func makeDiagnosticsFile() -> URL? {
         var text = Diagnostics.environment(settingsRef)
         text += "Kamera-Zustand: \(status)\(lastError.map { ", letzter Fehler: \($0)" } ?? "")\n\n"
@@ -523,6 +548,7 @@ final class CameraManager: NSObject, ObservableObject {
         appendLog("Wiederherstellung #\(recoverAttempts) (\(reason))")
         if recoverAttempts > 5 {
             banner = Banner(kind: .error, text: "Kamera antwortet nicht", detail: "Kamera aus- und einschalten oder USB neu stecken")
+            autoReport("Kamera antwortet nach 5 Versuchen nicht")
             recoverTask = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 20_000_000_000)   // danach weiter versuchen, aber langsamer
                 await MainActor.run { self?.recoverTask = nil; self?.recoverAttempts = 3; self?.scheduleRecover(reason: "erneut") }
@@ -592,6 +618,7 @@ final class CameraManager: NSObject, ObservableObject {
                     lastError = error.localizedDescription
                     if taken.isEmpty {
                         captureError = Self.friendly(error)
+                        autoReport("Aufnahme fehlgeschlagen")
                         capturePhrase = nil
                         break
                     }
