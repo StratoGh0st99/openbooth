@@ -151,6 +151,14 @@ final class SonyCamera {
     private(set) var deviceInfo = PTP.DeviceInfo()
     private(set) var protocolVersion: UInt16 = 0
     private(set) var vendorCodes: [UInt16] = []
+    /// Rohdaten der wichtigsten Antworten fuer die Diagnose (Hex im Bericht), damit sich fremde Modelle aus dem Log heraus
+    /// nachbauen lassen: DeviceInfo, 0x9202, erstes 0x9209, ObjectInfos der Aufnahmen, Kopf des ersten Liveview-Blocks.
+    private(set) var rawDumps: [(name: String, data: Data)] = []
+    private var liveHeaderDumped = false
+    func dump(_ name: String, _ d: Data, limit: Int = 65536) {
+        guard rawDumps.count < 40 else { return }
+        rawDumps.append((name, d.prefix(limit)))
+    }
     private(set) var vendorProps: [UInt16] = []    // erste Liste aus 0x9202: Sony-Properties
     private(set) var controlCodes: [UInt16] = []   // zweite Liste aus 0x9202: Steuercodes fuer 0x9207
     private(set) var connectedAt = Date.distantPast
@@ -165,6 +173,7 @@ final class SonyCamera {
     /// Schritt 1: nur GetDeviceInfo. Das ist der Machbarkeitstest fuer das PTP-Durchreichen auf iPadOS.
     func probe() async throws -> PTP.DeviceInfo {
         let data = try await transport.run(PTP.Op.getDeviceInfo)
+        dump("GetDeviceInfo 0x1001", data)
         deviceInfo = PTP.parseDeviceInfo(data)
         return deviceInfo
     }
@@ -183,6 +192,7 @@ final class SonyCamera {
             tries -= 1
             if ext.isEmpty { try await Task.sleep(nanoseconds: 100_000_000) }
         }
+        dump("Sony GetExtDeviceInfo 0x9202", ext)
         if ext.count >= 2 {
             protocolVersion = ext.readLE(UInt16.self, at: 0)
             var off = 2
@@ -208,6 +218,7 @@ final class SonyCamera {
     func refreshProps() async throws {
         let (resp, d) = try await transport.runWithResponse(SonyOp.getAllExtDevicePropInfo, quiet: true)
         guard resp.ok else { throw SonyError.ptp(op: SonyOp.getAllExtDevicePropInfo, code: resp.code) }
+        if !rawDumps.contains(where: { $0.name.hasPrefix("Sony GetAllExtDevicePropInfo") }) { dump("Sony GetAllExtDevicePropInfo 0x9209", d) }
         props = Self.parseAllProps(d)
     }
 
@@ -293,6 +304,7 @@ final class SonyCamera {
             }
             let (resp, data) = try await transport.runWithResponse(PTP.Op.getObject, params: [SonyHandle.liveView], quiet: true)
             if resp.ok, data.count > 4 {
+                if !liveHeaderDumped { liveHeaderDumped = true; dump("Liveview 0xFFFFC002 Kopf (\(data.count) Byte)", data, limit: 96) }
                 return Self.extractJPEG(data)
             }
             if resp.code == PTP.RC.accessDenied || resp.code == PTP.RC.deviceBusy {
@@ -389,6 +401,7 @@ final class SonyCamera {
         while pending && rounds < 4 {
             rounds += 1
             let oiData = try await transport.run(PTP.Op.getObjectInfo, params: [SonyHandle.capturedImage])
+            if rawDumps.filter({ $0.name.hasPrefix("ObjectInfo") }).count < 4 { dump("ObjectInfo 0xFFFFC001", oiData) }
             let oi = PTP.parseObjectInfo(oiData)
             let data = try await transport.run(PTP.Op.getObject, params: [SonyHandle.capturedImage])
             guard data.count > 1000 else { break }

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import UIKit
 
 enum PTPNames {
     static let operations: [UInt16: String] = [
@@ -109,6 +110,44 @@ extension SonyCamera {
             }
             out.append(line)
         }
+        out.append("")
+        out.append("## Rohdaten (Hex, little endian, PTP-Datenphase ohne Container-Header)")
+        for (name, d) in rawDumps {
+            out.append("### \(name), \(d.count) Byte")
+            out.append(Self.hexDump(d))
+        }
         return out.joined(separator: "\n") + "\n"
+    }
+
+    static func hexDump(_ d: Data) -> String {
+        var lines: [String] = []
+        let bytes = [UInt8](d)
+        var i = 0
+        while i < bytes.count {
+            let chunk = bytes[i..<min(i + 32, bytes.count)]
+            lines.append(String(format: "%06X  ", i) + chunk.map { String(format: "%02X", $0) }.joined(separator: " "))
+            i += 32
+        }
+        return lines.joined(separator: "\n")
+    }
+}
+
+/// Umgebung fuer den Diagnosebericht: iPad, System, App-Version, Einstellungen ohne Geheimnisse.
+enum Diagnostics {
+    @MainActor static func environment(_ s: AppSettings?) -> String {
+        let dev = UIDevice.current
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        var out = ["# OpenBooth Diagnose, \(Date())",
+                   "App \(v) (\(b)), \(dev.systemName) \(dev.systemVersion), Gerät \(Self.modelIdentifier()), Sprache \(Locale.current.identifier)"]
+        if let s {
+            out.append("Einstellungen: autoConnect=\(s.autoConnect) countdown=\(s.countdownSeconds) shots=\(s.shotsPerCapture)/\(s.shotInterval)s result=\(s.resultSeconds)s idle=\(s.idleSeconds)s slideshow=\(s.slideshowInterval)s mirror=\(s.mirrorLiveView) pickupExternal=\(s.pickupExternal) motionWake=\(s.motionWake)/\(s.motionThreshold) saveToPhotos=\(s.saveToPhotos) immich=\(s.immichEnabled)(\(s.immichURL.isEmpty ? "leer" : "gesetzt"), raw=\(s.immichUploadRAW)) webdav=\(s.webdavEnabled)(\(s.webdavURL.isEmpty ? "leer" : "gesetzt"), raw=\(s.webdavUploadRAW)) sounds=\(s.soundsEnabled) maxBrightness=\(s.maxBrightness) debug=\(s.debugMode)")
+        }
+        return out.joined(separator: "\n") + "\n"
+    }
+
+    static func modelIdentifier() -> String {
+        var sys = utsname(); uname(&sys)
+        return withUnsafePointer(to: &sys.machine) { $0.withMemoryRebound(to: CChar.self, capacity: 256) { String(cString: $0) } }
     }
 }

@@ -39,6 +39,10 @@ final class AppSettings: ObservableObject {
     @Published var webdavURL: String { didSet { d.set(webdavURL, forKey: "webdavURL") } }
     @Published var webdavUser: String { didSet { d.set(webdavUser, forKey: "webdavUser") } }
     @Published var webdavUploadRAW: Bool { didSet { d.set(webdavUploadRAW, forKey: "webdavUploadRAW") } }
+    @Published var brandingEnabled: Bool { didSet { d.set(brandingEnabled, forKey: "brandingEnabled") } }
+    @Published var brandingText: String { didSet { d.set(brandingText, forKey: "brandingText") } }
+    @Published var brandingPosition: String { didSet { d.set(brandingPosition, forKey: "brandingPosition") } }
+    @Published var brandingSize: String { didSet { d.set(brandingSize, forKey: "brandingSize") } }
     @Published var soundsEnabled: Bool { didSet { d.set(soundsEnabled, forKey: "soundsEnabled") } }
     @Published var soundWelcome: Bool { didSet { d.set(soundWelcome, forKey: "soundWelcome") } }
     @Published var soundCountdown: Bool { didSet { d.set(soundCountdown, forKey: "soundCountdown") } }
@@ -81,6 +85,10 @@ final class AppSettings: ObservableObject {
         webdavURL = d.string(forKey: "webdavURL") ?? ""
         webdavUser = d.string(forKey: "webdavUser") ?? ""
         webdavUploadRAW = d.object(forKey: "webdavUploadRAW") as? Bool ?? false
+        brandingEnabled = d.object(forKey: "brandingEnabled") as? Bool ?? false
+        brandingText = d.string(forKey: "brandingText") ?? ""
+        brandingPosition = d.string(forKey: "brandingPosition") ?? BrandingPosition.bottomRight.rawValue
+        brandingSize = d.string(forKey: "brandingSize") ?? BrandingSize.medium.rawValue
         soundsEnabled = d.object(forKey: "soundsEnabled") as? Bool ?? true
         soundWelcome = d.object(forKey: "soundWelcome") as? Bool ?? true
         soundCountdown = d.object(forKey: "soundCountdown") as? Bool ?? true

@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 import CoreImage.CIFilterBuiltins
 import ImageCaptureCore
 
@@ -373,15 +374,16 @@ struct AdminPanel: View {
     @Binding var adminUnlocked: Bool
     @State private var section: Section = .event
     @State private var newPin = ""
+    @State private var diagnosticsURL: URL?
 
     enum Section: String, CaseIterable, Identifiable {
         case event = "Veranstaltung", camera = "Kamera", flow = "Ablauf", screen = "Anzeige & Töne",
-             storage = "Speicherorte", phrases = "Sprüche", access = "Zugang", log = "Protokoll"
+             branding = "Logo & Schriftzug", storage = "Speicherorte", phrases = "Sprüche", access = "Zugang", log = "Protokoll"
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .event: "calendar"; case .camera: "camera"; case .flow: "timer"; case .screen: "display"
-            case .storage: "externaldrive"; case .phrases: "text.bubble"; case .access: "lock"; case .log: "doc.text.magnifyingglass"
+            case .branding: "signature"; case .storage: "externaldrive"; case .phrases: "text.bubble"; case .access: "lock"; case .log: "doc.text.magnifyingglass"
             }
         }
     }
@@ -439,6 +441,7 @@ struct AdminPanel: View {
                 case .camera: cameraSection
                 case .flow: flowSection
                 case .screen: screenSection
+                case .branding: BrandingPanel()
                 case .storage: storageSection
                 case .phrases: phrasesSection
                 case .access: accessSection
@@ -617,6 +620,19 @@ struct AdminPanel: View {
     }
 
     @ViewBuilder private var logSection: some View {
+        SwiftUI.Section {
+            if let url = diagnosticsURL {
+                ShareLink(item: url, subject: Text("OpenBooth Diagnose"),
+                          message: Text("Diagnose aus OpenBooth: Kamera-Fähigkeiten, Rohdaten und Protokoll.")) {
+                    Label("Diagnose teilen …", systemImage: "square.and.arrow.up")
+                }
+                Button("Neu erstellen") { diagnosticsURL = cam.makeDiagnosticsFile() }.font(.caption)
+            } else {
+                Button { diagnosticsURL = cam.makeDiagnosticsFile() } label: { Label("Diagnose erstellen", systemImage: "stethoscope") }
+            }
+        } header: { Text("Diagnose") } footer: {
+            Text("Eine Textdatei mit iPad- und App-Version, allen Operationen, Events und Properties der Kamera samt Rohdaten (Hex) und dem vollständigen Protokoll. Reicht, um ein neues Kameramodell ohne Zugriff auf die Kamera zu unterstützen. Enthält keine Passwörter oder API-Keys.")
+        }
         if let e = cam.lastError {
             SwiftUI.Section("Letzter Fehler") { Text(e).foregroundStyle(.red).font(.callout) }
         }
@@ -1051,6 +1067,104 @@ struct SettingPicker: View {
                 .onAppear { if let c = setting.current { proxy.scrollTo(c, anchor: .center) } }
             }
             .presentationCompactAdaptation(.popover)
+        }
+    }
+}
+
+/// Logo und Schriftzug fuer die Gaeste-Kopie, mit Vorschau auf dem letzten Foto.
+struct BrandingPanel: View {
+    @EnvironmentObject var cam: CameraManager
+    @EnvironmentObject var settings: AppSettings
+    @State private var logo: UIImage? = Branding.loadLogo()
+    @State private var pick: PhotosPickerItem?
+    @State private var preview: UIImage?
+
+    var body: some View {
+        Group {
+            sections
+        }
+        .onAppear { renderPreview() }
+        .onChange(of: settings.brandingEnabled) { _, _ in renderPreview() }
+        .onChange(of: settings.brandingText) { _, _ in renderPreview() }
+        .onChange(of: settings.brandingPosition) { _, _ in renderPreview() }
+        .onChange(of: settings.brandingSize) { _, _ in renderPreview() }
+        .onChange(of: cam.sessionPhotos.first) { _, _ in renderPreview() }
+        .onChange(of: pick) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self), Branding.saveLogo(data) {
+                    logo = Branding.loadLogo()
+                    cam.appendLog("Branding: Logo gesetzt")
+                } else {
+                    cam.appendLog("Branding: Logo konnte nicht geladen werden")
+                }
+                pick = nil
+                renderPreview()
+            }
+        }
+    }
+
+    @ViewBuilder private var sections: some View {
+        SwiftUI.Section {
+            Toggle("Logo oder Schriftzug auf die Gäste-Kopie", isOn: $settings.brandingEnabled)
+        } footer: {
+            Text("Das Original bleibt immer unberührt (App-Galerie, Mediathek). Nur die Kopie für Immich und WebDAV, also das, was Gäste über den QR-Code sehen, bekommt Logo und Schriftzug. Lange Kante 4000 px.")
+        }
+        if settings.brandingEnabled {
+            SwiftUI.Section("Schriftzug") {
+                TextField("z. B. Anna & Paul · 12. Juni 2027", text: $settings.brandingText)
+            }
+            SwiftUI.Section("Logo") {
+                HStack(spacing: 16) {
+                    if let logo {
+                        Image(uiImage: logo).resizable().scaledToFit().frame(height: 60)
+                            .padding(6).background(Color.gray.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
+                    } else {
+                        Text("Kein Logo").foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    PhotosPicker(selection: $pick, matching: .images) { Label(logo == nil ? "Aus Mediathek wählen" : "Ersetzen", systemImage: "photo") }
+                        .buttonStyle(.bordered)
+                    if logo != nil {
+                        Button(role: .destructive) { Branding.removeLogo(); logo = nil; renderPreview() } label: { Label("Entfernen", systemImage: "trash") }
+                            .buttonStyle(.bordered)
+                    }
+                }
+                Text("Am besten PNG mit transparentem Hintergrund, weiß oder hell. Wird auf 1200 px verkleinert.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            SwiftUI.Section("Platzierung") {
+                Picker("Position", selection: $settings.brandingPosition) {
+                    ForEach(BrandingPosition.allCases) { Text($0.rawValue).tag($0.rawValue) }
+                }
+                Picker("Größe", selection: $settings.brandingSize) {
+                    ForEach(BrandingSize.allCases) { Text($0.rawValue).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+            }
+            SwiftUI.Section("Vorschau") {
+                if let preview {
+                    Image(uiImage: preview).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 8))
+                } else if cam.lastPhoto == nil && cam.sessionPhotos.isEmpty {
+                    Text("Erst ein Foto machen, dann erscheint hier die Vorschau.").foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                }
+            }
+        }
+    }
+
+    func renderPreview() {
+        guard settings.brandingEnabled else { preview = nil; return }
+        // Quelle: letztes Foto der Veranstaltung
+        guard let url = cam.sessionPhotos.first, let jpeg = try? Data(contentsOf: url) else { preview = nil; return }
+        let text = settings.brandingText, lg = logo
+        let pos = BrandingPosition(rawValue: settings.brandingPosition) ?? .bottomRight
+        let size = BrandingSize(rawValue: settings.brandingSize) ?? .medium
+        Task.detached(priority: .userInitiated) {
+            let d = Branding.render(jpeg: jpeg, text: text, logo: lg, position: pos, size: size, maxEdge: 1400, quality: 0.8)
+            let img = d.flatMap(UIImage.init(data:))
+            await MainActor.run { preview = img }
         }
     }
 }

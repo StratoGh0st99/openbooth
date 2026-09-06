@@ -75,6 +75,26 @@ final class CameraManager: NSObject, ObservableObject {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: "\\", with: "-")
         return t.isEmpty ? "Fotobox" : t
     }
+    /// Kopie mit Branding unter Fotos/<Event>/branded/, nil wenn aus oder nichts zu zeichnen.
+    private func brandedCopy(of jpeg: Data, stamp: String) async -> URL? {
+        guard let s = settingsRef, s.brandingEnabled else { return nil }
+        let text = s.brandingText.trimmingCharacters(in: .whitespaces)
+        let logo = Branding.loadLogo()
+        guard !text.isEmpty || logo != nil else { return nil }
+        let pos = BrandingPosition(rawValue: s.brandingPosition) ?? .bottomRight
+        let size = BrandingSize(rawValue: s.brandingSize) ?? .medium
+        let data = await Task.detached(priority: .userInitiated) { Branding.render(jpeg: jpeg, text: text, logo: logo, position: pos, size: size) }.value
+        guard let data else { appendLog("Branding: Kopie konnte nicht erzeugt werden"); return nil }
+        let dir = Self.photosDir.appendingPathComponent("branded", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let url = dir.appendingPathComponent("openbooth-\(stamp).jpg")
+            try data.write(to: url)
+            appendLog("Branding: Kopie \(url.lastPathComponent) (\(data.count / 1_000_000) MB)")
+            return url
+        } catch { appendLog("Branding: \(error.localizedDescription)"); return nil }
+    }
+
     /// Datei an alle aktiven Upload-Ziele geben.
     private func upload(_ url: URL, isRAW: Bool) {
         if !isRAW || settingsRef?.immichUploadRAW == true { immich.enqueue(url) }
@@ -193,10 +213,10 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     /// Faehigkeitsbericht der Kamera nach Documents/openbooth-capabilities.log (holen mit tools/pull-caps.sh).
+    static var capabilitiesURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("openbooth-capabilities.log") }
     private func writeCapabilities(_ cam: SonyCamera) {
         let report = cam.capabilitiesReport()
-        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("openbooth-capabilities.log")
-        try? report.data(using: .utf8)?.write(to: url, options: .atomic)
+        try? report.data(using: .utf8)?.write(to: Self.capabilitiesURL, options: .atomic)
         let di = cam.deviceInfo
         appendLog("Fähigkeiten: \(di.operations.count) Operationen, \(di.events.count) Events, \(di.properties.count)+\(cam.vendorProps.count) Properties, \(cam.controlCodes.count) Steuercodes → openbooth-capabilities.log")
         appendLog("Operationen: " + di.operations.sorted().map { PTPNames.hex($0) }.joined(separator: " "))
@@ -237,6 +257,22 @@ final class CameraManager: NSObject, ObservableObject {
     /// Beim Verlassen der App die Helligkeit des Nutzers wiederherstellen.
     func restoreBrightness() {
         if forcingBrightness { UIScreen.main.brightness = userBrightness; forcingBrightness = false }
+    }
+
+    /// Diagnosedatei zum Teilen: Umgebung, aktueller Faehigkeitsbericht mit Rohdaten, komplettes Protokoll.
+    func makeDiagnosticsFile() -> URL? {
+        var text = Diagnostics.environment(settingsRef)
+        text += "Kamera-Zustand: \(status)\(lastError.map { ", letzter Fehler: \($0)" } ?? "")\n\n"
+        if let cam = sony { text += cam.capabilitiesReport() }
+        else if let d = try? String(contentsOf: Self.capabilitiesURL, encoding: .utf8) { text += d }
+        else { text += "(kein Fähigkeitsbericht, Kamera wurde noch nicht erkannt)\n" }
+        text += "\n# Protokoll\n"
+        Self.logFile.snapshot()
+        let logURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("openbooth.export.log")
+        text += (try? String(contentsOf: logURL, encoding: .utf8)) ?? log.joined(separator: "\n")
+        let f = DateFormatter(); f.dateFormat = "yyyyMMdd-HHmm"
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("OpenBooth-Diagnose-\(f.string(from: Date())).txt")
+        do { try text.data(using: .utf8)?.write(to: out, options: .atomic); return out } catch { appendLog("Diagnose: \(error.localizedDescription)"); return nil }
     }
 
     func noteInteraction() {
@@ -364,6 +400,9 @@ final class CameraManager: NSObject, ObservableObject {
                 deviceSummary = "\(info.manufacturer) \(info.model) FW \(info.deviceVersion), VendorExt 0x\(String(info.vendorExtensionID, radix: 16)), \(info.operations.count) Operationen"
                 appendLog("DeviceInfo OK: \(deviceSummary)")
                 appendLog("Operationen: \(ops)")
+                appendLog("Events: " + info.events.map { String(format: "%04X", $0) }.joined(separator: " "))
+                appendLog("Properties: " + info.properties.map { String(format: "%04X", $0) }.joined(separator: " "))
+                writeCapabilities(cam)   // schon nach dem Probe, damit auch fremde Kameras (Handshake scheitert) im Bericht landen
                 state = .probed
                 status = "PTP-Durchreichen funktioniert"
                 return true
@@ -593,7 +632,8 @@ final class CameraManager: NSObject, ObservableObject {
             let url = try Self.saveToDocuments(jpeg, stamp: stamp)
             ThumbnailStore.prepare(url)
             sessionPhotos.insert(url, at: 0)
-            upload(url, isRAW: false)
+            // Upload-Ziele bekommen die Kopie mit Logo/Schriftzug, wenn eingeschaltet; das Original bleibt unberuehrt
+            if let branded = await brandedCopy(of: jpeg, stamp: stamp) { upload(branded, isRAW: false) } else { upload(url, isRAW: false) }
             if settingsRef?.saveToPhotos ?? true {
                 Self.saveToPhotos(jpeg, raw: rawObj?.data) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
             }
