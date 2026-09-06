@@ -371,182 +371,272 @@ struct AdminPanel: View {
     @EnvironmentObject var cam: CameraManager
     @EnvironmentObject var settings: AppSettings
     @Binding var adminUnlocked: Bool
-    @State private var showLog = true
+    @State private var section: Section = .event
     @State private var newPin = ""
 
+    enum Section: String, CaseIterable, Identifiable {
+        case event = "Veranstaltung", camera = "Kamera", flow = "Ablauf", screen = "Anzeige & Töne",
+             storage = "Speicherorte", phrases = "Sprüche", access = "Zugang", log = "Protokoll"
+        var id: String { rawValue }
+        var icon: String {
+            switch self {
+            case .event: "calendar"; case .camera: "camera"; case .flow: "timer"; case .screen: "display"
+            case .storage: "externaldrive"; case .phrases: "text.bubble"; case .access: "lock"; case .log: "doc.text.magnifyingglass"
+            }
+        }
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("OpenBooth").font(.largeTitle.bold())
-                    Spacer()
-                    Button("Schließen") { adminUnlocked = false }.buttonStyle(.bordered)
-                }
-                Text(cam.status).font(.headline).foregroundStyle(.secondary)
-                if let e = cam.lastError {
-                    Text("Letzter Fehler: \(e)").font(.caption).foregroundStyle(.red)
-                }
-
-                GroupBox("Veranstaltung") {
-                    EventPanel()
-                }
-
-                GroupBox("Kamera") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if !cam.deviceSummary.isEmpty { Text(cam.deviceSummary).font(.caption) }
-                        if cam.devices.isEmpty {
-                            Text("Keine Kamera. Sony im Modus „PC-Fernbedienung“ per USB-C anschließen.").font(.callout)
-                        }
-                        ForEach(cam.devices, id: \.self) { dev in
-                            Button { cam.openSession(dev) } label: { Label(dev.name ?? "Kamera", systemImage: "camera") }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected)
-                        }
-                        HStack {
-                            Button("PTP-Test") { cam.probe() }.buttonStyle(.bordered)
-                                .disabled(!(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected))
-                            Button("Handshake") { cam.connect() }.buttonStyle(.bordered)
-                                .disabled(!(cam.state == .probed || cam.state == .connected))
-                            Button(cam.liveRunning ? "Liveview stop" : "Liveview") {
-                                cam.liveRunning ? cam.stopLiveView() : cam.startLiveView()
-                            }.buttonStyle(.bordered).disabled(cam.state != .connected)
-                        }
-                        Toggle("Automatisch verbinden", isOn: $settings.autoConnect).font(.caption)
+        HStack(spacing: 0) {
+            // Seitenleiste
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 10) {
+                    Image("Logo").resizable().frame(width: 34, height: 34).clipShape(RoundedRectangle(cornerRadius: 8))
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("OpenBooth").font(.title3.bold())
+                        Text(settings.eventName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
-
-                if cam.state == .connected && !cam.settings.isEmpty {
-                    GroupBox("Kameraeinstellungen") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(cam.settings) { st in
-                                HStack {
-                                    Text(st.title).font(.callout)
-                                    Spacer()
-                                    if st.options.isEmpty || !st.writable {
-                                        Text(st.currentLabel).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
-                                    } else {
-                                        SettingPicker(setting: st) { cam.apply(st.code, value: $0) }
-                                            .disabled(cam.settingsBusy)
-                                    }
-                                }
-                            }
-                            Button("Neu laden") { cam.reloadSettings() }.font(.caption).buttonStyle(.bordered)
-                        }
-                    }
-                }
-
-                GroupBox("Fotobox") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Stepper("Countdown: \(settings.countdownSeconds) s", value: $settings.countdownSeconds, in: 0...10)
-                        Stepper("Rückschau: \(settings.resultSeconds) s", value: $settings.resultSeconds, in: 3...60)
-                        Stepper("Bilder pro Auslösung: \(settings.shotsPerCapture)", value: $settings.shotsPerCapture, in: 1...5, step: 2)
-                        Stepper("Pause zwischen Bildern: \(settings.shotInterval) s", value: $settings.shotInterval, in: 0...10)
-                        Toggle("Töne", isOn: $settings.soundsEnabled)
-                        if settings.soundsEnabled {
-                            HStack(spacing: 24) {
-                                Toggle("Willkommensklang beim Aufwachen", isOn: $settings.soundWelcome)
-                                Toggle("Countdown-Piepen", isOn: $settings.soundCountdown)
-                            }
-                            .padding(.leading, 20)
-                            HStack(spacing: 12) {
-                                Button("Willkommen anhören") { Sounds.shared.play("welcome") }
-                                Button("Countdown anhören") { Sounds.shared.play("tick"); Task { try? await Task.sleep(nanoseconds: 900_000_000); Sounds.shared.play("shot") } }
-                            }
-                            .buttonStyle(.bordered).font(.caption).padding(.leading, 20)
-                        }
-                        Toggle("Display dauerhaft auf volle Helligkeit", isOn: $settings.maxBrightness)
-                            .onChange(of: settings.maxBrightness) { _, _ in cam.updateBrightness() }
-                        Text("Während der Leerlauf-Collage geht die Helligkeit auf den vorherigen Wert zurück, bei Bewegung oder Aufnahme wieder hoch. Die QR-Seite ist immer voll hell.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Toggle("Collage bei Bewegung vor der Kamera beenden", isOn: $settings.motionWake)
-                        if settings.motionWake {
-                            Stepper("Empfindlichkeit: Schwelle \(settings.motionThreshold)", value: $settings.motionThreshold, in: 2...40)
-                            Text(String(format: "Kleinere Schwelle reagiert früher. Aktuelle Bildänderung im Leerlauf: %.1f (nur sichtbar, während die Collage läuft).", cam.motionLevel))
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Toggle("Fotos vom Kamera-Auslöser übernehmen", isOn: $settings.pickupExternal)
-                        Text("Auch Bilder, die direkt an der Kamera oder per Fernauslöser gemacht werden, landen in Galerie, Rückschau und Speicherorten.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Stepper("Collage nach: \(settings.idleSeconds) s", value: $settings.idleSeconds, in: 30...900, step: 30)
-                        Stepper("Collage wechselt alle: \(settings.slideshowInterval) s", value: $settings.slideshowInterval, in: 3...30)
-                        Toggle("Liveview spiegeln", isOn: $settings.mirrorLiveView)
-                        Toggle("Galerie für Gäste", isOn: $settings.guestGallery)
-                        if settings.guestGallery {
-                            Stepper("Galerie schließt nach: \(settings.gallerySeconds) s ohne Berührung", value: $settings.gallerySeconds, in: 10...300, step: 5)
-                        }
-                        TextField("Titel", text: $settings.welcomeTitle).textFieldStyle(.roundedBorder)
-                        TextField("Text", text: $settings.welcomeText, axis: .vertical).textFieldStyle(.roundedBorder)
-                    }
-                    .font(.callout)
-                }
-
-                GroupBox("Speicherorte") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Label("App-Galerie auf dem iPad", systemImage: "internaldrive")
+                .padding(.horizontal, 16).padding(.top, 18).padding(.bottom, 14)
+                ForEach(Section.allCases) { sec in
+                    Button { section = sec } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: sec.icon).frame(width: 22)
+                            Text(sec.rawValue)
                             Spacer()
-                            Text("immer").foregroundStyle(.secondary)
+                            badge(for: sec)
                         }
-                        Toggle(isOn: $settings.saveToPhotos) { Label("iPad-Mediathek (Fotos-App)", systemImage: "photo.on.rectangle.angled") }
-                        Toggle(isOn: $settings.immichEnabled) { Label("Immich-Server", systemImage: "server.rack") }
-                            .onChange(of: settings.immichEnabled) { _, _ in cam.syncImmich() }
-                        Toggle(isOn: $settings.webdavEnabled) { Label("WebDAV-Ordner (Nextcloud, NAS, Storage Box)", systemImage: "externaldrive.connected.to.line.below") }
-                            .onChange(of: settings.webdavEnabled) { _, _ in cam.syncWebDAV() }
-                        Text("Die App-Galerie ist die Quelle für Rückschau, Galerie und Collage und bleibt immer an.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        .font(.body)
+                        .padding(.horizontal, 12).padding(.vertical, 10)
+                        .background(section == sec ? Color.accentColor.opacity(0.22) : .clear, in: RoundedRectangle(cornerRadius: 8))
+                        .foregroundStyle(section == sec ? Color.primary : Color.secondary)
                     }
-                    .font(.callout)
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 8)
                 }
+                Spacer()
+                // Kamerastatus kompakt
+                HStack(spacing: 8) {
+                    Circle().fill(statusColor).frame(width: 9, height: 9)
+                    Text(cam.status).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+                .padding(.horizontal, 16).padding(.bottom, 10)
+                Button { adminUnlocked = false } label: {
+                    Label("Zur Fotobox", systemImage: "xmark").frame(maxWidth: .infinity, minHeight: 40)
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.horizontal, 12).padding(.bottom, 16)
+            }
+            .frame(width: 230)
+            .background(Color(.systemBackground).opacity(0.5))
 
-                if settings.immichEnabled {
-                    GroupBox("Immich-Server") {
-                        ImmichPanel()
-                    }
-                }
-                if settings.webdavEnabled {
-                    GroupBox("WebDAV-Ordner") {
-                        WebDAVPanel()
-                    }
-                }
+            Divider()
 
-                GroupBox("Sprüche beim Auslösen") {
-                    PhraseEditor()
-                }
-
-                GroupBox("Zugang") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Debug-Modus (Seitenleiste immer sichtbar)", isOn: $settings.debugMode)
-                        HStack {
-                            SecureField("Neue PIN", text: $newPin).textFieldStyle(.roundedBorder).keyboardType(.numberPad)
-                            Button("Setzen") {
-                                if newPin.count >= 4 { settings.pin = newPin; newPin = "" }
-                            }.buttonStyle(.bordered).disabled(newPin.count < 4)
-                        }
-                        Text("Admin öffnen: mit zwei Fingern von oben nach unten wischen.").font(.caption).foregroundStyle(.secondary)
-                    }
-                    .font(.callout)
-                }
-
-                Toggle("Log anzeigen", isOn: $showLog).font(.caption)
-                if showLog {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 2) {
-                                ForEach(Array(cam.log.enumerated()), id: \.offset) { i, line in
-                                    Text(line).font(.system(size: 10, design: .monospaced)).id(i)
-                                }
-                            }
-                        }
-                        .onChange(of: cam.log.count) { _, n in if n > 0 { proxy.scrollTo(n - 1, anchor: .bottom) } }
-                    }
-                    .frame(height: 320)
-                    .background(Color.black.opacity(0.3))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            // Inhalt
+            Form {
+                switch section {
+                case .event: eventSection
+                case .camera: cameraSection
+                case .flow: flowSection
+                case .screen: screenSection
+                case .storage: storageSection
+                case .phrases: phrasesSection
+                case .access: accessSection
+                case .log: logSection
                 }
             }
-            .padding()
-            .frame(maxWidth: 820)
-            .frame(maxWidth: .infinity)
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+        }
+    }
+
+    private var statusColor: Color {
+        if cam.liveFrame != nil && cam.state == .connected { return .green }
+        return cam.devices.isEmpty ? .red : .yellow
+    }
+
+    @ViewBuilder private func badge(for sec: Section) -> some View {
+        switch sec {
+        case .storage:
+            let n = 1 + (settings.saveToPhotos ? 1 : 0) + (settings.immichEnabled ? 1 : 0) + (settings.webdavEnabled ? 1 : 0)
+            Text("\(n)").font(.caption2).padding(.horizontal, 6).padding(.vertical, 2).background(.quaternary, in: Capsule())
+        case .camera where cam.state != .connected:
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow).font(.caption)
+        case .log where cam.lastError != nil:
+            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red).font(.caption)
+        default: EmptyView()
+        }
+    }
+
+    // MARK: Abschnitte
+
+    private var eventSection: some View {
+        SwiftUI.Section {
+            EventPanel()
+        } header: { Text("Veranstaltung") } footer: {
+            Text("Der Name ist Immich-Album und WebDAV-Ordner zugleich. Fotos jeder Veranstaltung liegen getrennt auf dem iPad.")
+        }
+    }
+
+    @ViewBuilder private var cameraSection: some View {
+        SwiftUI.Section("Verbindung") {
+            if !cam.deviceSummary.isEmpty { Text(cam.deviceSummary).font(.caption).foregroundStyle(.secondary) }
+            if cam.devices.isEmpty {
+                Label("Keine Kamera. Sony im Modus „PC-Fernbedienung“ per USB-C anschließen.", systemImage: "cable.connector")
+            }
+            ForEach(cam.devices, id: \.self) { dev in
+                Button { cam.openSession(dev) } label: { Label(dev.name ?? "Kamera", systemImage: "camera") }
+                    .disabled(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected)
+            }
+            Toggle("Automatisch verbinden", isOn: $settings.autoConnect)
+            Toggle("Liveview spiegeln", isOn: $settings.mirrorLiveView)
+            HStack {
+                Button("PTP-Test") { cam.probe() }
+                    .disabled(!(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected))
+                Button("Handshake") { cam.connect() }.disabled(!(cam.state == .probed || cam.state == .connected))
+                Button(cam.liveRunning ? "Liveview stoppen" : "Liveview starten") {
+                    cam.liveRunning ? cam.stopLiveView() : cam.startLiveView()
+                }.disabled(cam.state != .connected)
+            }
+            .buttonStyle(.bordered)
+        }
+        if cam.state == .connected && !cam.settings.isEmpty {
+            SwiftUI.Section {
+                ForEach(cam.settings) { st in
+                    HStack {
+                        Text(st.title)
+                        Spacer()
+                        if st.options.isEmpty || !st.writable {
+                            Text(st.currentLabel).monospacedDigit().foregroundStyle(.secondary)
+                        } else {
+                            SettingPicker(setting: st) { cam.apply(st.code, value: $0) }.disabled(cam.settingsBusy)
+                        }
+                    }
+                }
+            } header: {
+                HStack { Text("Kameraeinstellungen"); Spacer(); Button("Neu laden") { cam.reloadSettings() }.font(.caption) }
+            } footer: {
+                Text("Werte werden direkt in der Kamera gesetzt. Bildqualität RAW oder RAW+JPEG liefert zusätzlich die ARW-Datei.")
+            }
+        }
+    }
+
+    @ViewBuilder private var flowSection: some View {
+        SwiftUI.Section("Aufnahme") {
+            Stepper("Countdown: \(settings.countdownSeconds) s", value: $settings.countdownSeconds, in: 0...10)
+            Stepper("Bilder pro Auslösung: \(settings.shotsPerCapture)", value: $settings.shotsPerCapture, in: 1...5, step: 2)
+            if settings.shotsPerCapture > 1 {
+                Stepper("Pause zwischen Bildern: \(settings.shotInterval) s", value: $settings.shotInterval, in: 0...10)
+            }
+            Stepper("Rückschau: \(settings.resultSeconds) s", value: $settings.resultSeconds, in: 3...60)
+            Toggle("Fotos vom Kamera-Auslöser übernehmen", isOn: $settings.pickupExternal)
+        }
+        SwiftUI.Section {
+            Stepper("Collage nach: \(settings.idleSeconds) s ohne Aktion", value: $settings.idleSeconds, in: 30...900, step: 30)
+            Stepper("Collage wechselt alle: \(settings.slideshowInterval) s", value: $settings.slideshowInterval, in: 3...30)
+            Toggle("Bei Bewegung vor der Kamera beenden", isOn: $settings.motionWake)
+            if settings.motionWake {
+                Stepper("Empfindlichkeit: Schwelle \(settings.motionThreshold)", value: $settings.motionThreshold, in: 2...40)
+                LabeledContent("Aktuelle Bildänderung", value: cam.idle ? String(format: "%.1f", cam.motionLevel) : "nur während der Collage")
+                    .foregroundStyle(.secondary)
+            }
+        } header: { Text("Leerlauf") } footer: {
+            Text("Kleinere Schwelle reagiert früher. Bewegung, Tipp oder Aufnahme beenden die Collage.")
+        }
+        SwiftUI.Section("Galerie") {
+            Toggle("Galerie für Gäste", isOn: $settings.guestGallery)
+            if settings.guestGallery {
+                Stepper("Schließt nach: \(settings.gallerySeconds) s ohne Berührung", value: $settings.gallerySeconds, in: 10...300, step: 5)
+            }
+        }
+    }
+
+    @ViewBuilder private var screenSection: some View {
+        SwiftUI.Section {
+            TextField("Titel", text: $settings.welcomeTitle)
+            TextField("Text", text: $settings.welcomeText, axis: .vertical).lineLimit(2...4)
+        } header: { Text("Begrüßung") } footer: { Text("Steht über dem Liveview und ohne Kamera groß in der Mitte.") }
+        SwiftUI.Section {
+            Toggle("Display dauerhaft auf volle Helligkeit", isOn: $settings.maxBrightness)
+                .onChange(of: settings.maxBrightness) { _, _ in cam.updateBrightness() }
+        } header: { Text("Display") } footer: {
+            Text("Während der Leerlauf-Collage geht die Helligkeit auf den vorherigen Wert zurück, bei Bewegung oder Aufnahme wieder hoch. Die QR-Seite ist immer voll hell.")
+        }
+        SwiftUI.Section("Töne") {
+            Toggle("Töne", isOn: $settings.soundsEnabled)
+            if settings.soundsEnabled {
+                Toggle("Willkommensklang beim Aufwachen", isOn: $settings.soundWelcome)
+                Toggle("Countdown-Piepen und Auslösesignal", isOn: $settings.soundCountdown)
+                HStack(spacing: 12) {
+                    Button("Willkommen anhören") { Sounds.shared.play("welcome") }
+                    Button("Countdown anhören") { Sounds.shared.play("tick"); Task { try? await Task.sleep(nanoseconds: 900_000_000); Sounds.shared.play("shot") } }
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    @ViewBuilder private var storageSection: some View {
+        SwiftUI.Section {
+            LabeledContent { Text("immer").foregroundStyle(.secondary) } label: { Label("App-Galerie auf dem iPad", systemImage: "internaldrive") }
+            Toggle(isOn: $settings.saveToPhotos) { Label("iPad-Mediathek (Fotos-App)", systemImage: "photo.on.rectangle.angled") }
+            Toggle(isOn: $settings.immichEnabled) { Label("Immich-Server", systemImage: "server.rack") }
+                .onChange(of: settings.immichEnabled) { _, _ in cam.syncImmich() }
+            Toggle(isOn: $settings.webdavEnabled) { Label("WebDAV-Ordner (Nextcloud, NAS, Storage Box)", systemImage: "externaldrive.connected.to.line.below") }
+                .onChange(of: settings.webdavEnabled) { _, _ in cam.syncWebDAV() }
+        } header: { Text("Ziele") } footer: {
+            Text("Die App-Galerie ist die Quelle für Rückschau, Galerie und Collage und bleibt immer an.")
+        }
+        if settings.immichEnabled {
+            SwiftUI.Section("Immich-Server") { ImmichPanel() }
+        }
+        if settings.webdavEnabled {
+            SwiftUI.Section("WebDAV-Ordner") { WebDAVPanel() }
+        }
+    }
+
+    private var phrasesSection: some View {
+        SwiftUI.Section {
+            PhraseEditor()
+        } header: { Text("Sprüche beim Auslösen") } footer: { Text("Nach dem Countdown erscheint zufällig einer davon.") }
+    }
+
+    @ViewBuilder private var accessSection: some View {
+        SwiftUI.Section {
+            HStack {
+                SecureField("Neue PIN (mindestens 4 Ziffern)", text: $newPin).keyboardType(.numberPad)
+                Button("Setzen") { if newPin.count >= 4 { settings.pin = newPin; newPin = "" } }
+                    .buttonStyle(.bordered).disabled(newPin.count < 4)
+            }
+        } header: { Text("PIN") } footer: { Text("Admin öffnen: mit zwei Fingern von oben nach unten wischen, dann PIN.") }
+        SwiftUI.Section {
+            Toggle("Debug-Modus", isOn: $settings.debugMode)
+        } header: { Text("Entwicklung") } footer: {
+            Text("Im Debug-Modus öffnet der Admin beim Start und die Wischgeste braucht keine PIN.")
+        }
+    }
+
+    @ViewBuilder private var logSection: some View {
+        if let e = cam.lastError {
+            SwiftUI.Section("Letzter Fehler") { Text(e).foregroundStyle(.red).font(.callout) }
+        }
+        SwiftUI.Section {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(Array(cam.log.enumerated()), id: \.offset) { i, line in
+                            Text(line).font(.system(size: 11, design: .monospaced)).id(i)
+                        }
+                    }
+                    .padding(6)
+                }
+                .onAppear { if !cam.log.isEmpty { proxy.scrollTo(cam.log.count - 1, anchor: .bottom) } }
+                .onChange(of: cam.log.count) { _, n in if n > 0 { proxy.scrollTo(n - 1, anchor: .bottom) } }
+            }
+            .frame(minHeight: 420)
+            .listRowInsets(EdgeInsets())
+        } header: { Text("Protokoll (\(cam.log.count) Zeilen)") } footer: {
+            Text("Vollständig in Documents/openbooth.log, holen mit tools/pull-log.sh. Kamera-Fähigkeiten in openbooth-capabilities.log.")
         }
     }
 }
@@ -987,8 +1077,6 @@ struct EventPanel: View {
                 Button(role: .destructive) { askDelete = true } label: { Label("Entfernen", systemImage: "trash") }
                     .buttonStyle(.bordered).disabled(settings.events.count <= 1)
             }
-            Text("Jede Veranstaltung hat eigene Fotos in Galerie und Collage, ein eigenes Album in Immich und einen eigenen Ordner im WebDAV-Ziel. Beim Wechsel bleiben die Fotos der anderen erhalten.")
-                .font(.caption).foregroundStyle(.secondary)
         }
         .font(.callout)
         .alert("Neue Veranstaltung", isPresented: $askNew) {
