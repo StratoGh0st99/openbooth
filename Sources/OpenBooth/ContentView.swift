@@ -631,15 +631,11 @@ struct AdminPanel: View {
                 let ips = LocalWebServer.localAddresses()
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
-                        if let host = LocalWebServer.localHostname() {
-                            LabeledContent("Name") { Text("http://\(host):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
-                        }
                         ForEach(ips, id: \.self) { ip in
-                            LabeledContent("Adresse") { Text("http://\(ip):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
+                            LabeledContent("Adresse") { Text(verbatim: "http://\(ip):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
                         }
                         if ips.isEmpty { Text("Kein WLAN verbunden").foregroundStyle(.secondary) }
-                        Text("Der Name ist aus dem Gerätenamen abgeleitet (Einstellungen › Allgemein › Info) und funktioniert von Apple-Geräten und den meisten Browsern; die IP immer.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        Text("QR-Code mit dem Handy scannen, dann mit der Admin-PIN anmelden.").font(.caption).foregroundStyle(.secondary)
                     }
                     if let ip = ips.first {
                         QRCodeView(text: "http://\(ip):\(LocalWebServer.port)").frame(width: 120, height: 120)
