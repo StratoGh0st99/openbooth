@@ -67,11 +67,14 @@ enum FrameStyle: String, CaseIterable, Identifiable {
 }
 
 enum LayoutRenderer {
-    static let maxEdge: CGFloat = 4000
+    /// Web-Groesse: 10x15 mit 2000 px Breite, Streifen 1000 x 3000 px. Der Druck bekommt spaeter ein eigenes Rendering.
+    static let maxEdge: CGFloat = 3000
+    static func defaultEdge(for layout: FixedLayout) -> CGFloat { layout == .strip4 ? 3000 : 2000 }
 
     /// Fotos (Aufnahmereihenfolge) ins Layout setzen, Rahmen zeichnen, Text und Logo in die Leiste unten.
     nonisolated static func render(photos: [Data], layout: FixedLayout, frame: FrameStyle, text: String, logo: UIImage?,
-                                   maxEdge: CGFloat = maxEdge, quality: CGFloat = 0.9) -> Data? {
+                                   maxEdge: CGFloat? = nil, quality: CGFloat = 0.9) -> Data? {
+        let maxEdge = maxEdge ?? defaultEdge(for: layout)
         let a = layout.aspect
         let W = (a >= 1 ? maxEdge : maxEdge * a).rounded(), H = (a >= 1 ? maxEdge / a : maxEdge).rounded()
         let canvas = CGSize(width: W, height: H)

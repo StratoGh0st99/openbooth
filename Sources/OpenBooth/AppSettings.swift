@@ -44,6 +44,8 @@ final class AppSettings: ObservableObject {
     @Published var sourceReview: String { didSet { d.set(sourceReview, forKey: "sourceReview") } }
     @Published var sourceImmich: String { didSet { d.set(sourceImmich, forKey: "sourceImmich") } }
     @Published var sourceWebDAV: String { didSet { d.set(sourceWebDAV, forKey: "sourceWebDAV") } }
+    @Published var immichAlsoOriginal: Bool { didSet { d.set(immichAlsoOriginal, forKey: "immichAlsoOriginal") } }
+    @Published var webdavAlsoOriginal: Bool { didSet { d.set(webdavAlsoOriginal, forKey: "webdavAlsoOriginal") } }
     @Published var brandingText: String { didSet { d.set(brandingText, forKey: "brandingText") } }
     @Published var soundsEnabled: Bool { didSet { d.set(soundsEnabled, forKey: "soundsEnabled") } }
     @Published var soundWelcome: Bool { didSet { d.set(soundWelcome, forKey: "soundWelcome") } }
@@ -95,6 +97,8 @@ final class AppSettings: ObservableObject {
             return FixedLayout.from(v) != nil ? v : FixedLayout.originalID
         }
         sourceReview = src("sourceReview"); sourceImmich = src("sourceImmich"); sourceWebDAV = src("sourceWebDAV")
+        immichAlsoOriginal = d.object(forKey: "immichAlsoOriginal") as? Bool ?? false
+        webdavAlsoOriginal = d.object(forKey: "webdavAlsoOriginal") as? Bool ?? false
         brandingText = d.string(forKey: "brandingText") ?? ""
         soundsEnabled = d.object(forKey: "soundsEnabled") as? Bool ?? true
         soundWelcome = d.object(forKey: "soundWelcome") as? Bool ?? true

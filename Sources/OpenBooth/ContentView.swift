@@ -71,7 +71,7 @@ struct ContentView: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $showGallery) { GalleryView(photos: cam.sessionPhotos, autoClose: settings.gallerySeconds, onActivity: { cam.noteInteraction() }) }
+        .fullScreenCover(isPresented: $showGallery) { GalleryView(photos: cam.galleryPhotos(for: settings.sourceReview), autoClose: settings.gallerySeconds, onActivity: { cam.noteInteraction() }) }
         // Leerlauf beginnt oder endet: Galerie und QR-Seite schliessen, die Buehne gehoert wieder der Fotobox
         .onChange(of: cam.idle) { _, _ in showGallery = false; showQR = false; cam.qrShown = false }
         .overlay {
@@ -131,8 +131,8 @@ struct ContentView: View {
             }
 
             // Leerlauf-Collage ueber dem Liveview
-            if cam.idle && !cam.sessionPhotos.isEmpty {
-                CollageView(photos: cam.sessionPhotos, interval: settings.slideshowInterval, title: settings.welcomeTitle)
+            if cam.idle && !cam.galleryPhotos(for: settings.sourceReview).isEmpty {
+                CollageView(photos: cam.galleryPhotos(for: settings.sourceReview), interval: settings.slideshowInterval, title: settings.welcomeTitle)
                     .transition(.opacity)
                     .onTapGesture { cam.noteInteraction() }
             }
@@ -174,7 +174,7 @@ struct ContentView: View {
                             Label("Galerie", systemImage: "photo.on.rectangle").frame(width: 160, height: 56)
                         }
                         .buttonStyle(.borderedProminent).tint(Color(white: 0.22))
-                        .disabled(cam.sessionPhotos.isEmpty)
+                        .disabled(cam.galleryPhotos(for: settings.sourceReview).isEmpty)
                         .padding()
                     } else {
                         Color.clear.frame(width: 160, height: 56).padding()
@@ -1101,11 +1101,17 @@ struct LayoutsPanel: View {
     var body: some View {
         Group {
             SwiftUI.Section {
-                sourcePicker("Rückschau", $settings.sourceReview)
+                sourcePicker("Rückschau und Galerie", $settings.sourceReview)
                 sourcePicker("Immich", $settings.sourceImmich).disabled(!settings.immichEnabled)
+                if settings.immichEnabled, FixedLayout.from(settings.sourceImmich) != nil {
+                    Toggle("Immich: zusätzlich das Original", isOn: $settings.immichAlsoOriginal).padding(.leading, 20)
+                }
                 sourcePicker("WebDAV", $settings.sourceWebDAV).disabled(!settings.webdavEnabled)
+                if settings.webdavEnabled, FixedLayout.from(settings.sourceWebDAV) != nil {
+                    Toggle("WebDAV: zusätzlich das Original", isOn: $settings.webdavAlsoOriginal).padding(.leading, 20)
+                }
             } header: { Text("Was bekommt welches Ziel?") } footer: {
-                Text("„Original“ ist das unveränderte Kamerabild. Bei „4 Bilder“ macht die Fotobox automatisch vier Aufnahmen, wenn die Rückschau darauf steht. App-Galerie und Mediathek bekommen immer die Originale.")
+                Text("„Original“ ist das unveränderte Kamerabild in voller Größe. Layouts sind die gerahmte Web-Version mit 2000 px Breite. Steht die Rückschau auf einem Layout, zeigen auch Galerie und Collage die fertigen Bilder, und bei „4 Bilder“ macht die Fotobox vier Aufnahmen. Die Mediathek bekommt immer die Originale.")
             }
 
             SwiftUI.Section {

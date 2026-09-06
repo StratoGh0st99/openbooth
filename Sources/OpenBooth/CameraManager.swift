@@ -44,6 +44,7 @@ final class CameraManager: NSObject, ObservableObject {
         Self.currentEvent = name
         dismissResult()
         sessionPhotos = Self.loadSessionPhotos()
+        renderedLayouts = Self.loadRenderedLayouts()
         lastPhoto = nil
         appendLog("Veranstaltung „\(name)“: \(sessionPhotos.count) Fotos")
     }
@@ -89,8 +90,14 @@ final class CameraManager: NSObject, ObservableObject {
             rendered[layout] = url
             return [url]
         }
-        if s.immichEnabled { for u in await output(for: s.sourceImmich) { immich.enqueue(u) } }
-        if s.webdavEnabled { for u in await output(for: s.sourceWebDAV) { webdav.enqueue(u) } }
+        if s.immichEnabled {
+            for u in await output(for: s.sourceImmich) { immich.enqueue(u) }
+            if s.immichAlsoOriginal, s.layout(for: s.sourceImmich) != nil { originals.forEach { immich.enqueue($0) } }
+        }
+        if s.webdavEnabled {
+            for u in await output(for: s.sourceWebDAV) { webdav.enqueue(u) }
+            if s.webdavAlsoOriginal, s.layout(for: s.sourceWebDAV) != nil { originals.forEach { webdav.enqueue($0) } }
+        }
         if s.layout(for: s.sourceReview) != nil {
             let urls = await output(for: s.sourceReview)
             if let u = urls.first, u != originals.first, let img = await Self.previewImage(from: (try? Data(contentsOf: u)) ?? Data()) {
@@ -101,6 +108,19 @@ final class CameraManager: NSObject, ObservableObject {
         return nil
     }
     private(set) var lastLayoutURL: URL?
+    /// Alle gerenderten Layouts der Veranstaltung, neueste zuerst (Galerie und Collage, wenn die Rueckschau ein Layout zeigt)
+    @Published var renderedLayouts: [URL] = []
+    static var layoutsDir: URL { photosDir.appendingPathComponent("layouts", isDirectory: true) }
+    static func loadRenderedLayouts() -> [URL] {
+        let urls = (try? FileManager.default.contentsOfDirectory(at: layoutsDir, includingPropertiesForKeys: nil)) ?? []
+        return urls.filter { $0.pathExtension.lowercased() == "jpg" && !$0.lastPathComponent.contains("-preview-") }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }
+    }
+    /// Galerie-Inhalt: Layouts des Rueckschau-Layouts oder die Originale
+    func galleryPhotos(for source: String) -> [URL] {
+        guard let l = FixedLayout.from(source) else { return sessionPhotos }
+        return renderedLayouts.filter { $0.lastPathComponent.hasSuffix("-\(l.rawValue).jpg") }
+    }
 
     /// Layout rendern und unter Fotos/<Event>/layouts/ ablegen.
     func renderLayout(_ layout: FixedLayout, originals: [URL], stamp: String) async -> URL? {
@@ -114,6 +134,7 @@ final class CameraManager: NSObject, ObservableObject {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             let url = dir.appendingPathComponent("openbooth-\(stamp)-\(layout.rawValue).jpg")
             try out.write(to: url)
+            if stamp != "preview" { renderedLayouts.insert(url, at: 0); ThumbnailStore.prepare(url) }
             appendLog("Layout „\(layout.label)“: \(url.lastPathComponent) aus \(datas.count) Fotos (\(out.count / 1_000_000) MB)")
             return url
         } catch { appendLog("Layout: \(error.localizedDescription)"); return nil }
@@ -195,6 +216,7 @@ final class CameraManager: NSObject, ObservableObject {
         super.init()
         browser.delegate = self
         sessionPhotos = Self.loadSessionPhotos()
+        renderedLayouts = Self.loadRenderedLayouts()
         UIApplication.shared.isIdleTimerDisabled = true   // iPad bleibt an
         watchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
@@ -822,7 +844,7 @@ final class CameraManager: NSObject, ObservableObject {
                 ThumbnailStore.remove(url)
                 sessionPhotos.removeAll { $0 == url }
             }
-            if let l = lastLayoutURL { try? FileManager.default.removeItem(at: l); lastLayoutURL = nil }
+            if let l = lastLayoutURL { try? FileManager.default.removeItem(at: l); ThumbnailStore.remove(l); renderedLayouts.removeAll { $0 == l }; lastLayoutURL = nil }
             appendLog("Serie aus App-Galerie gelöscht (\(resultURLs.count) Fotos)")
             dismissResult()
             return
