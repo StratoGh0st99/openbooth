@@ -635,7 +635,6 @@ struct AdminPanel: View {
                             LabeledContent("Address") { Text(verbatim: "http://\(ip):\(LocalWebServer.port)").monospaced().textSelection(.enabled) }
                         }
                         if ips.isEmpty { Text("No Wi‑Fi connected").foregroundStyle(.secondary) }
-                        Text("Scan the QR code with your phone, then sign in with the admin PIN.").font(.caption).foregroundStyle(.secondary)
                     }
                     if let ip = ips.first {
                         QRCodeView(text: "http://\(ip):\(LocalWebServer.port)").frame(width: 120, height: 120)
@@ -1041,7 +1040,7 @@ struct PhraseEditor: View {
                     .disabled(newPhrase.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             HStack {
-                Text("\(settings.phrases.count) phrases, random, never the same one twice in a row.")
+                Text("\(settings.phrases.count) phrases")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Defaults") { settings.phrases = AppSettings.defaultPhrases }.font(.caption).buttonStyle(.bordered)

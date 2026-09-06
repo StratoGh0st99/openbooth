@@ -42,12 +42,12 @@
         }
       }
     },
-    "%lld phrases, random, never the same one twice in a row.": {
+    "%lld phrases": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld Sprüche, zufällig, nie zweimal derselbe nacheinander."
+            "value": "%lld Sprüche"
           }
         }
       }
@@ -1518,16 +1518,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "QR-Code mit der Handykamera scannen"
-          }
-        }
-      }
-    },
-    "Scan the QR code with your phone, then sign in with the admin PIN.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "QR-Code mit dem Handy scannen, dann mit der Admin-PIN anmelden."
           }
         }
       }
