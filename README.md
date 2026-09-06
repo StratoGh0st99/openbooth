@@ -1,7 +1,11 @@
 # OpenBooth
 
 Offene Fotobox-App für das iPad. Die Kamera hängt direkt per USB-C am iPad, kein Rechner dazwischen.
-Ziel: Liveview, Auslösen, Galerie, Teilen per QR, und das alles ohne Abo.
+
+**Einfach, basic, funktional.** Keine Filter, keine Rahmen, keine Sticker, kein Abo. Das Foto kommt so aus der Kamera,
+wie der Fotograf sie eingestellt hat, als JPEG oder RAW, und landet dort, wo es hin soll: iPad-Mediathek, Immich, WebDAV.
+Reduziert auf das Nötigste, mit ein paar schlauen Details (Leerlauf-Collage, die bei Bewegung aufwacht, Fernauslöser
+wird mitgenommen, QR-Code zum Album, Display regelt sich selbst). Auf Performance optimiert, quelloffen.
 
 Status: **Prototyp, Kern funktioniert.** Stand 2026-09-05: Sony ILCE-7M4 per USB-C am iPad Air (M4) erkannt,
 PTP-Durchreichen bestätigt, Sony-Handshake und Liveview laufen. Auslösen und Bildabruf implementiert, im Test.
