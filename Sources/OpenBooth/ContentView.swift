@@ -32,7 +32,8 @@ struct ContentView: View {
                         .background(Color(.secondarySystemBackground))
                         .transition(.move(edge: .leading))
                     Divider()
-                    let w: CGFloat = 400
+                    // Vorschau-Spalte: 400 pt auf grossen iPads, auf dem iPad mini schmaler, damit der Admin Platz behaelt
+                    let w: CGFloat = min(400, geo.size.width * 0.3)
                     let sc = w / max(1, geo.size.width)
                     VStack(spacing: 6) {
                         Text("Gästesicht (live)").font(.caption).foregroundStyle(.secondary).padding(.top, 8)
@@ -1178,19 +1179,20 @@ struct EventPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Picker("Aktuell", selection: $settings.eventName) {
+                ForEach(settings.events, id: \.self) { Text($0).tag($0) }
+            }
+            .pickerStyle(.menu)
+            .onChange(of: settings.eventName) { _, _ in cam.syncUploaders() }
             HStack {
-                Picker("Aktuell", selection: $settings.eventName) {
-                    ForEach(settings.events, id: \.self) { Text($0).tag($0) }
-                }
-                .pickerStyle(.menu)
-                .onChange(of: settings.eventName) { _, _ in cam.syncUploaders() }
-                Spacer()
                 Text("\(cam.sessionPhotos.count) Fotos").foregroundStyle(.secondary)
+                Spacer()
                 Button { newName = ""; askNew = true } label: { Label("Neu", systemImage: "plus") }
                     .buttonStyle(.bordered)
                 Button(role: .destructive) { askDelete = true } label: { Label("Entfernen", systemImage: "trash") }
                     .buttonStyle(.bordered).disabled(settings.events.count <= 1)
             }
+            .lineLimit(1)
         }
         .font(.callout)
         .alert("Neue Veranstaltung", isPresented: $askNew) {

@@ -323,6 +323,14 @@ final class CameraManager: NSObject, ObservableObject {
 
     func start() {
         appendLog("Autorisierung anfragen …")
+        #if targetEnvironment(simulator)
+        // Der Simulator kennt weder USB-Kameras noch die Autorisierungsabfrage von ImageCaptureCore
+        authorization = "Simulator"
+        state = .browsing
+        status = "Simulator: keine Kamera möglich"
+        banner = Banner(kind: .info, text: "Kamera anschließen", detail: "Sony im Modus „PC-Fernbedienung“ per USB-C")
+        return
+        #endif
         browser.requestContentsAuthorization { [weak self] status in
             Task { @MainActor in
                 guard let self else { return }
