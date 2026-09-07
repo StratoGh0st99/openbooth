@@ -1178,13 +1178,31 @@ final class CameraManager: NSObject, ObservableObject {
         return url
     }
     /// Downscale a JPEG to a long edge (ImageIO subsampling, EXIF orientation applied), quality 0.9
+    /// Keeps the camera's metadata (capture time, model, exposure, lens) so Immich, WebDAV and the photo library
+    /// date and describe the web copy like the original. Orientation is baked in, so the tags say "upright".
     nonisolated static func downscaleJPEG(_ data: Data, maxEdge: Int) -> Data? {
         guard let src = CGImageSourceCreateWithData(data as CFData, nil),
               let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
                 kCGImageSourceCreateThumbnailWithTransform: true,
                 kCGImageSourceThumbnailMaxPixelSize: maxEdge] as CFDictionary) else { return nil }
-        return UIImage(cgImage: cg).jpegData(compressionQuality: 0.9)
+        var props = (CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]) ?? [:]
+        props[kCGImagePropertyOrientation] = 1
+        props[kCGImagePropertyPixelWidth] = cg.width
+        props[kCGImagePropertyPixelHeight] = cg.height
+        var tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any] ?? [:]
+        tiff[kCGImagePropertyTIFFOrientation] = 1
+        props[kCGImagePropertyTIFFDictionary] = tiff
+        var exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any] ?? [:]
+        exif[kCGImagePropertyExifPixelXDimension] = cg.width
+        exif[kCGImagePropertyExifPixelYDimension] = cg.height
+        props[kCGImagePropertyExifDictionary] = exif
+        props[kCGImageDestinationLossyCompressionQuality] = 0.9
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(out, "public.jpeg" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, cg, props as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return out as Data
     }
 
     /// Delete originals and RAWs no target needs anymore: not in a queue, older than 2 minutes.
