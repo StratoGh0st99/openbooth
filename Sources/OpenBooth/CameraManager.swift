@@ -45,10 +45,10 @@ final class CameraManager: NSObject, ObservableObject {
     /// Start the iPad camera after 4 s without a USB camera (if enabled); stop immediately when a USB camera appears.
     private func scheduleFallback() {
         fallbackTimer?.cancel()
-        guard settingsRef?.ipadFallback ?? true, sony == nil, device == nil, devices.isEmpty else { return }
+        guard settingsRef?.ipadFallback ?? true, driver == nil, device == nil, devices.isEmpty else { return }
         fallbackTimer = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 4_000_000_000)
-            guard !Task.isCancelled, let self, self.sony == nil, self.device == nil, self.devices.isEmpty else { return }
+            guard !Task.isCancelled, let self, self.driver == nil, self.device == nil, self.devices.isEmpty else { return }
             await self.startIPadCamera()
         }
     }
@@ -81,7 +81,7 @@ final class CameraManager: NSObject, ObservableObject {
         liveRunning = false
         liveFrame = nil
         liveHistogram = nil
-        if sony == nil { state = .browsing; status = String(localized: "Looking for a camera…") }
+        if driver == nil { state = .browsing; status = String(localized: "Looking for a camera…") }
         appendLog("iPad camera stopped (\(reason))")
     }
     /// Settings changed: fallback camera on/off or switch front/rear
@@ -133,7 +133,7 @@ final class CameraManager: NSObject, ObservableObject {
         let up = Int(Date().timeIntervalSince(startedAt))
         let stateName: String = { switch state { case .connected: return "connected"; case .error: return "error"; default: return "\(state)" } }()
         return WebStatus(event: s?.eventName ?? "",
-                         camera: sony?.deviceInfo.model.isEmpty == false ? sony!.deviceInfo.model : (ipadCam != nil ? String(localized: "iPad camera (fallback)") : (devices.first?.name ?? "none")),
+                         camera: driver?.deviceInfo.model.isEmpty == false ? driver!.deviceInfo.model : (ipadCam != nil ? String(localized: "iPad camera (fallback)") : (devices.first?.name ?? "none")),
                          state: stateName, status: status, fps: lastFPS, idle: idle, photos: sessionPhotos.count,
                          lastPhoto: sessionPhotos.first.flatMap { (try? $0.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate }.map { f.string(from: $0) },
                          immich: s?.immichEnabled == true ? immich.lastMessage : nil,
@@ -190,8 +190,7 @@ final class CameraManager: NSObject, ObservableObject {
     }
     /// Does the camera deliver RAW (image quality RAW or RAW+JPEG)?
     var cameraDeliversRAW: Bool {
-        guard let v = sony?.currentValue(SonyProp.imageQuality) else { return false }
-        return v == 1 || v == 2
+        return driver?.deliversRAW ?? false
     }
 
     func syncImmich() {
@@ -261,7 +260,9 @@ final class CameraManager: NSObject, ObservableObject {
 
     private let browser = ICDeviceBrowser()
     private var device: ICCameraDevice?
-    private(set) var sony: SonyCamera?
+    private(set) var driver: CameraDriver?
+    /// Kept for call sites that need the Sony specifics (events, RAW); nil for other drivers
+    var sony: SonyCamera? { driver as? SonyCamera }
     private var liveTask: Task<Void, Never>?
 
     override init() {
@@ -301,7 +302,7 @@ final class CameraManager: NSObject, ObservableObject {
             startLiveView()
         }
         // Connected but live view off (e.g. after errors) -> back on
-        if state == .connected, !liveRunning, !capturing, !settingsBusy, autoConnect, sony != nil, ipadCam == nil {
+        if state == .connected, !liveRunning, !capturing, !settingsBusy, autoConnect, driver != nil, ipadCam == nil {
             startLiveView()
         }
         // External shutter: with events only every 30 s as a safety net, otherwise every 2 s
@@ -329,11 +330,11 @@ final class CameraManager: NSObject, ObservableObject {
 
     /// Camera capability report to Documents/openbooth-capabilities.log (fetch with tools/pull-caps.sh).
     static var capabilitiesURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("openbooth-capabilities.log") }
-    private func writeCapabilities(_ cam: SonyCamera) {
+    private func writeCapabilities(_ cam: CameraDriver) {
         let report = cam.capabilitiesReport()
         try? report.data(using: .utf8)?.write(to: Self.capabilitiesURL, options: .atomic)
         let di = cam.deviceInfo
-        appendLog("Capabilities: \(di.operations.count) operations, \(di.events.count) events, \(di.properties.count)+\(cam.vendorProps.count) properties, \(cam.controlCodes.count) control codes → openbooth-capabilities.log")
+        appendLog("Capabilities: \(di.operations.count) operations, \(di.events.count) events, \(di.properties.count) properties → openbooth-capabilities.log")
         appendLog("Operations: " + di.operations.sorted().map { PTPNames.hex($0) }.joined(separator: " "))
     }
 
@@ -428,10 +429,7 @@ final class CameraManager: NSObject, ObservableObject {
     func batteryText(_ b: (Int, Bool)) -> String { b.0 < 0 ? String(localized: "unknown") : "\(b.0) %\(b.1 ? String(localized: " (charging)") : "")" }
     /// Camera battery in percent from Sony property 0xD218 (updated on every property fetch)
     func cameraBattery() -> Int? {
-        guard let cam = sony else { return nil }
-        if let v = cam.currentValue(0xD218) { return Int(v) }
-        if let v = cam.currentValue(0x5001) { return Int(v) }
-        return nil
+        return driver?.batteryPercent()
     }
 
     /// Send diagnostics to the OpenBooth endpoint. Returns the server's ID.
@@ -462,7 +460,7 @@ final class CameraManager: NSObject, ObservableObject {
     func makeDiagnosticsFile() -> URL? {
         var text = Diagnostics.environment(settingsRef)
         text += "Camera state: \(status)\(lastError.map { ", last error: \($0)" } ?? "")\n\n"
-        if let cam = sony { text += cam.capabilitiesReport() }
+        if let cam = driver { text += cam.capabilitiesReport() }
         else if let d = try? String(contentsOf: Self.capabilitiesURL, encoding: .utf8) { text += d }
         else { text += "(no capability report, camera not detected yet)\n" }
         text += "\n# Log\n"
@@ -580,14 +578,22 @@ final class CameraManager: NSObject, ObservableObject {
                 self.state = .sessionOpen
                 self.status = "Session open"
                 self.banner = Banner(kind: .working, text: String(localized: "Connecting camera…"))
-                let cam = SonyCamera(device: dev)
-                self.sony = cam
-                await cam.transport.setLogHandler { [weak self] line in
+                // Probe with a generic driver first, then pick the real driver from the vendor extension
+                let transport = PTPTransport(device: dev)
+                await transport.setLogHandler { [weak self] line in
                     Task { @MainActor in self?.appendLog(line) }
                 }
+                self.driver = GenericPTPCamera(transport: transport, deviceInfo: PTP.DeviceInfo())
                 if self.autoConnect {
                     if await self.probeAsync(), await self.connectAsync() {
                         self.startLiveView()
+                    } else if self.driver?.supportsRemoteControl == false {
+                        // Unknown camera: no recovery loop, just say so and keep the report
+                        self.state = .error("unsupported")
+                        self.status = String(localized: "Camera not supported yet")
+                        self.banner = Banner(kind: .warning, text: String(localized: "Camera not supported yet"),
+                                             detail: String(localized: "Please send diagnostics from the admin log"))
+                        self.autoReport("unsupported camera: \(self.driver?.deviceInfo.model ?? "?")")
                     } else {
                         self.scheduleRecover(reason: "Connection")
                     }
@@ -601,16 +607,20 @@ final class CameraManager: NSObject, ObservableObject {
 
     @discardableResult
     func probeAsync() async -> Bool {
-        guard let cam = sony else { return false }
+        guard let cam = driver else { return false }
         do {
                 let info = try await cam.probe()
+                if cam.supportsRemoteControl == false, let generic = cam as? GenericPTPCamera {
+                    let chosen = CameraDrivers.make(for: info, transport: generic.transport)
+                    if chosen !== cam { driver = chosen; appendLog("Driver: \(type(of: chosen))") }
+                }
                 let ops = info.operations.map { String(format: "%04X", $0) }.joined(separator: " ")
                 deviceSummary = "\(info.manufacturer) \(info.model) FW \(info.deviceVersion), VendorExt 0x\(String(info.vendorExtensionID, radix: 16)), \(info.operations.count) Operationen"
                 appendLog("DeviceInfo OK: \(deviceSummary)")
                 appendLog("Operations: \(ops)")
                 appendLog("Events: " + info.events.map { String(format: "%04X", $0) }.joined(separator: " "))
                 appendLog("Properties: " + info.properties.map { String(format: "%04X", $0) }.joined(separator: " "))
-                writeCapabilities(cam)   // already after the probe so unknown cameras (handshake fails) end up in the report too
+                if let d = driver { writeCapabilities(d) }   // already after the probe so unknown cameras (handshake fails) end up in the report too
                 state = .probed
                 status = String(localized: "PTP pass-through works")
                 return true
@@ -627,16 +637,15 @@ final class CameraManager: NSObject, ObservableObject {
 
     @discardableResult
     func connectAsync() async -> Bool {
-        guard let cam = sony else { return false }
+        guard let cam = driver else { return false }
             do {
-                status = String(localized: "Sony handshake…")
+                status = String(localized: "Camera handshake…")
                 try await cam.connect()
-                appendLog("Handshake OK, protocol 0x\(String(cam.protocolVersion, radix: 16)), \(cam.vendorCodes.count) vendor codes, \(cam.props.count) properties")
+                appendLog(cam.connectSummary)
                 writeCapabilities(cam)
                 if let iso = cam.currentValue(SonyProp.iso) { appendLog("ISO = \(iso)") }
                 if let f = cam.currentValue(SonyProp.fNumber) { appendLog("Aperture = f/\(Double(f) / 100)") }
                 if let s = cam.currentValue(SonyProp.shutterSpeed) { appendLog("Shutter = \(SonyFormat.label(code: SonyProp.shutterSpeed, value: s))") }
-                appendLog("ObjectInMemory(0xD215) = \(cam.currentValue(SonyProp.objectInMemory).map(String.init) ?? "fehlt"), FocusFound(0xD213) = \(cam.currentValue(SonyProp.focusFound).map(String.init) ?? "fehlt")")
                 state = .connected
                 status = String(localized: "Connected")
                 settings = cam.settings()
@@ -658,7 +667,7 @@ final class CameraManager: NSObject, ObservableObject {
     // MARK: Settings
 
     func reloadSettings() {
-        guard let cam = sony else { return }
+        guard let cam = driver else { return }
         Task {
             do { try await cam.refreshProps(); settings = cam.settings() }
             catch { appendLog("Reading settings: \(error.localizedDescription)") }
@@ -666,7 +675,7 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     /// Remember the set value per camera model so it is applied again on the next connect
-    private func remember(code: UInt16, value: Int64, for cam: SonyCamera) {
+    private func remember(code: UInt16, value: Int64, for cam: CameraDriver) {
         guard let s = settingsRef else { return }
         let model = cam.deviceInfo.model.isEmpty ? "Camera" : cam.deviceInfo.model
         var m = s.rememberedCamera[model] ?? [:]
@@ -675,7 +684,7 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     /// After connecting: apply remembered values that differ from the camera (writable properties only).
-    private func restoreRememberedSettings(_ cam: SonyCamera) async {
+    private func restoreRememberedSettings(_ cam: CameraDriver) async {
         guard let s = settingsRef, s.restoreCameraSettings else { return }
         let model = cam.deviceInfo.model.isEmpty ? "Camera" : cam.deviceInfo.model
         guard let saved = s.rememberedCamera[model], !saved.isEmpty else { return }
@@ -684,7 +693,7 @@ final class CameraManager: NSObject, ObservableObject {
             guard let code = UInt16(hex, radix: 16), let cur = cam.currentValue(code), cur != Int64(value) else { continue }
             guard cam.settings().first(where: { $0.code == code })?.writable == true else { continue }
             do {
-                try await cam.setSetting(code, to: Int64(value))
+                try await cam.setSetting(code, to: Int64(value), log: nil)
                 applied += 1
                 appendLog("Restored: 0x\(hex) = \(SonyFormat.label(code: code, value: Int64(value)))")
             } catch { appendLog("Restore 0x\(hex): \(error.localizedDescription)") }
@@ -693,7 +702,7 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     func apply(_ code: UInt16, value: Int64) {
-        guard let cam = sony, !settingsBusy else { return }
+        guard let cam = driver, !settingsBusy else { return }
         settingsBusy = true
         let wasLive = liveTask != nil
         stopLiveView()
@@ -716,7 +725,7 @@ final class CameraManager: NSObject, ObservableObject {
 
     func startLiveView() {
         if ipadCam != nil { liveRunning = true; return }
-        guard let cam = sony, liveTask == nil else { return }
+        guard let cam = driver, cam.supportsRemoteControl, liveTask == nil else { return }
         liveRunning = true
         lastFrame = Date()
         liveTask = Task { [weak self] in
@@ -788,7 +797,7 @@ final class CameraManager: NSObject, ObservableObject {
             await MainActor.run {
                 guard let self else { return }
                 self.recoverTask = nil
-                self.sony = nil
+                self.driver = nil
                 if self.devices.contains(where: { $0 === dev }) {
                     self.device = nil
                     self.openSession(dev)
@@ -803,8 +812,8 @@ final class CameraManager: NSObject, ObservableObject {
 
     /// Booth flow: countdown, one or more shots with pause, large review, save.
     func capture(withCountdown seconds: Int = 3) {
-        guard sony != nil || ipadCam != nil, !capturing else { return }
-        let cam = sony
+        guard driver?.supportsRemoteControl == true || ipadCam != nil, !capturing else { return }
+        let cam = driver?.supportsRemoteControl == true ? driver : nil
         noteInteraction()
         dismissResult()
         let shots = max(1, settingsRef?.shotsPerCapture ?? 1)
@@ -950,7 +959,7 @@ final class CameraManager: NSObject, ObservableObject {
         case 0xC201:   // Sony ObjectAdded: new image in RAM (handle in param 1)
             appendLog(String(format: "Event ObjectAdded 0x%08X", params.first ?? 0))
             if !eventsWorking { eventsWorking = true; appendLog("Camera events arrive, external shutter now reacts instantly") }
-            sony?.objectAdded.fire()
+            driver?.objectAdded.fire()
             if !capturing { pollExternalCapture() }
         case 0xC203:   // PropertyChanged: arrives on every setting change and while focusing, just count
             break
@@ -965,7 +974,7 @@ final class CameraManager: NSObject, ObservableObject {
     /// From tick(): if the camera reports an image in RAM without the app having triggered, it is picked up
     /// just like an app photo and shown in the review.
     private func pollExternalCapture() {
-        guard settingsRef?.pickupExternal ?? true, let cam = sony, state == .connected,
+        guard settingsRef?.pickupExternal ?? true, let cam = driver, cam.supportsRemoteControl, state == .connected,
               !capturing, !settingsBusy, pickupTask == nil, recoverTask == nil else { return }
         pickupTask = Task { [weak self] in
             defer { Task { @MainActor in self?.pickupTask = nil } }
@@ -1258,7 +1267,7 @@ extension CameraManager: ICDeviceBrowserDelegate {
                 stopLiveView()
                 recoverTask?.cancel(); recoverTask = nil
                 self.device = nil
-                sony = nil
+                driver = nil
                 liveFrame = nil
                 state = .browsing
                 status = String(localized: "Camera disconnected")

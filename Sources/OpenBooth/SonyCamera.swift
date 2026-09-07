@@ -146,7 +146,7 @@ actor PTPTransport {
 }
 
 /// Der Sony-Treiber: Handshake, Liveview, Ausloesen, Bildabruf.
-final class SonyCamera {
+final class SonyCamera: CameraDriver {
     let transport: PTPTransport
     private(set) var deviceInfo = PTP.DeviceInfo()
     private(set) var protocolVersion: UInt16 = 0
@@ -168,6 +168,24 @@ final class SonyCamera {
 
     init(device: ICCameraDevice) {
         transport = PTPTransport(device: device)
+    }
+    init(transport: PTPTransport, deviceInfo: PTP.DeviceInfo) {
+        self.transport = transport
+        self.deviceInfo = deviceInfo
+    }
+
+    var supportsRemoteControl: Bool { true }
+    var connectSummary: String { "Handshake OK, protocol 0x\(String(protocolVersion, radix: 16)), \(vendorCodes.count) vendor codes, \(props.count) properties" }
+    /// Image quality RAW (1) or RAW+JPEG (2)
+    var deliversRAW: Bool { let v = currentValue(SonyProp.imageQuality); return v == 1 || v == 2 }
+    func batteryPercent() -> Int? {
+        if let v = currentValue(0xD218) { return Int(v) }
+        if let v = currentValue(0x5001) { return Int(v) }
+        return nil
+    }
+    func capabilitiesReport() -> String {
+        CapabilityReport.build(deviceInfo: deviceInfo, protocolLine: "Sony protocol version 0x\(String(protocolVersion, radix: 16))",
+                               vendorProps: vendorProps, controlCodes: controlCodes, props: props, rawDumps: rawDumps)
     }
 
     // MARK: Connection

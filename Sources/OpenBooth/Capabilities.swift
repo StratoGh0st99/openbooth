@@ -73,15 +73,15 @@ enum PTPNames {
     static func prop(_ v: UInt16) -> String { "\(hex(v)) \(properties[v] ?? (v >= 0xD000 ? "Sony" : "?"))" }
 }
 
-extension SonyCamera {
-    /// Full capability report after the handshake.
-    func capabilitiesReport() -> String {
+enum CapabilityReport {
+    /// Full capability report; generic for every driver.
+    static func build(deviceInfo di: PTP.DeviceInfo, protocolLine: String, vendorProps: [UInt16], controlCodes: [UInt16],
+                      props: [UInt16: SonyPropDesc], rawDumps: [(name: String, data: Data)]) -> String {
         var out: [String] = []
-        let di = deviceInfo
         out.append("# OpenBooth camera capabilities, \(DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium))")
         out.append("Model: \(di.manufacturer) \(di.model), firmware \(di.deviceVersion), serial \(di.serialNumber)")
         out.append("PTP standard \(di.standardVersion), vendor extension 0x\(String(di.vendorExtensionID, radix: 16)) \(di.vendorExtensionDesc)")
-        out.append("Sony protocol version 0x\(String(protocolVersion, radix: 16))")
+        out.append(protocolLine)
         out.append("")
         out.append("## Operations (\(di.operations.count), from GetDeviceInfo)")
         out += di.operations.sorted().map { "  " + PTPNames.op($0) }

@@ -58,7 +58,12 @@ final class LocalWebServer: @unchecked Sendable {
             l.stateUpdateHandler = { [weak self] st in
                 switch st {
                 case .ready: self?.running = true; self?.log?("Remote: status page ready on port \(Self.port)")
-                case .failed(let e): self?.running = false; self?.log?("Remote: error \(e.localizedDescription)"); self?.stop()
+                case .failed(let e):
+                    // A defunct listener (e.g. after a Wi-Fi change) must not end the status page: restart after 2 s
+                    self?.running = false
+                    self?.log?("Remote: listener failed (\(e.localizedDescription)), restarting")
+                    self?.listener = nil
+                    self?.queue.asyncAfter(deadline: .now() + 2) { [weak self] in self?.start() }
                 case .cancelled: self?.running = false
                 default: break
                 }
