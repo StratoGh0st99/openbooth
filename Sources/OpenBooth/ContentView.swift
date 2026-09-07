@@ -80,7 +80,7 @@ struct ContentView: View {
         .statusBarHidden()
     }
 
-    // MARK: Buehne
+    // MARK: Stage
 
     var stage: some View {
         ZStack {
@@ -781,7 +781,7 @@ struct AdminPanel: View {
     }
 }
 
-// MARK: - PIN-Eingabe
+// MARK: - PIN entry
 
 struct PinPadView: View {
     let expected: String
@@ -831,7 +831,7 @@ struct PinPadView: View {
     }
 }
 
-// MARK: - Leerlauf-Collage
+// MARK: - Idle collage
 
 struct CollageView: View {
     let photos: [URL]
@@ -904,7 +904,7 @@ struct CollageCard: View {
     }
 }
 
-// MARK: - Galerie
+// MARK: - Gallery
 
 struct GalleryView: View {
     let photos: [URL]
@@ -1010,7 +1010,7 @@ struct GalleryView: View {
 }
 
 
-// MARK: - Beruehrungs-Beobachter (UIKit): meldet jeden Touch im Fenster, erkennt selbst nie, stoert nichts
+// MARK: - Touch observer (UIKit): reports every touch in the window, never recognizes, interferes with nothing
 
 struct TouchActivity: UIViewRepresentable {
     let action: () -> Void
@@ -1061,7 +1061,7 @@ struct TouchActivity: UIViewRepresentable {
     }
 }
 
-// MARK: - Zwei-Finger-Wischgeste (UIKit), haengt sich ans Fenster, blockiert keine anderen Touches
+// MARK: - Two-finger swipe gesture (UIKit), attaches to the window, blocks no other touches
 
 struct TwoFingerSwipeDown: UIViewRepresentable {
     let action: () -> Void
@@ -1109,7 +1109,7 @@ struct TwoFingerSwipeDown: UIViewRepresentable {
 }
 
 
-// MARK: - Sprueche bearbeiten
+// MARK: - Phrases bearbeiten
 
 struct PhraseEditor: View {
     @EnvironmentObject var settings: AppSettings
@@ -1155,7 +1155,7 @@ struct PhraseEditor: View {
 }
 
 
-// MARK: - Immich-Einstellungen
+// MARK: - Immich settings
 
 /// Pick a camera value in a scrollable popover (menus with 40+ entries could not be scrolled).
 struct SettingPicker: View {

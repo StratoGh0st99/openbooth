@@ -93,7 +93,7 @@ final class LocalWebServer: @unchecked Sendable {
         return out
     }
 
-    // MARK: Verbindung
+    // MARK: Connection
 
     private func handle(_ c: NWConnection) {
         c.start(queue: queue)
@@ -133,7 +133,7 @@ final class LocalWebServer: @unchecked Sendable {
         return "?"
     }
 
-    // MARK: Routen
+    // MARK: Routes
 
     private func route(method: String, path: String, headers: [String: String], body: Data, ip: String) async -> Data {
         let p = path.split(separator: "?").first.map(String.init) ?? "/"
@@ -201,7 +201,7 @@ final class LocalWebServer: @unchecked Sendable {
 
     private func html(_ s: String) -> Data { Data(s.utf8) }
 
-    // MARK: Seiten
+    // MARK: Pages
 
     private let style = """
     <meta name=viewport content="width=device-width,initial-scale=1"><meta charset=utf-8>

@@ -227,7 +227,7 @@ enum PTP {
         return info
     }
 
-    // MARK: ObjectInfo (nur die Felder, die wir brauchen)
+    // MARK: ObjectInfo (only the fields we need)
 
     struct ObjectInfo {
         var storageID: UInt32 = 0

@@ -36,7 +36,7 @@ final class CameraManager: NSObject, ObservableObject {
         syncImmich(); syncWebDAV(); syncWeb(); syncFallback()
     }
 
-    // MARK: Ersatz: iPad-Kamera, wenn keine Kamera per USB da ist
+    // MARK: Fallback: iPad camera when no USB camera is present
 
     private(set) var ipadCam: IPadCamera?
     @Published private(set) var usingIPadCamera = false
@@ -105,7 +105,7 @@ final class CameraManager: NSObject, ObservableObject {
         if wantHistogram, fallbackFrames % 3 == 0 { liveHistogram = Histogram.compute(img) } else if !wantHistogram, liveHistogram != nil { liveHistogram = nil }
     }
 
-    // MARK: Fernzugriff (Statusseite im WLAN)
+    // MARK: Remote access (status page on Wi-Fi)
 
     let web = LocalWebServer()
     private var lastFPS = 0
@@ -228,7 +228,7 @@ final class CameraManager: NSObject, ObservableObject {
         var detail: String? = nil
     }
     @Published var banner: Banner? = Banner(kind: .info, text: String(localized: "Connect a camera"))
-    @Published var captureError: String?      // Overlay mit "Try again"
+    @Published var captureError: String?      // overlay with "Try again"
     @Published var lastError: String?         // for the admin panel
     private var recoverAttempts = 0
     private var recoverTask: Task<Void, Never>?
@@ -276,7 +276,7 @@ final class CameraManager: NSObject, ObservableObject {
 
     private var tickCount = 0
     private var frameCount = 0
-    /// Alle 2 s: Leerlauf erkennen, Liveview ueberwachen, Log-Kopie schreiben.
+    /// Every 2 s: detect idle, watch the live view, write the log copy.
     private func tick() {
         tickCount += 1
         sampleUserBrightness()
@@ -337,7 +337,7 @@ final class CameraManager: NSObject, ObservableObject {
         appendLog("Operations: " + di.operations.sorted().map { PTPNames.hex($0) }.joined(separator: " "))
     }
 
-    // MARK: Display-Helligkeit
+    // MARK: Display brightness
 
     /// QR page visible (set by ContentView), forces full brightness.
     @Published var qrShown = false { didSet { updateBrightness() } }
@@ -375,7 +375,7 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     /// Diagnostics file for sharing: environment, current capability report with raw data, full log.
-    // MARK: Speicherbelegung der Veranstaltung
+    // MARK: Event storage usage
 
     /// Size of the event folder in bytes (gallery, originals, RAW, thumbnails)
     static func eventFolderSize() -> Int64 {
@@ -396,7 +396,7 @@ final class CameraManager: NSObject, ObservableObject {
         appendLog("Deleted all photos of event “\(Self.currentEvent)” from the iPad (\(n) in gallery)")
     }
 
-    // MARK: Akku und Speicher: Warnungen fuer den Gaestebildschirm
+    // MARK: Battery and storage: warnings for the guest screen
 
     @Published var resourceWarnings: [String] = []
     static func freeDiskGB() -> Double? {
@@ -416,7 +416,7 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: Akku
+    // MARK: Battery
 
     /// iPad battery in percent (-1 unknown) and whether it is charging
     func iPadBattery() -> (Int, Bool) {
@@ -655,7 +655,7 @@ final class CameraManager: NSObject, ObservableObject {
             }
     }
 
-    // MARK: Einstellungen
+    // MARK: Settings
 
     func reloadSettings() {
         guard let cam = sony else { return }
@@ -799,7 +799,7 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: Aufnahme
+    // MARK: Capture
 
     /// Booth flow: countdown, one or more shots with pause, large review, save.
     func capture(withCountdown seconds: Int = 3) {
@@ -959,7 +959,7 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: Fremdausloesung (Ausloeser an der Kamera, Fernausloeser)
+    // MARK: External shutter (camera button, remote release)
 
     private var pickupTask: Task<Void, Never>?
     /// From tick(): if the camera reports an image in RAM without the app having triggered, it is picked up

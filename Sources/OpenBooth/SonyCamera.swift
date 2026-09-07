@@ -170,7 +170,7 @@ final class SonyCamera {
         transport = PTPTransport(device: device)
     }
 
-    // MARK: Verbindung
+    // MARK: Connection
 
     /// Step 1: GetDeviceInfo only. This is the feasibility test for PTP pass-through on iPadOS.
     func probe() async throws -> PTP.DeviceInfo {
@@ -226,7 +226,7 @@ final class SonyCamera {
 
     /// Format per entry (after libgphoto2 ptp_unpack_Sony_DPD):
     ///   u16 PropCode, u16 DataType, u8 GetSet, u8 IsEnabled, Default, Current, u8 FormFlag,
-    ///   FormFlag 1: Min, Max, Step;  FormFlag 2: u16 N, N Werte;
+    ///   FormFlag 1: Min, Max, Step;  FormFlag 2: u16 N, N values;
     ///   then optionally a second list (u16 N < 0x200, N values) that carries the valid values on newer cameras.
     static func parseAllProps(_ d: Data) -> [UInt16: SonyPropDesc] {
         var out: [UInt16: SonyPropDesc] = [:]
