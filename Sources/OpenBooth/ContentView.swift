@@ -659,7 +659,7 @@ struct AdminPanel: View {
             Toggle(isOn: $settings.webdavEnabled) { Label("WebDAV folder (Nextcloud, NAS, Storage Box)", systemImage: "externaldrive.connected.to.line.below") }
                 .onChange(of: settings.webdavEnabled) { _, _ in cam.syncWebDAV() }
             if !settings.anyTargetKeepsOriginal {
-                Label("No target keeps the original; originals stay in the app folder.", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                Label("No target keeps the original. Full-size photos are discarded.", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
         } header: { Text("Targets") } footer: { Text("Gallery keeps a 2000 px web copy.") }
         if settings.immichEnabled {

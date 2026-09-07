@@ -65,7 +65,7 @@ Personal Team reicht, die App läuft dann 7 Tage und muss neu installiert werden
 - **Veranstaltung**: der Eventname im Admin ist Immich-Album und WebDAV-Ordner zugleich, beides wird automatisch angelegt.
 - **Speicherorte** im Admin: App-Galerie (immer, Web-Kopie 2000 px, Quelle für Rückschau und Collage), iPad-Mediathek, Immich und
   WebDAV einzeln schaltbar; jedes externe Ziel (Mediathek, Immich, WebDAV) bekommt wahlweise Original oder Web-Kopie (gut für LTE). Originale bleiben nur so lange
-  im App-Ordner, bis jedes Ziel sie hat; bekommt kein Ziel Originale, bleiben sie liegen.
+  im App-Ordner, bis jedes Ziel sie hat, dann werden sie verworfen (der Admin warnt, wenn kein Ziel Originale bekommt).
 - **Warnungen**: iPad-Akku, Kamera-Akku und freier Speicher erscheinen als Hinweis auf dem Gästebildschirm, wenn sie knapp werden.
 - **WebDAV-Upload** (optional): Ordner-URL, Benutzer, Passwort (Schlüsselbund). Ordner wird per `MKCOL` angelegt, Dateien per `PUT`,
   eigene Warteschlange mit Wiederholung. Getestet mit Nextcloud (`remote.php/dav/files/NAME/Ordner`).

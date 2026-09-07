@@ -1132,12 +1132,12 @@
         }
       }
     },
-    "No target keeps the original; originals stay in the app folder.": {
+    "No target keeps the original. Full-size photos are discarded.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kein Ziel bekommt das Original; Originale bleiben im App-Ordner."
+            "value": "Kein Ziel bekommt das Original. Fotos in voller Größe werden verworfen."
           }
         }
       }

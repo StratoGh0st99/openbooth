@@ -1121,10 +1121,9 @@ final class CameraManager: NSObject, ObservableObject {
         return UIImage(cgImage: cg).jpegData(compressionQuality: 0.9)
     }
 
-    /// Originale (und RAWs) loeschen, die kein Ziel mehr braucht: nicht in einer Warteschlange, mindestens ein Ziel
-    /// bekommt Originale (Mediathek oder Upload in Originalgroesse), aelter als 2 Minuten. Sonst bleiben sie liegen.
+    /// Originale und RAWs loeschen, die kein Ziel mehr braucht: nicht in einer Warteschlange, aelter als 2 Minuten.
+    /// Kein Fallback: bekommt kein Ziel das Original, ist es danach weg (der Admin warnt davor).
     private func cleanupOriginals() {
-        guard let s = settingsRef, s.anyTargetKeepsOriginal else { return }
         let fm = FileManager.default
         let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].path + "/"
         let pending = Set(immich.pending.map { $0.path } + webdav.pending.map { $0.path })
@@ -1135,8 +1134,6 @@ final class CameraManager: NSObject, ObservableObject {
                 guard !pending.contains(rel) else { continue }
                 let vals = try? f.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
                 guard let mod = vals?.contentModificationDate, Date().timeIntervalSince(mod) > 120 else { continue }
-                // RAW nur loeschen, wenn ein Ziel es hat (Mediathek oder RAW-Upload)
-                if dir == Self.rawDir, !(s.saveToPhotos || (s.immichEnabled && s.immichUploadRAW) || (s.webdavEnabled && s.webdavUploadRAW)) { continue }
                 freed += vals?.fileSize ?? 0; n += 1
                 try? fm.removeItem(at: f)
             }

@@ -66,7 +66,7 @@ Localization: strings are English in code, German lives in `Sources/OpenBooth/Lo
 - **Event**: the event name is the Immich album and the WebDAV folder; both are created automatically.
 - **Destinations**: app gallery (always, a 2000 px web copy, source for review and collage), iPad photo library, Immich, WebDAV,
   each switchable; every external target (photo library, Immich, WebDAV) can receive the original or the web copy (good for LTE setups). Originals are kept in the
-  app folder only until every target has them; if no target keeps originals, they stay.
+  app folder only until every target has them, then discarded (the admin warns if no target keeps originals).
 - **Warnings**: iPad battery, camera battery and free storage are shown as a chip on the guest screen when they get low.
 - **Immich upload** (optional): server, API key (keychain) and album; each photo is queued via `POST /api/assets` and then
   added to the album (`PUT /api/albums/{id}/assets`). Offline uploads catch up later, “Test connection” checks key and album.
