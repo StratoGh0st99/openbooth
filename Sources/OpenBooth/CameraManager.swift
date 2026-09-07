@@ -615,7 +615,7 @@ final class CameraManager: NSObject, ObservableObject {
                     if chosen !== cam { driver = chosen; appendLog("Driver: \(type(of: chosen))") }
                 }
                 let ops = info.operations.map { String(format: "%04X", $0) }.joined(separator: " ")
-                deviceSummary = "\(info.manufacturer) \(info.model) FW \(info.deviceVersion), VendorExt 0x\(String(info.vendorExtensionID, radix: 16)), \(info.operations.count) Operationen"
+                deviceSummary = "\(info.manufacturer) \(info.model) FW \(info.deviceVersion), VendorExt 0x\(String(info.vendorExtensionID, radix: 16)), \(info.operations.count) operations"
                 appendLog("DeviceInfo OK: \(deviceSummary)")
                 appendLog("Operations: \(ops)")
                 appendLog("Events: " + info.events.map { String(format: "%04X", $0) }.joined(separator: " "))
