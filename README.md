@@ -88,6 +88,8 @@ Localization: strings are English in code, German lives in `Sources/OpenBooth/Lo
   threshold, send diagnostics. PIN login, five failed attempts lock for one minute.
 - **Diagnostics**: “Share diagnostics” (share sheet) or “Send to OpenBooth” (HTTPS endpoint); contains environment,
   capabilities with raw data and the log, no credentials, serial number shortened. Optionally automatic on errors.
+- **Admin helpers**: test photo, retry or clear upload queues, storage used per event with “Delete photos”, settings export/import
+  (JSON without secrets), warning while the default PIN is active.
 - Series of 1/3/5 shots with pause (cancellable, taken photos are kept), review with progress bar (hold to pause) and delete, editable phrases, status banner with automatic
   recovery, log in `Documents/openbooth.log` (fetch with `tools/pull-log.sh`).
 

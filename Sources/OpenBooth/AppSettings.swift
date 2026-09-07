@@ -113,4 +113,75 @@ final class AppSettings: ObservableObject {
     var anyTargetKeepsOriginal: Bool {
         (saveToPhotos && photosOriginal) || (immichEnabled && immichOriginal) || (webdavEnabled && webdavOriginal)
     }
+
+    /// Alle Werte neu aus UserDefaults lesen (nach einem Import)
+    func reloadFromDefaults() {
+        let name = d.string(forKey: "eventName") ?? d.string(forKey: "immichAlbum") ?? String(localized: "Photo Booth")
+        var ev = d.stringArray(forKey: "events") ?? []
+        if !ev.contains(name) { ev.append(name) }
+        eventName = name
+        events = ev
+        qrEnabled = d.object(forKey: "qrEnabled") as? Bool ?? true
+        pin = d.string(forKey: "pin") ?? "0000"
+        debugMode = d.object(forKey: "debugMode") as? Bool ?? false
+        autoReports = d.object(forKey: "autoReports") as? Bool ?? false
+        webEnabled = d.object(forKey: "webEnabled") as? Bool ?? false
+        ipadFallback = d.object(forKey: "ipadFallback") as? Bool ?? true
+        ipadFrontCamera = d.object(forKey: "ipadFrontCamera") as? Bool ?? true
+        restoreCameraSettings = d.object(forKey: "restoreCameraSettings") as? Bool ?? true
+        rememberedCamera = d.dictionary(forKey: "rememberedCamera") as? [String: [String: Int]] ?? [:]
+        autoConnect = d.object(forKey: "autoConnect") as? Bool ?? true
+        countdownSeconds = d.object(forKey: "countdownSeconds") as? Int ?? 3
+        resultSeconds = d.object(forKey: "resultSeconds") as? Int ?? 10
+        idleSeconds = d.object(forKey: "idleSeconds") as? Int ?? 120
+        slideshowInterval = d.object(forKey: "slideshowInterval") as? Int ?? 7
+        mirrorLiveView = d.object(forKey: "mirrorLiveView") as? Bool ?? true
+        showHistogram = d.object(forKey: "showHistogram") as? Bool ?? false
+        welcomeTitle = d.string(forKey: "welcomeTitle") ?? String(localized: "📸 Photo Booth")
+        welcomeText = d.string(forKey: "welcomeText") ?? String(localized: "Step in front of the camera\nand press the button!")
+        guestGallery = d.object(forKey: "guestGallery") as? Bool ?? true
+        gallerySeconds = d.object(forKey: "gallerySeconds") as? Int ?? 30
+        shotsPerCapture = d.object(forKey: "shotsPerCapture") as? Int ?? 1
+        shotInterval = d.object(forKey: "shotInterval") as? Int ?? 3
+        phrases = d.stringArray(forKey: "phrases") ?? Self.defaultPhrases
+        pickupExternal = d.object(forKey: "pickupExternal") as? Bool ?? true
+        saveToPhotos = d.object(forKey: "saveToPhotos") as? Bool ?? true
+        immichEnabled = d.object(forKey: "immichEnabled") as? Bool ?? false
+        immichURL = d.string(forKey: "immichURL") ?? ""
+        photosOriginal = d.object(forKey: "photosOriginal") as? Bool ?? true
+        immichOriginal = d.object(forKey: "immichOriginal") as? Bool ?? true
+        webdavOriginal = d.object(forKey: "webdavOriginal") as? Bool ?? true
+        webdavEnabled = d.object(forKey: "webdavEnabled") as? Bool ?? false
+        webdavURL = d.string(forKey: "webdavURL") ?? ""
+        webdavUser = d.string(forKey: "webdavUser") ?? ""
+        soundsEnabled = d.object(forKey: "soundsEnabled") as? Bool ?? true
+        soundWelcome = d.object(forKey: "soundWelcome") as? Bool ?? true
+        soundCountdown = d.object(forKey: "soundCountdown") as? Bool ?? true
+        maxBrightness = d.object(forKey: "maxBrightness") as? Bool ?? false
+        motionWake = d.object(forKey: "motionWake") as? Bool ?? true
+        // Standard 6 (Dauerlauf 2026-09-06: Ruhepegel max 2,9, Treffer ab 8,8); alter Standard 8 wird einmalig migriert
+        var mt = d.object(forKey: "motionThreshold") as? Int ?? 6
+        if mt == 8, !d.bool(forKey: "motionThresholdV2") { mt = 6 }
+        d.set(true, forKey: "motionThresholdV2")
+        motionThreshold = mt
+    }
+
+    /// Exportierbare Schluessel (ohne PIN und ohne Schluesselbund-Inhalte)
+    static let exportKeys: [String] = ["autoConnect", "autoReports", "countdownSeconds", "debugMode", "eventName", "events", "gallerySeconds", "guestGallery", "idleSeconds", "immichAlbum", "immichEnabled", "immichOriginal", "immichURL", "ipadFallback", "ipadFrontCamera", "maxBrightness", "mirrorLiveView", "motionThreshold", "motionWake", "photosOriginal", "phrases", "pickupExternal", "qrEnabled", "rememberedCamera", "restoreCameraSettings", "resultSeconds", "saveToPhotos", "shotInterval", "shotsPerCapture", "showHistogram", "slideshowInterval", "soundCountdown", "soundWelcome", "soundsEnabled", "webEnabled", "webdavEnabled", "webdavOriginal", "webdavURL", "webdavUser", "welcomeText", "welcomeTitle"]
+
+    func exportJSON() -> Data? {
+        var dict: [String: Any] = [:]
+        for k in Self.exportKeys { if let v = d.object(forKey: k) { dict[k] = v } }
+        dict["_openbooth"] = "settings"
+        return try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys])
+    }
+
+    /// Import: nur bekannte Schluessel uebernehmen, danach neu laden. Liefert die Zahl der uebernommenen Werte.
+    func importJSON(_ data: Data) -> Int {
+        guard let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any], dict["_openbooth"] as? String == "settings" else { return 0 }
+        var n = 0
+        for k in Self.exportKeys { if let v = dict[k] { d.set(v, forKey: k); n += 1 } }
+        reloadFromDefaults()
+        return n
+    }
 }

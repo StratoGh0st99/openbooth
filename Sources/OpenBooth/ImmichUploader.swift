@@ -88,6 +88,20 @@ final class ImmichUploader: ObservableObject {
         kick()
     }
 
+    /// Sofort erneut versuchen: laufenden Worker (der evtl. in der Wartezeit schlaeft) abbrechen und neu starten
+    func retryNow() {
+        worker?.cancel(); worker = nil
+        for i in pending.indices { pending[i].attempts = 0 }
+        kick()
+    }
+    /// Warteschlange verwerfen (Dateien bleiben liegen, bis das Aufraeumen sie holt)
+    func clearQueue() {
+        worker?.cancel(); worker = nil
+        pending = []; saveQueue()
+        lastMessage = enabled ? String(localized: "ready") : String(localized: "off")
+        log?("Immich: queue cleared")
+    }
+
     private func kick() {
         guard worker == nil, enabled, !pending.isEmpty else { return }
         worker = Task { [weak self] in

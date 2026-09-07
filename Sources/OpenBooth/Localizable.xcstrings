@@ -42,12 +42,32 @@
         }
       }
     },
+    "%lld photos · %@ on the iPad": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Fotos · %@ auf dem iPad"
+          }
+        }
+      }
+    },
     "%lld phrases": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "%lld Sprüche"
+          }
+        }
+      }
+    },
+    "%lld settings imported": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Einstellungen importiert"
           }
         }
       }
@@ -432,6 +452,16 @@
         }
       }
     },
+    "Clear queue (%lld)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warteschlange leeren (%lld)"
+          }
+        }
+      }
+    },
     "Close": {
       "localizations": {
         "de": {
@@ -592,6 +622,16 @@
         }
       }
     },
+    "Default PIN 0000 is active. Change it before guests arrive.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Standard-PIN 0000 ist aktiv. Vor dem Fest ändern."
+          }
+        }
+      }
+    },
     "Defaults": {
       "localizations": {
         "de": {
@@ -608,6 +648,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Löschen"
+          }
+        }
+      }
+    },
+    "Delete all photos of “%@” from the iPad?": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle Fotos von „%@“ vom iPad löschen?"
+          }
+        }
+      }
+    },
+    "Delete photos": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotos löschen"
           }
         }
       }
@@ -718,6 +778,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Veranstaltung"
+          }
+        }
+      }
+    },
+    "Export settings…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen exportieren …"
           }
         }
       }
@@ -898,6 +968,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Immich-Server"
+          }
+        }
+      }
+    },
+    "Import settings…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen importieren …"
           }
         }
       }
@@ -1152,6 +1232,16 @@
         }
       }
     },
+    "Not an OpenBooth settings file": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine OpenBooth-Einstellungsdatei"
+          }
+        }
+      }
+    },
     "OK, folder reachable": {
       "localizations": {
         "de": {
@@ -1308,6 +1398,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fotobox"
+          }
+        }
+      }
+    },
+    "Photo library and servers keep their copies. Pending uploads are dropped.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mediathek und Server behalten ihre Kopien. Ausstehende Uploads werden verworfen."
           }
         }
       }
@@ -1542,6 +1642,16 @@
         }
       }
     },
+    "Retry now": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetzt erneut"
+          }
+        }
+      }
+    },
     "Review: %lld s": {
       "localizations": {
         "de": {
@@ -1718,6 +1828,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Einstellung nicht übernommen"
+          }
+        }
+      }
+    },
+    "Settings file": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungsdatei"
           }
         }
       }
@@ -1942,6 +2062,16 @@
         }
       }
     },
+    "Test photo": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testfoto"
+          }
+        }
+      }
+    },
     "Testing…": {
       "localizations": {
         "de": {
@@ -2138,6 +2268,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Willkommensklang beim Aufwachen"
+          }
+        }
+      }
+    },
+    "Without PIN, API key and passwords.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ohne PIN, API-Key und Passwörter."
           }
         }
       }

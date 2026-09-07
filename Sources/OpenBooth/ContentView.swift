@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 import CoreImage.CIFilterBuiltins
 import ImageCaptureCore
 
@@ -439,6 +440,17 @@ struct AdminPanel: View {
     @State private var section: Section = Section(rawValue: UserDefaults.standard.string(forKey: "adminSection") ?? "") ?? .event
     @State private var newPin = ""
     @State private var diagnosticsURL: URL?
+    @State private var exportURL: URL?
+    @State private var importing = false
+    @State private var importResult = ""
+
+    private func writeExport() -> URL? {
+        guard let data = settings.exportJSON() else { return nil }
+        let f = DateFormatter(); f.dateFormat = "yyyyMMdd-HHmm"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("OpenBooth-Settings-\(f.string(from: Date())).json")
+        try? data.write(to: url, options: .atomic)
+        return url
+    }
 
     enum Section: String, CaseIterable, Identifiable {
         case event = "Event", camera = "Camera", flow = "Flow", screen = "Display & Sounds",
@@ -530,6 +542,8 @@ struct AdminPanel: View {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow).font(.caption)
         case .log where cam.lastError != nil:
             Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red).font(.caption)
+        case .access where settings.pin == "0000":
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red).font(.caption)
         default: EmptyView()
         }
     }
@@ -567,6 +581,8 @@ struct AdminPanel: View {
             Toggle("Mirror live view", isOn: $settings.mirrorLiveView)
             Toggle("Histogram in live view and review", isOn: $settings.showHistogram)
             HStack {
+                Button { cam.capture(withCountdown: 0) } label: { Label("Test photo", systemImage: "camera") }
+                    .disabled(cam.state != .connected || cam.capturing)
                 Button("PTP test") { cam.probe() }
                     .disabled(!(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected))
                 Button("Handshake") { cam.connect() }.disabled(!(cam.state == .probed || cam.state == .connected))
@@ -678,6 +694,9 @@ struct AdminPanel: View {
 
     @ViewBuilder private var accessSection: some View {
         SwiftUI.Section {
+            if settings.pin == "0000" {
+                Label("Default PIN 0000 is active. Change it before guests arrive.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
+            }
             HStack {
                 SecureField("New PIN (at least 4 digits)", text: $newPin).keyboardType(.numberPad)
                 Button("Set") { if newPin.count >= 4 { settings.pin = newPin; newPin = "" } }
@@ -703,6 +722,24 @@ struct AdminPanel: View {
                 }
             }
         } header: { Text("Remote access") } footer: { Text("Read-only status page, same Wi‑Fi, admin PIN.") }
+        SwiftUI.Section {
+            HStack(spacing: 12) {
+                Button { exportURL = writeExport() } label: { Label("Export settings…", systemImage: "square.and.arrow.up") }.buttonStyle(.bordered)
+                Button { importing = true } label: { Label("Import settings…", systemImage: "square.and.arrow.down") }.buttonStyle(.bordered)
+                Spacer()
+                if !importResult.isEmpty { Text(importResult).font(.caption).foregroundStyle(.secondary) }
+            }
+            .sheet(item: $exportURL) { url in ShareSheet(items: [url]) }
+            .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+                guard case .success(let url) = result else { return }
+                let ok = url.startAccessingSecurityScopedResource(); defer { if ok { url.stopAccessingSecurityScopedResource() } }
+                if let data = try? Data(contentsOf: url) {
+                    let n = settings.importJSON(data)
+                    importResult = n > 0 ? String(localized: "\(n) settings imported") : String(localized: "Not an OpenBooth settings file")
+                    if n > 0 { cam.syncUploaders(); cam.appendLog("Settings imported: \(n) values") }
+                }
+            }
+        } header: { Text("Settings file") } footer: { Text("Without PIN, API key and passwords.") }
         SwiftUI.Section {
             Toggle("Debug mode", isOn: $settings.debugMode)
         } header: { Text("Development") }
@@ -1201,6 +1238,8 @@ struct EventPanel: View {
     @State private var newName = ""
     @State private var askNew = false
     @State private var askDelete = false
+    @State private var askDeletePhotos = false
+    @State private var folderSize: Int64 = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1210,16 +1249,24 @@ struct EventPanel: View {
             .pickerStyle(.menu)
             .onChange(of: settings.eventName) { _, _ in cam.syncUploaders() }
             HStack {
-                Text("\(cam.sessionPhotos.count) photos").foregroundStyle(.secondary)
+                Text("\(cam.sessionPhotos.count) photos · \(ByteCountFormatter.string(fromByteCount: folderSize, countStyle: .file)) on the iPad").foregroundStyle(.secondary)
                 Spacer()
                 Button { newName = ""; askNew = true } label: { Label("New", systemImage: "plus") }
                     .buttonStyle(.bordered)
+                Button(role: .destructive) { askDeletePhotos = true } label: { Label("Delete photos", systemImage: "photo.badge.exclamationmark") }
+                    .buttonStyle(.bordered).disabled(cam.sessionPhotos.isEmpty && folderSize == 0)
                 Button(role: .destructive) { askDelete = true } label: { Label("Remove", systemImage: "trash") }
                     .buttonStyle(.bordered).disabled(settings.events.count <= 1)
             }
             .lineLimit(1)
         }
         .font(.callout)
+        .onAppear { folderSize = CameraManager.eventFolderSize() }
+        .onChange(of: cam.sessionPhotos.count) { _, _ in folderSize = CameraManager.eventFolderSize() }
+        .alert("Delete all photos of “\(settings.eventName)” from the iPad?", isPresented: $askDeletePhotos) {
+            Button("Delete", role: .destructive) { cam.deleteEventPhotos(); folderSize = CameraManager.eventFolderSize() }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("Photo library and servers keep their copies. Pending uploads are dropped.") }
         .alert("New event", isPresented: $askNew) {
             TextField("Name, e.g. Anna & Paul’s wedding", text: $newName)
             Button("Create") {
@@ -1289,6 +1336,10 @@ struct WebDAVPanel: View {
             HStack {
                 Button(testing ? "Testing…" : "Test connection") { cam.syncWebDAV(); runTest() }
                     .buttonStyle(.bordered).disabled(testing || settings.webdavURL.isEmpty)
+                if !cam.webdav.pending.isEmpty {
+                    Button("Retry now") { cam.webdav.retryNow() }.buttonStyle(.bordered)
+                    Button(role: .destructive) { cam.webdav.clearQueue() } label: { Text("Clear queue (\(cam.webdav.pending.count))") }.buttonStyle(.bordered)
+                }
                 Spacer()
                 Text("Status: \(cam.webdav.lastMessage)").font(.caption).foregroundStyle(.secondary)
             }
@@ -1334,6 +1385,10 @@ struct ImmichPanel: View {
             HStack {
                 Button(testing ? "Testing…" : "Test connection") { cam.syncImmich(); runTest() }
                     .buttonStyle(.bordered).disabled(testing || settings.immichURL.isEmpty)
+                if !cam.immich.pending.isEmpty {
+                    Button("Retry now") { cam.immich.retryNow() }.buttonStyle(.bordered)
+                    Button(role: .destructive) { cam.immich.clearQueue() } label: { Text("Clear queue (\(cam.immich.pending.count))") }.buttonStyle(.bordered)
+                }
                 Spacer()
                 Text("Status: \(cam.immich.lastMessage)").font(.caption).foregroundStyle(.secondary)
             }

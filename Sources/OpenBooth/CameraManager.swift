@@ -375,6 +375,27 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     /// Diagnosedatei zum Teilen: Umgebung, aktueller Faehigkeitsbericht mit Rohdaten, komplettes Protokoll.
+    // MARK: Speicherbelegung der Veranstaltung
+
+    /// Groesse des Event-Ordners in Bytes (Galerie, Originale, RAW, Vorschauen)
+    static func eventFolderSize() -> Int64 {
+        let fm = FileManager.default
+        guard let e = fm.enumerator(at: photosDir, includingPropertiesForKeys: [.fileSizeKey]) else { return 0 }
+        var total: Int64 = 0
+        for case let u as URL in e { total += Int64((try? u.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0) }
+        return total
+    }
+    /// Alle Fotos der aktuellen Veranstaltung vom iPad loeschen (Mediathek und Server bleiben unberuehrt)
+    func deleteEventPhotos() {
+        dismissResult()
+        immich.clearQueue(); webdav.clearQueue()
+        let n = sessionPhotos.count
+        try? FileManager.default.removeItem(at: Self.photosDir)
+        sessionPhotos = []
+        lastPhoto = nil
+        appendLog("Deleted all photos of event “\(Self.currentEvent)” from the iPad (\(n) in gallery)")
+    }
+
     // MARK: Akku und Speicher: Warnungen fuer den Gaestebildschirm
 
     @Published var resourceWarnings: [String] = []
