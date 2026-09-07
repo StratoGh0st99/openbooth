@@ -60,7 +60,7 @@ final class CameraManager: NSObject, ObservableObject {
         guard await IPadCamera.authorized() else { appendLog("iPad camera: no access (Settings › OpenBooth › Camera)"); return }
         let cam = IPadCamera()
         do {
-            try cam.start(front: settingsRef?.ipadFrontCamera ?? true) { [weak self] img in
+            try cam.start(front: settingsRef?.ipadFrontCamera ?? true, ultraWide: settingsRef?.ipadUltraWide ?? false) { [weak self] img in
                 Task { @MainActor in self?.ingestFallbackFrame(img) }
             }
         } catch { appendLog("iPad camera: \(error.localizedDescription)"); return }
@@ -71,7 +71,7 @@ final class CameraManager: NSObject, ObservableObject {
         liveRunning = true
         lastFrame = Date()
         banner = nil
-        appendLog("iPad camera started as fallback (\(settingsRef?.ipadFrontCamera ?? true ? "front" : "rear") camera, \(cam.formatSummary))")
+        appendLog("iPad camera started as fallback (\(settingsRef?.ipadFrontCamera ?? true ? "front" : "rear") \(cam.ultraWide ? "ultra wide" : "wide"), \(cam.formatSummary))")
         appendLog("iPad cameras: " + cam.deviceList.joined(separator: " | "))
     }
     func stopIPadCamera(reason: String) {
@@ -89,7 +89,7 @@ final class CameraManager: NSObject, ObservableObject {
     func syncFallback() {
         guard let s = settingsRef else { return }
         if !s.ipadFallback { stopIPadCamera(reason: "disabled"); return }
-        if let cam = ipadCam, cam.position == (s.ipadFrontCamera ? .front : .back) { return }
+        if let cam = ipadCam, cam.position == (s.ipadFrontCamera ? .front : .back), cam.ultraWide == s.ipadUltraWide { return }
         if ipadCam != nil { stopIPadCamera(reason: "camera switched") }
         scheduleFallback()
     }

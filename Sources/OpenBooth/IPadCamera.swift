@@ -28,26 +28,25 @@ final class IPadCamera: NSObject, @unchecked Sendable {
     }
 
     /// Open the camera; `front` = front camera (faces the guests when the iPad sits in the enclosure).
-    func start(front: Bool, onFrame: @escaping (UIImage) -> Void) throws {
+    private(set) var ultraWide = false
+    func start(front: Bool, ultraWide: Bool, onFrame: @escaping (UIImage) -> Void) throws {
         position = front ? .front : .back
+        self.ultraWide = ultraWide
         frameHandler = onFrame
         session.beginConfiguration()
         // inputPriority: we pick the device format ourselves (30 fps video + full-size photos), see pickFormat()
         session.sessionPreset = .inputPriority
         session.inputs.forEach { session.removeInput($0) }
         session.outputs.forEach { session.removeOutput($0) }
-        // Take the device with the largest photo size at this position (the front camera may be listed as ultra wide)
-        let types: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera, .builtInUltraWideCamera, .builtInDualWideCamera, .builtInTrueDepthCamera]
+        // Lens per setting: ultra wide (more megapixels on the iPad Air front, wider view) or the standard wide angle
+        let types: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera, .builtInUltraWideCamera, .builtInTrueDepthCamera]
         let discovered = AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: position).devices
         deviceList = discovered.map { d in
             let px = d.formats.compactMap { $0.supportedMaxPhotoDimensions.last }.map { Int($0.width) * Int($0.height) }.max() ?? 0
             return "\(d.localizedName) [\(d.deviceType.rawValue)] max \(px / 1_000_000) MP"
         }
-        let pick = discovered.max { a, b in
-            let pa = a.formats.compactMap { $0.supportedMaxPhotoDimensions.last }.map { Int($0.width) * Int($0.height) }.max() ?? 0
-            let pb = b.formats.compactMap { $0.supportedMaxPhotoDimensions.last }.map { Int($0.width) * Int($0.height) }.max() ?? 0
-            return pa < pb
-        }
+        let wanted: AVCaptureDevice.DeviceType = ultraWide ? .builtInUltraWideCamera : .builtInWideAngleCamera
+        let pick = discovered.first { $0.deviceType == wanted } ?? discovered.first
         guard let dev = pick ?? AVCaptureDevice.default(for: .video) else {
             session.commitConfiguration()
             throw NSError(domain: "IPadCamera", code: 1, userInfo: [NSLocalizedDescriptionKey: "No iPad camera found"])

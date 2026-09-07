@@ -574,6 +574,9 @@ struct AdminPanel: View {
                 Picker("iPad camera", selection: $settings.ipadFrontCamera) { Text("Front camera").tag(true); Text("Rear camera").tag(false) }
                     .pickerStyle(.segmented)
                     .onChange(of: settings.ipadFrontCamera) { _, _ in cam.syncFallback() }
+                Picker("Lens", selection: $settings.ipadUltraWide) { Text("Standard").tag(false); Text("Ultra wide").tag(true) }
+                    .pickerStyle(.segmented)
+                    .onChange(of: settings.ipadUltraWide) { _, _ in cam.syncFallback() }
                 if cam.usingIPadCamera { Label("iPad camera active", systemImage: "ipad.and.arrow.forward").foregroundStyle(.orange) }
             }
             LabeledContent("Battery", value: "iPad \(cam.batteryText(cam.iPadBattery()))" + (cam.cameraBattery().map { String(localized: ", camera \($0) %") } ?? ""))
