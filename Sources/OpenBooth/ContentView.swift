@@ -567,8 +567,8 @@ struct AdminPanel: View {
                     .disabled(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected)
             }
             Toggle("Connect automatically", isOn: $settings.autoConnect)
-            Toggle("Restore camera settings made in the app when connecting", isOn: $settings.restoreCameraSettings)
-            Toggle("Use the iPad camera as fallback when no USB camera is present", isOn: $settings.ipadFallback)
+            Toggle("Restore app camera settings on connect", isOn: $settings.restoreCameraSettings)
+            Toggle("iPad camera as fallback", isOn: $settings.ipadFallback)
                 .onChange(of: settings.ipadFallback) { _, _ in cam.syncFallback() }
             if settings.ipadFallback {
                 Picker("iPad camera", selection: $settings.ipadFrontCamera) { Text("Front camera").tag(true); Text("Rear camera").tag(false) }
@@ -580,9 +580,9 @@ struct AdminPanel: View {
             LabeledContent("Free storage", value: CameraManager.freeDiskGB().map { String(format: "%.1f GB", $0) } ?? "?")
             Toggle("Mirror live view", isOn: $settings.mirrorLiveView)
             Toggle("Histogram in live view and review", isOn: $settings.showHistogram)
+            Button { cam.capture(withCountdown: 0) } label: { Label("Test photo", systemImage: "camera") }
+                .buttonStyle(.borderedProminent).disabled(cam.state != .connected || cam.capturing)
             HStack {
-                Button { cam.capture(withCountdown: 0) } label: { Label("Test photo", systemImage: "camera") }
-                    .disabled(cam.state != .connected || cam.capturing)
                 Button("PTP test") { cam.probe() }
                     .disabled(!(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected))
                 Button("Handshake") { cam.connect() }.disabled(!(cam.state == .probed || cam.state == .connected))
@@ -747,12 +747,12 @@ struct AdminPanel: View {
 
     @ViewBuilder private var logSection: some View {
         SwiftUI.Section {
-            HStack(spacing: 16) {
-                // Datei wird beim Antippen frisch erzeugt, dann Teilen-Menue (AirDrop, Mail, …)
-                Button { diagnosticsURL = cam.makeDiagnosticsFile() } label: { Label("Share diagnostics…", systemImage: "square.and.arrow.up") }
-                    .buttonStyle(.bordered)
+            // Datei wird beim Antippen frisch erzeugt, dann Teilen-Menue (AirDrop, Mail, …)
+            Button { diagnosticsURL = cam.makeDiagnosticsFile() } label: { Label("Share diagnostics…", systemImage: "square.and.arrow.up") }
+                .buttonStyle(.bordered)
+            HStack {
                 Button { Task { await cam.sendDiagnostics(reason: "manual") } } label: { Label("Send to OpenBooth", systemImage: "paperplane") }
-                    .buttonStyle(.bordered).disabled(cam.reportStatus == String(localized: "Sending…"))
+                    .buttonStyle(.bordered).disabled(cam.reportStatus == String(localized: "Sending…")).lineLimit(1)
                 Spacer()
                 if !cam.reportStatus.isEmpty { Text(cam.reportStatus).font(.caption).foregroundStyle(.secondary) }
             }
@@ -1248,17 +1248,17 @@ struct EventPanel: View {
             }
             .pickerStyle(.menu)
             .onChange(of: settings.eventName) { _, _ in cam.syncUploaders() }
-            HStack {
-                Text("\(cam.sessionPhotos.count) photos · \(ByteCountFormatter.string(fromByteCount: folderSize, countStyle: .file)) on the iPad").foregroundStyle(.secondary)
-                Spacer()
-                Button { newName = ""; askNew = true } label: { Label("New", systemImage: "plus") }
+            Text("\(cam.sessionPhotos.count) photos · \(ByteCountFormatter.string(fromByteCount: folderSize, countStyle: .file)) on the iPad").foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Button("New") { newName = ""; askNew = true }
                     .buttonStyle(.bordered)
-                Button(role: .destructive) { askDeletePhotos = true } label: { Label("Delete photos", systemImage: "photo.badge.exclamationmark") }
+                Button("Delete photos", role: .destructive) { askDeletePhotos = true }
                     .buttonStyle(.bordered).disabled(cam.sessionPhotos.isEmpty && folderSize == 0)
-                Button(role: .destructive) { askDelete = true } label: { Label("Remove", systemImage: "trash") }
+                Button("Remove", role: .destructive) { askDelete = true }
                     .buttonStyle(.bordered).disabled(settings.events.count <= 1)
+                Spacer()
             }
-            .lineLimit(1)
+            .lineLimit(1).fixedSize(horizontal: false, vertical: true)
         }
         .font(.callout)
         .onAppear { folderSize = CameraManager.eventFolderSize() }

@@ -7,8 +7,6 @@ exactly as the photographer set it up, as JPEG or RAW, and lands where it belong
 Reduced to the essentials, with a few smart details (idle collage that wakes on motion, the camera’s own shutter is
 picked up, QR code to the album, the display regulates itself). Optimized for performance, open source.
 
-Languages: English (primary), German (maintained alongside). Deutsche Fassung: [README.de.md](README.de.md).
-
 Status: **prototype, core works.** As of 2026-09-06: Sony ILCE-7M4 over USB-C on an iPad Air (M4), PTP pass-through
 confirmed, Sony handshake, live view, capture, RAW, uploads, remote shutter via camera events, all verified on device.
 
@@ -36,9 +34,6 @@ open OpenBooth.xcodeproj
 Signing via `Local.xcconfig` (not in the repo): Apple development team, optionally your own bundle ID. A free
 Personal Team is enough; the app then runs for 7 days and must be reinstalled. Straight to the iPad without the Xcode
 GUI: `xcrun devicectl list devices`, write the ID to `.device`, then `tools/install.sh`. Fetch the log: `tools/pull-log.sh`.
-
-Localization: strings are English in code, German lives in `Sources/OpenBooth/Localizable.xcstrings` and
-`InfoPlist.xcstrings`. Every new UI string gets its German translation in the same change.
 
 ## Findings from the first device test
 
