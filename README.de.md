@@ -82,7 +82,7 @@ Personal Team reicht, die App läuft dann 7 Tage und muss neu installiert werden
   Login mit der Admin-PIN, nach fünf Fehlversuchen eine Minute Sperre.
 - **Diagnose**: „Diagnose teilen“ (Teilen-Menü) oder „An OpenBooth senden“ (HTTPS-Endpunkt); enthält Umgebung, Fähigkeiten
   mit Rohdaten und Protokoll, keine Zugangsdaten, Seriennummer gekürzt. Optional automatisch bei Fehlern.
-- Bilderserie 1/3/5 mit Pause, Rückschau mit Restzeitbalken und Löschen, editierbare Sprüche, Statusbanner mit
+- Bilderserie 1/3/5 mit Pause (abbrechbar, gemachte Bilder bleiben), Rückschau mit Restzeitbalken (Halten pausiert) und Löschen, editierbare Sprüche, Statusbanner mit
   automatischer Wiederherstellung, Log in `Documents/openbooth.log` (holen mit `tools/pull-log.sh`).
 
 ## Fahrplan
