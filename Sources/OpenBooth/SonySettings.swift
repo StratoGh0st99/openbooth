@@ -2,8 +2,8 @@
 //  SonySettings.swift
 //  OpenBooth
 //
-//  Kameraeinstellungen: Werte lesen, lesbar formatieren und setzen.
-//  Kodierungen nach libgphoto2 camlibs/ptp2/config.c (Sony).
+//  Camera settings: read values, format them readably and set them.
+//  Encodings after libgphoto2 camlibs/ptp2/config.c (Sony).
 //
 
 import Foundation
@@ -46,7 +46,7 @@ enum SonyFormat {
     static let pcSaveFormats: [Int64: String] = [0: String(localized: "Off"), 1: "RAW & JPEG", 2: String(localized: "JPEG only"), 3: String(localized: "RAW only"), 4: "RAW & HEIF", 5: String(localized: "HEIF only")]
     static let pcSaveSizes: [Int64: String] = [1: "Original", 2: "2 MP"]
 
-    /// Die Einstellungen, die die Fotobox braucht, in Anzeigereihenfolge.
+    /// The settings the booth needs, in display order.
     static let wanted: [(code: UInt16, title: String)] = [
         (0x500E, String(localized: "Program")),
         (SonyProp.iso, "ISO"),
@@ -98,7 +98,7 @@ enum SonyFormat {
 }
 
 extension SonyCamera {
-    /// Die fuer die Fotobox relevanten Einstellungen aus dem letzten Property-Abruf.
+    /// The booth-relevant settings from the last property fetch.
     func settings() -> [CameraSetting] {
         SonyFormat.wanted.compactMap { w in
             guard let d = props[w.code] else { return nil }
@@ -106,8 +106,8 @@ extension SonyCamera {
         }
     }
 
-    /// Setzt einen Wert. Erst direkt (ControlDeviceA, Protokoll 3), dann als 32-Bit-Wert, dann schrittweise
-    /// ueber ControlDeviceB entlang der Enum-Reihenfolge (noetig bei Protokoll 2, z. B. ILCE-6400).
+    /// Sets a value. First directly (ControlDeviceA, protocol 3), then as a 32-bit value, then stepwise
+    /// via ControlDeviceB along the enum order (needed with protocol 2, e.g. ILCE-6400).
     func setSetting(_ code: UInt16, to target: Int64, log: ((String) -> Void)? = nil) async throws {
         guard let desc = props[code] else { throw SonyError.badData("Property 0x\(String(code, radix: 16)) unknown") }
         if desc.currentValue == target { return }
@@ -127,14 +127,14 @@ extension SonyCamera {
             try await setValue(code, value: target, type: desc.dataType)
             if try await verify() { return }
             if PTP.size(of: desc.dataType) == 2 {
-                // libgphoto2 schickt z. B. FNumber im Protokoll 3 als UINT32
+                // libgphoto2 sends e.g. FNumber as UINT32 in protocol 3
                 log?("retry as 32-bit value")
                 try await setValue(code, value: target, type: PTP.DTC.uint32)
                 if try await verify() { return }
             }
         }
 
-        // Schrittweise: Position in der Enum vergleichen, mit +1/-1 (u8 0x01 / 0xFF) laufen, nach jedem Schritt lesen
+        // Stepwise: compare the position in the enum, step with +1/-1 (u8 0x01 / 0xFF), read after every step
         guard !desc.enumValues.isEmpty else { throw SonyError.badData("no value list for stepping") }
         log?("setting 0x\(String(code, radix: 16)) stepwise")
         var steps = 60
@@ -152,7 +152,7 @@ extension SonyCamera {
             else { stepVal = first ? Int64(0x100 - (posCur - posNew)) : 0xFF }
             first = false
             try await control(code, value: stepVal, type: PTP.DTC.uint8)
-            // Kamera braucht bis ~0,7 s pro Schritt
+            // The camera needs up to ~0.7 s per step
             let start = Date()
             while Date().timeIntervalSince(start) < 0.8 {
                 try await Task.sleep(nanoseconds: 100_000_000)

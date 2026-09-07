@@ -2,7 +2,7 @@
 //  CameraManager.swift
 //  OpenBooth
 //
-//  Findet USB-Kameras ueber ImageCaptureCore, oeffnet die Session und haelt den Sony-Treiber.
+//  Finds USB cameras via ImageCaptureCore, opens the session and holds the Sony driver.
 //
 
 import Foundation
@@ -30,7 +30,7 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var settingsBusy = false
     var autoConnect: Bool { settingsRef?.autoConnect ?? true }
     weak var settingsRef: AppSettings? { didSet { syncUploaders() } }
-    /// Nach Aenderung von Eventname oder Zielen: Fotoordner wechseln und alle Upload-Ziele neu konfigurieren.
+    /// After changing the event name or targets: switch photo folder and reconfigure all upload targets.
     func syncUploaders() {
         if let s = settingsRef { switchEvent(to: Self.safeName(s.eventName)) }
         syncImmich(); syncWebDAV(); syncWeb(); syncFallback()
@@ -42,7 +42,7 @@ final class CameraManager: NSObject, ObservableObject {
     @Published private(set) var usingIPadCamera = false
     private var fallbackTimer: Task<Void, Never>?
 
-    /// Nach 4 s ohne USB-Kamera die iPad-Kamera starten (wenn eingeschaltet); bei USB-Kamera sofort stoppen.
+    /// Start the iPad camera after 4 s without a USB camera (if enabled); stop immediately when a USB camera appears.
     private func scheduleFallback() {
         fallbackTimer?.cancel()
         guard settingsRef?.ipadFallback ?? true, sony == nil, device == nil, devices.isEmpty else { return }
@@ -54,7 +54,7 @@ final class CameraManager: NSObject, ObservableObject {
     }
     private func startIPadCamera() async {
         #if targetEnvironment(simulator)
-        return   // der Simulator hat keine Kamera
+        return   // the simulator has no camera
         #endif
         guard ipadCam == nil, settingsRef?.ipadFallback ?? true else { return }
         guard await IPadCamera.authorized() else { appendLog("iPad camera: no access (Settings › OpenBooth › Camera)"); return }
@@ -84,7 +84,7 @@ final class CameraManager: NSObject, ObservableObject {
         if sony == nil { state = .browsing; status = String(localized: "Looking for a camera…") }
         appendLog("iPad camera stopped (\(reason))")
     }
-    /// Einstellungen geaendert: Ersatzkamera an/aus oder Front/Rueck wechseln
+    /// Settings changed: fallback camera on/off or switch front/rear
     func syncFallback() {
         guard let s = settingsRef else { return }
         if !s.ipadFallback { stopIPadCamera(reason: "disabled"); return }
@@ -144,7 +144,7 @@ final class CameraManager: NSObject, ObservableObject {
                          motionThreshold: s?.motionThreshold ?? 6, motionLevel: motionLevel)
     }
 
-    /// Fotos liegen je Veranstaltung unter Documents/Fotos/<Name>/ (RAW in raw/ darunter).
+    /// Photos live per event under Documents/Fotos/<name>/ (RAW in raw/ below).
     private static var currentEvent = String(localized: "Photo Booth")
     private func switchEvent(to name: String) {
         Self.migrateFlatPhotos(into: name)
@@ -155,7 +155,7 @@ final class CameraManager: NSObject, ObservableObject {
         lastPhoto = nil
         appendLog("Event “\(name)”: \(sessionPhotos.count) photos")
     }
-    /// Einmalig: Fotos aus der alten flachen Struktur Documents/Fotos/*.jpg in den Ordner der Veranstaltung schieben.
+    /// One-time: move photos from the old flat structure Documents/Fotos/*.jpg into the event folder.
     private static func migrateFlatPhotos(into name: String) {
         let fm = FileManager.default
         let root = photosRoot
@@ -178,17 +178,17 @@ final class CameraManager: NSObject, ObservableObject {
         webdav.log = { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
         webdav.configure(enabled: s.webdavEnabled, url: s.webdavURL, user: s.webdavUser, folder: Self.safeName(s.eventName))
     }
-    /// Eventname als Album- und Ordnername: ohne Pfadzeichen, nie leer.
+    /// Event name as album and folder name: no path characters, never empty.
     static func safeName(_ s: String) -> String {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: "\\", with: "-")
         return t.isEmpty ? String(localized: "Photo Booth") : t
     }
-    /// RAW-Datei an alle aktiven Upload-Ziele: was von der Kamera kommt, wird weggespeichert.
+    /// RAW file to all active upload targets: whatever the camera delivers gets stored.
     private func upload(_ url: URL, isRAW: Bool) {
         if settingsRef?.immichEnabled == true { immich.enqueue(url) }
         if settingsRef?.webdavEnabled == true { webdav.enqueue(url) }
     }
-    /// Liefert die Kamera RAW (Bildqualitaet RAW oder RAW+JPEG)?
+    /// Does the camera deliver RAW (image quality RAW or RAW+JPEG)?
     var cameraDeliversRAW: Bool {
         guard let v = sony?.currentValue(SonyProp.imageQuality) else { return false }
         return v == 1 || v == 2
@@ -204,23 +204,23 @@ final class CameraManager: NSObject, ObservableObject {
             }
         }
     }
-    @Published var idle = false {   // Leerlauf: Collage anzeigen
+    @Published var idle = false {   // idle: show the collage
         didSet {
             guard idle != oldValue else { return }
-            lastNoiseLog = Date()   // Ruhepegel erst 30 s nach Leerlaufbeginn protokollieren
+            lastNoiseLog = Date()   // log the idle level only 30 s after idle start
             updateBrightness()
             if !idle, settingsRef?.soundsEnabled ?? true, settingsRef?.soundWelcome ?? true { Sounds.shared.play("welcome") }
         }
     }
-    @Published var motionLevel: Double = 0    // letzte Bildaenderung im Leerlauf (Debug)
-    @Published var liveHistogram: Histogram?  // alle 3 Liveview-Bilder, wenn im Admin eingeschaltet
+    @Published var motionLevel: Double = 0    // last image change while idle (debug)
+    @Published var liveHistogram: Histogram?  // every 3rd live view frame, when enabled in the admin
     @Published var resultHistogram: Histogram?
     private var wantHistogram: Bool { settingsRef?.showHistogram ?? false }
-    /// Bewegungserkennung aktiv? Wird vom Liveview-Task gelesen (laeuft dort im Hintergrund, nicht auf dem Main-Thread).
+    /// Motion detection armed? Read by the live view task (runs there in the background, not on the main thread).
     private var motionArmed: Bool { idle && (settingsRef?.motionWake ?? true) }
     private var motionThreshold: Double { Double(settingsRef?.motionThreshold ?? 8) }
 
-    /// Rueckmeldung fuer Gaeste, klar und ohne Technik.
+    /// Feedback for guests, clear and non-technical.
     struct Banner: Equatable {
         enum Kind { case info, working, warning, error }
         let kind: Kind
@@ -229,17 +229,17 @@ final class CameraManager: NSObject, ObservableObject {
     }
     @Published var banner: Banner? = Banner(kind: .info, text: String(localized: "Connect a camera"))
     @Published var captureError: String?      // Overlay mit "Try again"
-    @Published var lastError: String?         // fuer das Admin-Panel
+    @Published var lastError: String?         // for the admin panel
     private var recoverAttempts = 0
     private var recoverTask: Task<Void, Never>?
     private var connectedSince: Date?
     private var lastInteraction = Date()
     private var lastFrame = Date()
     private var watchdog: Timer?
-    @Published var countdown: Int?            // 3, 2, 1 vor der Aufnahme
-    @Published var capturePhrase: String?     // "Cheese!" waehrend der Aufnahme
+    @Published var countdown: Int?            // 3, 2, 1 before the capture
+    @Published var capturePhrase: String?     // "Cheese!" during the capture
     private var lastPhrase = ""
-    /// Zufaelliger Spruch aus den Einstellungen, nie zweimal derselbe hintereinander.
+    /// Random phrase from the settings, never the same one twice in a row.
     private func nextPhrase() -> String {
         let list = (settingsRef?.phrases ?? AppSettings.defaultPhrases).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         guard !list.isEmpty else { return "Cheese!" }
@@ -248,14 +248,14 @@ final class CameraManager: NSObject, ObservableObject {
         lastPhrase = p
         return p
     }
-    @Published var resultPhoto: UIImage?      // grosse Vorschau nach der Aufnahme (erstes Bild der Serie)
-    @Published var resultPhotos: [UIImage] = [] // alle Bilder der Serie
-    @Published var resultURLs: [URL] = []       // zugehoerige Dateien im App-Ordner
-    @Published var resultShownAt: Date?       // fuer den Restzeit-Balken
-    @Published var shotNumber = 0             // laufende Nummer in der Serie (1..n), 0 = keine Serie
+    @Published var resultPhoto: UIImage?      // large review after the capture (first image of the series)
+    @Published var resultPhotos: [UIImage] = [] // all images of the series
+    @Published var resultURLs: [URL] = []       // matching files in the app folder
+    @Published var resultShownAt: Date?       // for the remaining-time bar
+    @Published var shotNumber = 0             // running number in the series (1..n), 0 = no series
     @Published var shotTotal = 1
     @Published var capturing = false
-    @Published var sessionPhotos: [URL] = []  // Fotos des Abends, neueste zuerst
+    @Published var sessionPhotos: [URL] = []  // photos of the evening, newest first
     var resultSeconds: Double { Double(settingsRef?.resultSeconds ?? 10) }
     private var resultTask: Task<Void, Never>?
 
@@ -268,7 +268,7 @@ final class CameraManager: NSObject, ObservableObject {
         super.init()
         browser.delegate = self
         sessionPhotos = Self.loadSessionPhotos()
-        UIApplication.shared.isIdleTimerDisabled = true   // iPad bleibt an
+        UIApplication.shared.isIdleTimerDisabled = true   // iPad stays awake
         watchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
@@ -291,8 +291,8 @@ final class CameraManager: NSObject, ObservableObject {
         let shouldIdle = idleFor > limit && !capturing && resultPhoto == nil && countdown == nil && !sessionPhotos.isEmpty
         if shouldIdle != idle { idle = shouldIdle }
 
-        // Liveview-Waechter: seit 8 s kein Bild -> neu starten. Kommen aber Kamera-Events (Kamera arbeitet, z. B. eigener
-        // Ausloeser, Menue offen), erst nach 20 s: dann ist der Liveview wirklich haengen geblieben.
+        // Live view watchdog: no frame for 8 s -> restart. But if camera events arrive (camera is busy, e.g. its own
+        // shutter, menu open), only after 20 s: then the live view is really stuck.
         let stalled = Date().timeIntervalSince(lastFrame)
         let eventsRecently = Date().timeIntervalSince(lastEventAt) < 8
         if state == .connected, liveRunning, !capturing, ipadCam == nil, stalled > (eventsRecently ? 20 : 8) {
@@ -300,11 +300,11 @@ final class CameraManager: NSObject, ObservableObject {
             stopLiveView()
             startLiveView()
         }
-        // Verbunden, aber Liveview aus (z. B. nach Fehlern) -> wieder an
+        // Connected but live view off (e.g. after errors) -> back on
         if state == .connected, !liveRunning, !capturing, !settingsBusy, autoConnect, sony != nil, ipadCam == nil {
             startLiveView()
         }
-        // Fremdausloesung: mit Events nur noch alle 30 s als Sicherheitsnetz, sonst alle 2 s
+        // External shutter: with events only every 30 s as a safety net, otherwise every 2 s
         if !eventsWorking || tickCount % 15 == 0 { pollExternalCapture() }
         if tickCount % 30 == 0, !eventCounts.isEmpty {
             appendLog("Events last 60 s: " + eventCounts.sorted { $0.key < $1.key }.map { String(format: "0x%04X×%d", $0.key, $0.value) }.joined(separator: " "))
@@ -312,11 +312,11 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    /// Ergebnis der Bewegungserkennung aus dem Liveview-Task.
+    /// Motion detection result from the live view task.
     private var lastNoiseLog = Date.distantPast
     private func motionResult(level: Double, hit: Bool, noise: Double = 0, global: Double = 0) {
         motionLevel = level
-        // alle 30 s im Leerlauf (erst nach Einschwingen, nicht direkt beim Leerlaufbeginn): Ruhepegel und Rauschen
+        // every 30 s while idle (after settling, not right at idle start): idle level and noise
         if noise > 0, Date().timeIntervalSince(lastNoiseLog) > 30 {
             lastNoiseLog = Date()
             appendLog(String(format: "Motion idle level: cell %.1f, global %.1f, noise %.1f, threshold %d", level, global, noise, settingsRef?.motionThreshold ?? 8))
@@ -327,7 +327,7 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    /// Faehigkeitsbericht der Kamera nach Documents/openbooth-capabilities.log (holen mit tools/pull-caps.sh).
+    /// Camera capability report to Documents/openbooth-capabilities.log (fetch with tools/pull-caps.sh).
     static var capabilitiesURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("openbooth-capabilities.log") }
     private func writeCapabilities(_ cam: SonyCamera) {
         let report = cam.capabilitiesReport()
@@ -339,14 +339,14 @@ final class CameraManager: NSObject, ObservableObject {
 
     // MARK: Display-Helligkeit
 
-    /// QR-Seite sichtbar (setzt ContentView), erzwingt volle Helligkeit.
+    /// QR page visible (set by ContentView), forces full brightness.
     @Published var qrShown = false { didSet { updateBrightness() } }
-    private var forcingBrightness = false                        // wir halten gerade volle Helligkeit
-    private var userBrightness: CGFloat = UIScreen.main.brightness // Wert des Nutzers, nur gemessen, wenn wir nicht eingreifen
+    private var forcingBrightness = false                        // we are currently forcing full brightness
+    private var userBrightness: CGFloat = UIScreen.main.brightness // the user's value, sampled only while we are not forcing
 
-    /// Volle Helligkeit bei QR-Seite oder Option "dauerhaft", nicht waehrend der Leerlauf-Collage.
-    /// Der Nutzerwert wird laufend im tick() gemessen, solange wir nicht eingreifen. So kann er nie versehentlich
-    /// mit 1.0 ueberschrieben werden (frueher: Wert beim Hochdrehen gemerkt, war er da schon 1.0, blieb es dabei).
+    /// Full brightness on the QR page or with the "permanent" option, not during the idle collage.
+    /// The user value is sampled continuously in tick() while we are not forcing. So it can never accidentally
+    /// be overwritten with 1.0 (before: value captured when raising; if it was already 1.0, it stayed there).
     func updateBrightness() {
         let wantFull = qrShown || ((settingsRef?.maxBrightness ?? false) && !idle)
         let screen = UIScreen.main
@@ -362,22 +362,22 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    /// Nutzerwert merken, aber nie einen Wert, den wir selbst gesetzt haben.
+    /// Remember the user value, but never one we set ourselves.
     private func sampleUserBrightness() {
         guard !forcingBrightness else { return }
         let b = UIScreen.main.brightness
         if b < 0.98 { userBrightness = b }
     }
 
-    /// Beim Verlassen der App die Helligkeit des Nutzers wiederherstellen.
+    /// Restore the user's brightness when leaving the app.
     func restoreBrightness() {
         if forcingBrightness { UIScreen.main.brightness = userBrightness; forcingBrightness = false }
     }
 
-    /// Diagnosedatei zum Teilen: Umgebung, aktueller Faehigkeitsbericht mit Rohdaten, komplettes Protokoll.
+    /// Diagnostics file for sharing: environment, current capability report with raw data, full log.
     // MARK: Speicherbelegung der Veranstaltung
 
-    /// Groesse des Event-Ordners in Bytes (Galerie, Originale, RAW, Vorschauen)
+    /// Size of the event folder in bytes (gallery, originals, RAW, thumbnails)
     static func eventFolderSize() -> Int64 {
         let fm = FileManager.default
         guard let e = fm.enumerator(at: photosDir, includingPropertiesForKeys: [.fileSizeKey]) else { return 0 }
@@ -385,7 +385,7 @@ final class CameraManager: NSObject, ObservableObject {
         for case let u as URL in e { total += Int64((try? u.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0) }
         return total
     }
-    /// Alle Fotos der aktuellen Veranstaltung vom iPad loeschen (Mediathek und Server bleiben unberuehrt)
+    /// Delete all photos of the current event from the iPad (photo library and servers untouched)
     func deleteEventPhotos() {
         dismissResult()
         immich.clearQueue(); webdav.clearQueue()
@@ -418,7 +418,7 @@ final class CameraManager: NSObject, ObservableObject {
 
     // MARK: Akku
 
-    /// iPad-Akku in Prozent (-1 unbekannt) und ob es laedt
+    /// iPad battery in percent (-1 unknown) and whether it is charging
     func iPadBattery() -> (Int, Bool) {
         UIDevice.current.isBatteryMonitoringEnabled = true
         let l = UIDevice.current.batteryLevel
@@ -426,7 +426,7 @@ final class CameraManager: NSObject, ObservableObject {
         return (l < 0 ? -1 : Int((l * 100).rounded()), charging)
     }
     func batteryText(_ b: (Int, Bool)) -> String { b.0 < 0 ? String(localized: "unknown") : "\(b.0) %\(b.1 ? String(localized: " (charging)") : "")" }
-    /// Kamera-Akku in Prozent aus Sony-Property 0xD218 (aktualisiert bei jedem Property-Abruf)
+    /// Camera battery in percent from Sony property 0xD218 (updated on every property fetch)
     func cameraBattery() -> Int? {
         guard let cam = sony else { return nil }
         if let v = cam.currentValue(0xD218) { return Int(v) }
@@ -434,7 +434,7 @@ final class CameraManager: NSObject, ObservableObject {
         return nil
     }
 
-    /// Diagnose an den OpenBooth-Endpunkt schicken. Liefert die Kennung des Servers.
+    /// Send diagnostics to the OpenBooth endpoint. Returns the server's ID.
     @Published private(set) var reportStatus = ""
     private var lastAutoReport = Date.distantPast
     func sendDiagnostics(reason: String) async -> String? {
@@ -452,7 +452,7 @@ final class CameraManager: NSObject, ObservableObject {
             return nil
         }
     }
-    /// Bei Fehlern automatisch, wenn eingeschaltet, hoechstens alle 10 Minuten.
+    /// Automatically on errors, if enabled, at most every 10 minutes.
     private func autoReport(_ reason: String) {
         guard settingsRef?.autoReports == true, Date().timeIntervalSince(lastAutoReport) > 600 else { return }
         lastAutoReport = Date()
@@ -487,13 +487,13 @@ final class CameraManager: NSObject, ObservableObject {
         Self.logFile.append(line)
     }
 
-    /// Logdatei im App-Ordner (Documents/openbooth.log), abholbar per devicectl. Wird bei 2 MB rotiert.
+    /// Log file in the app folder (Documents/openbooth.log), fetchable via devicectl. Rotated at 2 MB.
     static let logFile = LogFile()
     final class LogFile {
         private let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("openbooth.log")
         private let q = DispatchQueue(label: "openbooth.log")
         init() { append("===== App started \(Date()) =====") }
-        /// Abgeschlossene Kopie fuer den Download (die wachsende Datei laesst sich per devicectl nicht uebertragen).
+        /// Finished copy for download (the growing file cannot be transferred via devicectl).
         func snapshot() {
             q.async {
                 let dst = self.url.deletingLastPathComponent().appendingPathComponent("openbooth.export.log")
@@ -523,7 +523,7 @@ final class CameraManager: NSObject, ObservableObject {
     func start() {
         appendLog("Requesting authorization…")
         #if targetEnvironment(simulator)
-        // Der Simulator kennt weder USB-Kameras noch die Autorisierungsabfrage von ImageCaptureCore
+        // The simulator has neither USB cameras nor the ImageCaptureCore authorization prompt
         authorization = "Simulator"
         state = .browsing
         status = String(localized: "Simulator: no camera available")
@@ -610,7 +610,7 @@ final class CameraManager: NSObject, ObservableObject {
                 appendLog("Operations: \(ops)")
                 appendLog("Events: " + info.events.map { String(format: "%04X", $0) }.joined(separator: " "))
                 appendLog("Properties: " + info.properties.map { String(format: "%04X", $0) }.joined(separator: " "))
-                writeCapabilities(cam)   // schon nach dem Probe, damit auch fremde Kameras (Handshake scheitert) im Bericht landen
+                writeCapabilities(cam)   // already after the probe so unknown cameras (handshake fails) end up in the report too
                 state = .probed
                 status = String(localized: "PTP pass-through works")
                 return true
@@ -665,7 +665,7 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    /// Gesetzten Wert je Kameramodell merken, damit er beim naechsten Anstecken wieder gesetzt wird
+    /// Remember the set value per camera model so it is applied again on the next connect
     private func remember(code: UInt16, value: Int64, for cam: SonyCamera) {
         guard let s = settingsRef else { return }
         let model = cam.deviceInfo.model.isEmpty ? "Camera" : cam.deviceInfo.model
@@ -674,7 +674,7 @@ final class CameraManager: NSObject, ObservableObject {
         s.rememberedCamera[model] = m
     }
 
-    /// Nach dem Verbinden: gemerkte Werte setzen, die von der Kamera abweichen (nur schreibbare Properties).
+    /// After connecting: apply remembered values that differ from the camera (writable properties only).
     private func restoreRememberedSettings(_ cam: SonyCamera) async {
         guard let s = settingsRef, s.restoreCameraSettings else { return }
         let model = cam.deviceInfo.model.isEmpty ? "Camera" : cam.deviceInfo.model
@@ -726,7 +726,7 @@ final class CameraManager: NSObject, ObservableObject {
             while !Task.isCancelled {
                 do {
                     if let jpeg = try await cam.liveViewFrame(), let raw = UIImage(data: jpeg) {
-                        // JPEG hier im Hintergrund dekodieren, damit der Main-Thread nur noch anzeigt
+                        // Decode the JPEG here in the background so the main thread only displays
                         let img = raw.preparingForDisplay() ?? raw
                         let (armed, threshold, wantHist) = await MainActor.run { (self?.motionArmed ?? false, self?.motionThreshold ?? 8, self?.wantHistogram ?? false) }
                         var level = 0.0, hit = false, noise = 0.0, global = 0.0
@@ -765,7 +765,7 @@ final class CameraManager: NSObject, ObservableObject {
 
     // MARK: Wiederherstellung
 
-    /// Verbindung neu aufbauen: Session schliessen, kurz warten, neu oeffnen. Mit Zaehler und klarer Rueckmeldung.
+    /// Re-establish the connection: close session, wait briefly, reopen. With a counter and clear feedback.
     func scheduleRecover(reason: String) {
         guard recoverTask == nil, let dev = device else { return }
         recoverAttempts += 1
@@ -801,7 +801,7 @@ final class CameraManager: NSObject, ObservableObject {
 
     // MARK: Aufnahme
 
-    /// Fotobox-Ablauf: Countdown, ein oder mehrere Bilder mit Pause, grosse Vorschau, speichern.
+    /// Booth flow: countdown, one or more shots with pause, large review, save.
     func capture(withCountdown seconds: Int = 3) {
         guard sony != nil || ipadCam != nil, !capturing else { return }
         let cam = sony
@@ -821,15 +821,15 @@ final class CameraManager: NSObject, ObservableObject {
             for shot in 1...shots {
                 if captureCancelled { break }
                 shotNumber = shot
-                // Countdown: beim ersten Bild der eingestellte, danach die Pause
+                // Countdown: the configured one for the first shot, then the pause
                 let cd = shot == 1 ? seconds : interval
-                if wasLive, liveTask == nil, cd >= 2 { startLiveView() }   // Pause mit Liveview ueberbruecken
+                if wasLive, liveTask == nil, cd >= 2 { startLiveView() }   // bridge the pause with live view
                 let beep = (settingsRef?.soundsEnabled ?? true) && (settingsRef?.soundCountdown ?? true)
                 for n in stride(from: cd, through: 1, by: -1) {
                     if captureCancelled { break }
                     countdown = n
                     if beep { Sounds.shared.play("tick") }
-                    // in 100-ms-Schritten schlafen, damit ein Abbruch sofort greift
+                    // sleep in 100 ms steps so a cancel takes effect immediately
                     for _ in 0..<10 { if captureCancelled { break }; try? await Task.sleep(nanoseconds: 100_000_000) }
                 }
                 if captureCancelled { countdown = nil; break }
@@ -877,8 +877,8 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    /// Abbruch durch den Gast: wirkt sofort im Countdown und zwischen den Bildern einer Serie.
-    /// Ein gerade laufender Kameraabruf wird noch zu Ende gefuehrt, damit die Kamera sauber bleibt.
+    /// Cancel by the guest: takes effect immediately during the countdown and between shots of a series.
+    /// A fetch already in progress is completed so the camera stays in a clean state.
     @Published private(set) var captureCancelled = false
     func cancelCapture() {
         guard capturing else { return }
@@ -886,8 +886,8 @@ final class CameraManager: NSObject, ObservableObject {
         noteInteraction()
     }
 
-    /// Objekte einer Aufnahme sichern: App-Galerie (immer), Mediathek und Immich nach Einstellung.
-    /// Liefert Vorschaubild und Galerie-URL fuer die Rueckschau.
+    /// Store the objects of a capture: app gallery (always), photo library and uploads per settings.
+    /// Returns preview image and gallery URL for the review.
     private func store(_ objects: [CapturedObject]) async throws -> (UIImage, URL)? {
         var result: (UIImage, URL)?
         let jpegObj = objects.first { $0.isJPEG } ?? objects.first { !$0.isRAW }
@@ -900,7 +900,7 @@ final class CameraManager: NSObject, ObservableObject {
             upload(rawURL!, isRAW: true)
         }
         if let jpeg = jpegObj?.data {
-            // Galerie bekommt die Web-Version (2000 px), das Original liegt unter originals/ bis alle Ziele es haben
+            // Gallery gets the web version (2000 px), the original sits under originals/ until all targets have it
             let origURL = try Self.saveOriginal(jpeg, stamp: stamp)
             let web = await Task.detached(priority: .userInitiated) { Self.downscaleJPEG(jpeg, maxEdge: 2000) }.value ?? jpeg
             let url = try Self.saveToDocuments(web, stamp: stamp)
@@ -917,7 +917,7 @@ final class CameraManager: NSObject, ObservableObject {
             }
             if let img = UIImage(data: web) { result = (img, url); lastPhoto = img }
         } else if let raw = rawObj, let rawURL {
-            // Nur RAW: ARW als RAW in die Mediathek, Vorschau aus dem eingebetteten Bild
+            // RAW only: ARW as RAW into the photo library, preview from the embedded image
             if settingsRef?.saveToPhotos ?? true {
                 Self.saveRAWOnlyToPhotos(raw.data) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
             }
@@ -925,7 +925,7 @@ final class CameraManager: NSObject, ObservableObject {
             appendLog(preview == nil ? "RAW preview: no decodable preview in the ARW" : "RAW preview: \(Int(preview!.size.width))x\(Int(preview!.size.height))")
             if let img = preview {
                 result = (img, rawURL); lastPhoto = img
-                // JPEG-Ableitung fuer Galerie und Collage neben das ARW legen
+                // Put a JPEG derivative next to the ARW for gallery and collage
                 if let jpg = img.jpegData(compressionQuality: 0.9) {
                     let url = try Self.saveToDocuments(jpg, stamp: stamp)
                     ThumbnailStore.prepare(url)
@@ -940,19 +940,19 @@ final class CameraManager: NSObject, ObservableObject {
     // MARK: PTP-Events (zuhoeren statt fragen)
 
     private var eventCounts: [UInt16: Int] = [:]
-    private(set) var eventsWorking = false      // mindestens ein ObjectAdded empfangen: Fremdausloesung laeuft ueber Events
+    private(set) var eventsWorking = false      // at least one ObjectAdded received: external shutter runs via events
 
     private var lastEventAt = Date.distantPast
     private func handleEvent(code: UInt16, params: [UInt32]) {
         eventCounts[code, default: 0] += 1
         lastEventAt = Date()
         switch code {
-        case 0xC201:   // Sony ObjectAdded: neues Bild im RAM (Handle in Param 1)
+        case 0xC201:   // Sony ObjectAdded: new image in RAM (handle in param 1)
             appendLog(String(format: "Event ObjectAdded 0x%08X", params.first ?? 0))
             if !eventsWorking { eventsWorking = true; appendLog("Camera events arrive, external shutter now reacts instantly") }
             sony?.objectAdded.fire()
             if !capturing { pollExternalCapture() }
-        case 0xC203:   // PropertyChanged: kommt bei jeder Einstellungsaenderung und beim Fokussieren, nur zaehlen
+        case 0xC203:   // PropertyChanged: arrives on every setting change and while focusing, just count
             break
         default:
             if eventCounts[code] == 1 { appendLog(String(format: "PTP-Event 0x%04X %@", code, params.map { String(format: "0x%X", $0) }.joined(separator: " "))) }
@@ -962,8 +962,8 @@ final class CameraManager: NSObject, ObservableObject {
     // MARK: Fremdausloesung (Ausloeser an der Kamera, Fernausloeser)
 
     private var pickupTask: Task<Void, Never>?
-    /// Alle 2 s aus tick(): meldet die Kamera ein Bild im RAM, ohne dass die App ausgeloest hat, wird es genauso
-    /// wie ein App-Foto uebernommen und in der Rueckschau gezeigt.
+    /// From tick(): if the camera reports an image in RAM without the app having triggered, it is picked up
+    /// just like an app photo and shown in the review.
     private func pollExternalCapture() {
         guard settingsRef?.pickupExternal ?? true, let cam = sony, state == .connected,
               !capturing, !settingsBusy, pickupTask == nil, recoverTask == nil else { return }
@@ -1007,7 +1007,7 @@ final class CameraManager: NSObject, ObservableObject {
         startResultTimer(seconds: Double(resultSeconds))
     }
 
-    /// Rueckschau-Timer: laeuft bis zum Ende der Restzeit; Antippen und Halten pausiert ihn (wie eine Story).
+    /// Review timer: runs until the remaining time is up; press and hold pauses it (like a story).
     @Published var resultPausedAt: Date?
     private func startResultTimer(seconds: Double) {
         resultTask?.cancel()
@@ -1023,7 +1023,7 @@ final class CameraManager: NSObject, ObservableObject {
             resultPausedAt = Date()
             resultTask?.cancel()
         } else if let pausedAt = resultPausedAt {
-            // Startzeit um die Pause verschieben, dann mit der Restzeit weiterlaufen
+            // Shift the start time by the pause, then continue with the remaining time
             let pause = Date().timeIntervalSince(pausedAt)
             resultShownAt = shownAt.addingTimeInterval(pause)
             resultPausedAt = nil
@@ -1032,8 +1032,8 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    /// Bild fuer die Anzeige auf 2000 px Kantenlaenge verkleinern (Original 33 MP waere ~130 MB im Speicher).
-    /// Ueber ImageIO, damit auch Sony-RAW (ARW) dekodiert wird; nutzt eingebettete Vorschauen.
+    /// Downscale the image to a 2000 px edge for display (a 33 MP original would be ~130 MB in memory).
+    /// Via ImageIO so Sony RAW (ARW) decodes too; uses embedded previews.
     nonisolated static func previewImage(from data: Data) async -> UIImage? {
         await Task.detached(priority: .userInitiated) {
             guard let src = CGImageSourceCreateWithData(data as CFData, nil) else { return UIImage(data: data) }
@@ -1044,14 +1044,14 @@ final class CameraManager: NSObject, ObservableObject {
                 kCGImageSourceShouldCacheImmediately: true,
             ]
             if let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) { return UIImage(cgImage: cg) }
-            // RAW nicht dekodierbar: eingebettete JPEG-Vorschau aus dem ARW (TIFF) holen
+            // RAW not decodable: take the embedded JPEG preview from the ARW (TIFF)
             if let jpg = embeddedJPEG(in: data), let img = UIImage(data: jpg) { return img }
             return UIImage(data: data)
         }.value
     }
 
-    /// Sony ARW ist TIFF: IFD0 traegt JPEGInterchangeFormat (0x0201) und -Length (0x0202) fuer die grosse Vorschau.
-    /// Fallback: erstes JPEG (FF D8 FF) in der Datei.
+    /// Sony ARW is TIFF: IFD0 carries JPEGInterchangeFormat (0x0201) and -Length (0x0202) for the large preview.
+    /// Fallback: first JPEG (FF D8 FF) in the file.
     nonisolated static func embeddedJPEG(in d: Data) -> Data? {
         func u16(_ o: Int, _ le: Bool) -> Int { guard o + 2 <= d.count else { return 0 }; return le ? Int(d.readLE(UInt16.self, at: o)) : Int(d[d.startIndex + o]) << 8 | Int(d[d.startIndex + o + 1]) }
         func u32(_ o: Int, _ le: Bool) -> Int { guard o + 4 <= d.count else { return 0 }; return le ? Int(d.readLE(UInt32.self, at: o)) : (u16(o, false) << 16) | u16(o + 2, false) }
@@ -1074,7 +1074,7 @@ final class CameraManager: NSObject, ObservableObject {
                 ifd = u32(ifd + 2 + n * 12, le)
             }
         }
-        // Fallback: erstes JPEG in den Daten
+        // Fallback: first JPEG in the data
         let bytes = [UInt8](d)
         var i = 0
         while i + 2 < bytes.count {
@@ -1084,7 +1084,7 @@ final class CameraManager: NSObject, ObservableObject {
         return nil
     }
 
-    /// Technischen Fehler in einen Satz fuer Gaeste uebersetzen.
+    /// Translate a technical error into one sentence for guests.
     static func friendly(_ error: Error) -> String {
         let t = error.localizedDescription
         if t.contains("focus") || t.contains("no image") { return String(localized: "The camera didn’t take a picture. Maybe no focus? Please try again.") }
@@ -1101,7 +1101,7 @@ final class CameraManager: NSObject, ObservableObject {
         resultShownAt = nil
     }
 
-    /// Loescht ein Bild der Rueckschau aus der App-Galerie. Die Apple-Mediathek bleibt unveraendert.
+    /// Deletes a review image from the app gallery. The Apple photo library stays unchanged.
     func deleteResult(at index: Int) {
         guard resultPhotos.indices.contains(index) else { return }
         if resultURLs.indices.contains(index) {
@@ -1140,7 +1140,7 @@ final class CameraManager: NSObject, ObservableObject {
         try jpeg.write(to: url)
         return url
     }
-    /// JPEG auf eine lange Kante verkleinern (ImageIO-Subsampling, EXIF-Ausrichtung angewandt), Qualitaet 0.9
+    /// Downscale a JPEG to a long edge (ImageIO subsampling, EXIF orientation applied), quality 0.9
     nonisolated static func downscaleJPEG(_ data: Data, maxEdge: Int) -> Data? {
         guard let src = CGImageSourceCreateWithData(data as CFData, nil),
               let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, [
@@ -1150,8 +1150,8 @@ final class CameraManager: NSObject, ObservableObject {
         return UIImage(cgImage: cg).jpegData(compressionQuality: 0.9)
     }
 
-    /// Originale und RAWs loeschen, die kein Ziel mehr braucht: nicht in einer Warteschlange, aelter als 2 Minuten.
-    /// Kein Fallback: bekommt kein Ziel das Original, ist es danach weg (der Admin warnt davor).
+    /// Delete originals and RAWs no target needs anymore: not in a queue, older than 2 minutes.
+    /// No fallback: if no target gets the original, it is gone afterwards (the admin warns about this).
     private func cleanupOriginals() {
         let fm = FileManager.default
         let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].path + "/"
@@ -1193,8 +1193,8 @@ final class CameraManager: NSObject, ObservableObject {
         return urls.filter { $0.pathExtension.lowercased() == "jpg" }.sorted { $0.lastPathComponent > $1.lastPathComponent }
     }
 
-    /// In die Mediathek: JPEG und RAW als getrennte Eintraege. (Ein gemeinsamer Eintrag mit dem ARW als
-    /// alternatePhoto wird von Photos mit Fehler 3300 abgelehnt, am Geraet geprueft.)
+    /// Into the photo library: JPEG and RAW as separate assets. (A combined asset with the ARW as
+    /// alternatePhoto is rejected by Photos with error 3300, verified on device.)
     static func saveToPhotos(_ jpeg: Data, raw: Data?, log: ((String) -> Void)? = nil) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { st in
             guard st == .authorized || st == .limited else { log?("Photo library: no access (\(st.rawValue))"); return }
@@ -1243,7 +1243,7 @@ extension CameraManager: ICDeviceBrowserDelegate {
             status = String(localized: "Camera found")
             banner = Banner(kind: .working, text: String(localized: "Camera found, connecting…"))
             if autoConnect && self.device == nil {
-                // kurz warten, bis die Kamera nach dem Anstecken bereit ist
+                // wait briefly until the camera is ready after connecting
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
                 if self.device == nil, devices.contains(where: { $0 === cam }) { openSession(cam) }
             }
@@ -1286,7 +1286,7 @@ extension CameraManager: ICCameraDeviceDelegate {
     nonisolated func cameraDevice(_ camera: ICCameraDevice, didReceiveMetadata metadata: [AnyHashable: Any]?, for item: ICCameraItem, error: Error?) {}
     nonisolated func cameraDevice(_ camera: ICCameraDevice, didRenameItems items: [ICCameraItem]) {}
     nonisolated func cameraDeviceDidChangeCapability(_ camera: ICCameraDevice) {}
-    /// PTP-Event-Container: u32 Laenge, u16 Typ (4), u16 Code, u32 Transaktion, dann u32-Parameter.
+    /// PTP event container: u32 length, u16 type (4), u16 code, u32 transaction, then u32 parameters.
     nonisolated func cameraDevice(_ camera: ICCameraDevice, didReceivePTPEvent eventData: Data) {
         guard eventData.count >= 12 else { return }
         let code = eventData.readLE(UInt16.self, at: 6)

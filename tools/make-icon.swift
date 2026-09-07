@@ -1,4 +1,4 @@
-// Zeichnet das OpenBooth-Icon: offener Blendenring mit rotem Ausloeser. Aufruf: swift tools/make-icon.swift <ausgabe.png> [groesse]
+// Draws the OpenBooth icon: open aperture ring with a red shutter dot. Usage: swift tools/make-icon.swift <output.png> [size]
 import Foundation
 import CoreGraphics
 import ImageIO
@@ -10,7 +10,7 @@ let S = CGFloat(size)
 let cs = CGColorSpaceCreateDeviceRGB()
 let ctx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0, space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
 
-// Hintergrund: sehr dunkles Grau mit leichtem Verlauf nach unten
+// Background: very dark gray with a slight gradient downwards
 let bg = CGGradient(colorsSpace: cs, colors: [CGColor(red: 0.13, green: 0.13, blue: 0.14, alpha: 1), CGColor(red: 0.04, green: 0.04, blue: 0.05, alpha: 1)] as CFArray, locations: [0, 1])!
 ctx.drawLinearGradient(bg, start: CGPoint(x: 0, y: S), end: CGPoint(x: 0, y: 0), options: [])
 
@@ -27,13 +27,13 @@ ctx.setLineCap(.round)
 ctx.addArc(center: c, radius: r, startAngle: gapCenter + gapHalf, endAngle: gapCenter - gapHalf + 2 * .pi, clockwise: false)
 ctx.strokePath()
 
-// Roter Ausloeser in der Luecke, leicht nach aussen versetzt
+// Red shutter dot in the gap, slightly offset outwards
 let dotR = S * 0.072
 let dotC = CGPoint(x: c.x + cos(gapCenter) * (r + w * 0.05), y: c.y + sin(gapCenter) * (r + w * 0.05))
 ctx.setFillColor(CGColor(red: 1.0, green: 0.23, blue: 0.19, alpha: 1))
 ctx.fillEllipse(in: CGRect(x: dotC.x - dotR, y: dotC.y - dotR, width: dotR * 2, height: dotR * 2))
 
-// Innere Linse: kleiner dunkler Kreis mit feinem Glanz, gibt Tiefe
+// Inner lens: small dark circle with a fine highlight, adds depth
 let lensR = r - w * 0.9
 ctx.setFillColor(CGColor(red: 0.09, green: 0.09, blue: 0.10, alpha: 1))
 ctx.fillEllipse(in: CGRect(x: c.x - lensR, y: c.y - lensR, width: lensR * 2, height: lensR * 2))

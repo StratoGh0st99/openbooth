@@ -13,7 +13,7 @@ settings:
     TARGETED_DEVICE_FAMILY: "2"
     SUPPORTS_MACCATALYST: NO
     ENABLE_USER_SCRIPT_SANDBOXING: YES
-# Signing-Team liegt lokal in Local.xcconfig (nicht im Repo), Vorlage: Local.xcconfig.example
+# Signing team lives locally in Local.xcconfig (not in the repo), template: Local.xcconfig.example
 configFiles:
   Debug: Local.xcconfig
   Release: Local.xcconfig
@@ -36,10 +36,10 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         UIStatusBarHidden: true
         UIApplicationSupportsIndirectInputEvents: true
-        # Documents-Ordner in der Dateien-App zeigen (Fotos, Logs, Warteschlangen)
+        # Show the Documents folder in the Files app (photos, logs, queues)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
-        # Pflicht fuer PTP-Passthrough ueber ImageCaptureCore auf iPadOS
+        # Required for PTP pass-through via ImageCaptureCore on iPadOS
         NSCameraUsageDescription: "OpenBooth controls the camera connected via USB (live view and shutter) and uses the iPad camera as a fallback when none is connected."
         NSPhotoLibraryAddUsageDescription: "OpenBooth saves the captured photos to your photo library."
         NSPhotoLibraryUsageDescription: "OpenBooth shows the captured photos in the gallery."

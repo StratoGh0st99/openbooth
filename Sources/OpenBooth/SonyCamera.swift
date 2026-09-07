@@ -2,42 +2,42 @@
 //  SonyCamera.swift
 //  OpenBooth
 //
-//  Sony-Fernsteuerung ueber PTP (PC-Remote-Modus). Ablauf nach libgphoto2 camlibs/ptp2 (LGPL),
-//  hier in Swift neu geschrieben. Getestet werden soll zuerst eine ILCE-7M4, spaeter ILCE-6400.
+//  Sony remote control via PTP (PC Remote mode). Flow after libgphoto2 camlibs/ptp2 (LGPL),
+//  rewritten here in Swift. Tested first with an ILCE-7M4, later ILCE-6400.
 //
 
 import Foundation
 import ImageCaptureCore
 
 enum SonyOp {
-    static let sdioConnect: UInt16 = 0x9201            // Phasen 1, 2, 3
-    static let getExtDeviceInfo: UInt16 = 0x9202       // Param1 = Protokollversion, Param2 = 1
+    static let sdioConnect: UInt16 = 0x9201            // phases 1, 2, 3
+    static let getExtDeviceInfo: UInt16 = 0x9202       // param1 = protocol version, param2 = 1
     static let getDevicePropDesc: UInt16 = 0x9203
     static let getDevicePropValue: UInt16 = 0x9204
-    static let setExtDevicePropValue: UInt16 = 0x9205  // "ControlDeviceA": Wert setzen
+    static let setExtDevicePropValue: UInt16 = 0x9205  // "ControlDeviceA": set a value
     static let getControlDeviceDesc: UInt16 = 0x9206
-    static let controlDevice: UInt16 = 0x9207          // "ControlDeviceB": Tasten (Ausloeser) / Schritte
+    static let controlDevice: UInt16 = 0x9207          // "ControlDeviceB": buttons (shutter) / steps
     static let getAllExtDevicePropInfo: UInt16 = 0x9209
 }
 
 enum SonyProp {
-    static let imageQuality: UInt16 = 0xD253     // 1 RAW, 2 RAW+JPEG, 3 JPEG (Protokoll 3)
-    static let pcSaveImageFormat: UInt16 = 0xD269 // 0 Aus, 1 RAW & JPEG, 2 nur JPEG, 3 nur RAW, 4 RAW & HEIF, 5 nur HEIF
+    static let imageQuality: UInt16 = 0xD253     // 1 RAW, 2 RAW+JPEG, 3 JPEG (protocol 3)
+    static let pcSaveImageFormat: UInt16 = 0xD269 // 0 off, 1 RAW & JPEG, 2 JPEG only, 3 RAW only, 4 RAW & HEIF, 5 HEIF only
     static let pcSaveImageSize: UInt16 = 0xD268  // 1 Original, 2 2M
     static let shutterSpeed: UInt16 = 0xD20D
-    static let focusFound: UInt16 = 0xD213       // 1 -> 2 (oder 3) wenn Fokus sitzt
-    static let objectInMemory: UInt16 = 0xD215   // >= 0x8000: Bild liegt unter 0xFFFFC001 bereit
+    static let focusFound: UInt16 = 0xD213       // 1 -> 2 (or 3) when focus is locked
+    static let objectInMemory: UInt16 = 0xD215   // >= 0x8000: image is ready under 0xFFFFC001
     static let iso: UInt16 = 0xD21E
     static let liveViewStatus: UInt16 = 0xD221
     static let liveViewSettingEffect: UInt16 = 0xD231
-    static let priorityMode: UInt16 = 0xD25A     // 1 = Application (PC steuert)
+    static let priorityMode: UInt16 = 0xD25A     // 1 = application (host controls)
     static let shutterHalfRelease: UInt16 = 0xD2C1
     static let shutterRelease: UInt16 = 0xD2C2
-    static let fNumber: UInt16 = 0x5007          // Standard-PTP FNumber
-    static let focusMode: UInt16 = 0x500A        // Standard-PTP FocusMode, 1 = manuell
+    static let fNumber: UInt16 = 0x5007          // standard PTP FNumber
+    static let focusMode: UInt16 = 0x500A        // standard PTP FocusMode, 1 = manual
 }
 
-/// Ein aus dem Kamera-RAM abgeholtes Objekt (JPEG oder RAW).
+/// An object fetched from camera RAM (JPEG or RAW).
 struct CapturedObject {
     let data: Data
     let format: UInt16       // 0x3801 JPEG, 0xB101 Sony RAW (ARW)
@@ -81,7 +81,7 @@ enum SonyError: LocalizedError {
     }
 }
 
-/// Fuehrt PTP-Transaktionen ueber ein ICCameraDevice aus. Serialisiert alle Aufrufe.
+/// Runs PTP transactions through an ICCameraDevice. Serializes all calls.
 actor PTPTransport {
     private let device: ICCameraDevice
     private var transactionID: UInt32 = 1
@@ -100,7 +100,7 @@ actor PTPTransport {
         logHandler?(s)
     }
 
-    /// Log aus dem Completion-Handler heraus (nicht im Actor-Kontext), nur Weitergabe an den Handler.
+    /// Log from the completion handler (not in the actor context), just forwarded to the handler.
     nonisolated private func emitSync(_ s: String) {
         Task { await self.emit(s) }
     }
@@ -111,7 +111,7 @@ actor PTPTransport {
         transactionID &+= 1
         let cmd = PTP.command(op, params: params, transactionID: tid)
         return try await withCheckedThrowingContinuation { cont in
-            // Reihenfolge der Completion-Parameter (am Geraet verifiziert): 1. Data-In-Payload, 2. Response-Container
+            // Order of the completion parameters (verified on device): 1. data-in payload, 2. response container
             device.requestSendPTPCommand(cmd, outData: dataOut) { inData, responseData, error in
                 if let error = error {
                     cont.resume(throwing: error)
@@ -123,7 +123,7 @@ actor PTPTransport {
         }
     }
 
-    /// Transaktion, die bei Nicht-OK wirft.
+    /// Transaction that throws on non-OK.
     @discardableResult
     func run(_ op: UInt16, params: [UInt32] = [], dataOut: Data? = nil, allow: Set<UInt16> = []) async throws -> Data {
         let (resp, data) = try await transaction(op, params: params, dataOut: dataOut)
@@ -137,7 +137,7 @@ actor PTPTransport {
 
     func runWithResponse(_ op: UInt16, params: [UInt32] = [], dataOut: Data? = nil, quiet: Bool = false) async throws -> (PTP.Response, Data) {
         let (resp, data) = try await transaction(op, params: params, dataOut: dataOut)
-        // quiet: nur echte Fehler loggen; AccessDenied/DeviceBusy sind beim Liveview normal (zu schnell gefragt)
+        // quiet: log only real errors; AccessDenied/DeviceBusy are normal during live view (asked too fast)
         if !quiet || (!resp.ok && resp.code != PTP.RC.accessDenied && resp.code != PTP.RC.deviceBusy && resp.code != PTP.RC.invalidObjectHandle) {
             emit(String(format: "op 0x%04X -> %@ (%d bytes)", op, resp.codeHex, data.count))
         }
@@ -151,18 +151,18 @@ final class SonyCamera {
     private(set) var deviceInfo = PTP.DeviceInfo()
     private(set) var protocolVersion: UInt16 = 0
     private(set) var vendorCodes: [UInt16] = []
-    /// Rohdaten der wichtigsten Antworten fuer die Diagnose (Hex im Bericht), damit sich fremde Modelle aus dem Log heraus
-    /// nachbauen lassen: DeviceInfo, 0x9202, erstes 0x9209, ObjectInfos der Aufnahmen, Kopf des ersten Liveview-Blocks.
+    /// Raw data of the key responses for diagnostics (hex in the report) so unknown models can be reverse-engineered
+    /// from the log: DeviceInfo, 0x9202, first 0x9209, ObjectInfos of captures, header of the first live view block.
     private(set) var rawDumps: [(name: String, data: Data)] = []
     private var liveHeaderDumped = false
     func dump(_ name: String, _ d: Data, limit: Int = 65536) {
         guard rawDumps.count < 40 else { return }
         rawDumps.append((name, d.prefix(limit)))
     }
-    private(set) var vendorProps: [UInt16] = []    // erste Liste aus 0x9202: Sony-Properties
-    private(set) var controlCodes: [UInt16] = []   // zweite Liste aus 0x9202: Steuercodes fuer 0x9207
+    private(set) var vendorProps: [UInt16] = []    // first list from 0x9202: Sony properties
+    private(set) var controlCodes: [UInt16] = []   // second list from 0x9202: control codes for 0x9207
     private(set) var connectedAt = Date.distantPast
-    /// Von der Kamera gemeldetes ObjectAdded (Event 0xC201): Bild liegt bereit, nicht mehr pollen.
+    /// ObjectAdded reported by the camera (event 0xC201): image is ready, stop polling.
     let objectAdded = EventSignal()
     private(set) var props: [UInt16: SonyPropDesc] = [:]
 
@@ -172,7 +172,7 @@ final class SonyCamera {
 
     // MARK: Verbindung
 
-    /// Schritt 1: nur GetDeviceInfo. Das ist der Machbarkeitstest fuer das PTP-Durchreichen auf iPadOS.
+    /// Step 1: GetDeviceInfo only. This is the feasibility test for PTP pass-through on iPadOS.
     func probe() async throws -> PTP.DeviceInfo {
         let data = try await transport.run(PTP.Op.getDeviceInfo)
         dump("GetDeviceInfo 0x1001", data)
@@ -180,7 +180,7 @@ final class SonyCamera {
         return deviceInfo
     }
 
-    /// Schritt 2: Sony-Handshake wie libgphoto2 camera_init.
+    /// Step 2: Sony handshake like libgphoto2 camera_init.
     func connect() async throws {
         if deviceInfo.model.isEmpty { _ = try await probe() }
 
@@ -207,7 +207,7 @@ final class SonyCamera {
 
         try await transport.run(SonyOp.sdioConnect, params: [3, 0, 0])
 
-        // PriorityMode = 1 (Application): Kamera nimmt Einstellungen vom Rechner an
+        // PriorityMode = 1 (application): the camera accepts settings from the host
         _ = try? await setValue(SonyProp.priorityMode, value: 1, type: PTP.DTC.int8)
         connectedAt = Date()
 
@@ -216,7 +216,7 @@ final class SonyCamera {
 
     // MARK: Properties
 
-    /// Holt alle Sony-Properties (0x9209) und parst sie.
+    /// Fetches all Sony properties (0x9209) and parses them.
     func refreshProps() async throws {
         let (resp, d) = try await transport.runWithResponse(SonyOp.getAllExtDevicePropInfo, quiet: true)
         guard resp.ok else { throw SonyError.ptp(op: SonyOp.getAllExtDevicePropInfo, code: resp.code) }
@@ -224,10 +224,10 @@ final class SonyCamera {
         props = Self.parseAllProps(d)
     }
 
-    /// Format je Eintrag (nach libgphoto2 ptp_unpack_Sony_DPD):
+    /// Format per entry (after libgphoto2 ptp_unpack_Sony_DPD):
     ///   u16 PropCode, u16 DataType, u8 GetSet, u8 IsEnabled, Default, Current, u8 FormFlag,
     ///   FormFlag 1: Min, Max, Step;  FormFlag 2: u16 N, N Werte;
-    ///   danach optional eine zweite Liste (u16 N < 0x200, N Werte), die bei neueren Kameras die gueltigen Werte traegt.
+    ///   then optionally a second list (u16 N < 0x200, N values) that carries the valid values on newer cameras.
     static func parseAllProps(_ d: Data) -> [UInt16: SonyPropDesc] {
         var out: [UInt16: SonyPropDesc] = [:]
         guard d.count > 8 else { return out }
@@ -286,7 +286,7 @@ final class SonyCamera {
                                 dataOut: PTP.encodeValue(value, type: type))
     }
 
-    /// ControlDeviceB: Tasten und Schritte (Ausloeser halb/voll, +/-).
+    /// ControlDeviceB: buttons and steps (shutter half/full, +/-).
     func control(_ code: UInt16, value: Int64, type: UInt16 = PTP.DTC.uint16) async throws {
         try await transport.run(SonyOp.controlDevice, params: [UInt32(code)],
                                 dataOut: PTP.encodeValue(value, type: type))
@@ -294,7 +294,7 @@ final class SonyCamera {
 
     // MARK: Liveview
 
-    /// Ein Liveview-Frame als JPEG. Gibt nil zurueck, wenn die Kamera gerade keins liefert.
+    /// One live view frame as JPEG. Returns nil when the camera has none right now.
     func liveViewFrame() async throws -> Data? {
         var tries = 10
         while tries > 0 {
@@ -318,7 +318,7 @@ final class SonyCamera {
         return nil
     }
 
-    /// Sony liefert vorne einen Header: die ersten 4 Byte sind der Offset zum JPEG. Fallback: FFD8 suchen.
+    /// Sony prepends a header: the first 4 bytes are the offset to the JPEG. Fallback: search for FFD8.
     static func extractJPEG(_ d: Data) -> Data? {
         if d.count > 4 {
             let off = Int(d.readLE(UInt32.self, at: 0))
@@ -326,7 +326,7 @@ final class SonyCamera {
                 return d.subdata(in: (d.startIndex + off)..<d.endIndex)
             }
         }
-        // Suche nach SOI
+        // Search for SOI
         let bytes = [UInt8](d)
         var i = 0
         while i + 1 < bytes.count {
@@ -338,18 +338,18 @@ final class SonyCamera {
 
     // MARK: Ausloesen
 
-    /// Loest aus und liefert alle Objekte aus dem Kamera-RAM (JPEG, bei RAW+JPEG zusaetzlich das ARW).
-    /// Ablauf wie libgphoto2 camera_sony_capture; mehrere Objekte wie in ptp_wait_event: solange 0xD215 > 0x8000,
-    /// liegt das naechste Objekt wieder unter 0xFFFFC001.
+    /// Releases the shutter and returns all objects from camera RAM (JPEG, plus the ARW with RAW+JPEG).
+    /// Flow like libgphoto2 camera_sony_capture; multiple objects as in ptp_wait_event: while 0xD215 > 0x8000,
+    /// the next object is again available under 0xFFFFC001.
     func capture(progress: ((String) -> Void)? = nil) async throws -> [CapturedObject] {
-        // Neuere Bodies (A7 IV u. a.) brauchen ~3 s nach dem Handshake, bevor sie ausloesen koennen
+        // Newer bodies (A7 IV and others) need ~3 s after the handshake before they can release
         let sinceConnect = Date().timeIntervalSince(connectedAt)
         if sinceConnect < 3.0 {
             progress?("Preparing camera…")
             try await Task.sleep(nanoseconds: UInt64((3.0 - sinceConnect) * 1_000_000_000))
         }
 
-        // RAM leeren, falls noch ein Bild vom letzten Mal drin liegt
+        // Clear RAM in case an image from last time is still there
         try await refreshProps()
         if let inMem = currentValue(SonyProp.objectInMemory), inMem >= 0x8000 {
             progress?("Removing old image from camera RAM…")
@@ -361,7 +361,7 @@ final class SonyCamera {
         try await control(SonyProp.shutterHalfRelease, value: 2)
         try await control(SonyProp.shutterRelease, value: 2)
 
-        // Fokus abwarten, ausser bei manuellem Fokus (FocusMode 1)
+        // Wait for focus, except with manual focus (FocusMode 1)
         let manualFocus = currentValue(SonyProp.focusMode) == 1
         if !manualFocus {
             let start = Date()
@@ -375,8 +375,8 @@ final class SonyCamera {
         try await control(SonyProp.shutterRelease, value: 1)
         try await control(SonyProp.shutterHalfRelease, value: 1)
 
-        // Auf das Bild warten: die Kamera meldet ObjectAdded (0xC201) sofort; solange keine Events beobachtet
-        // wurden, alle 100 ms pollen, sonst nur noch jede Sekunde als Sicherheitsnetz. Maximal 35 s (Langzeitbelichtung).
+        // Wait for the image: the camera reports ObjectAdded (0xC201) immediately; as long as no events have been
+        // observed, poll every 100 ms, otherwise only once a second as a safety net. At most 35 s (long exposure).
         progress?("Waiting for the image…")
         objectAdded.reset()
         let start = Date()
@@ -400,13 +400,13 @@ final class SonyCamera {
         return try await fetchObjects(progress: progress)
     }
 
-    /// Liegt ein Bild im Kamera-RAM, das nicht die App ausgeloest hat (Ausloeser an der Kamera, Fernausloeser)?
+    /// Is there an image in camera RAM the app did not trigger (camera shutter, remote release)?
     func hasPendingObject() async throws -> Bool {
         try await refreshProps()
         return (currentValue(SonyProp.objectInMemory) ?? 0) >= 0x8000
     }
 
-    /// Alle Objekte aus dem RAM holen (JPEG, RAW oder beide), solange 0xD215 weitere meldet.
+    /// Fetch all objects from RAM (JPEG, RAW or both) while 0xD215 reports more.
     func fetchObjects(progress: ((String) -> Void)? = nil) async throws -> [CapturedObject] {
         progress?("Fetching image…")
         var objects: [CapturedObject] = []
@@ -421,7 +421,7 @@ final class SonyCamera {
             guard data.count > 1000 else { break }
             objects.append(CapturedObject(data: data, format: oi.objectFormat, filename: oi.filename))
             progress?(String(format: "Received: %@ format 0x%04X (%d KB)", oi.filename, oi.objectFormat, data.count / 1024))
-            // Liegt noch ein Objekt im RAM (RAW+JPEG)? Kamera braucht eventuell einen Moment fuer den Zaehler.
+            // Another object in RAM (RAW+JPEG)? The camera may need a moment for the counter.
             var mem: Int64 = 0
             for _ in 0..<4 {
                 try await refreshProps()
@@ -438,7 +438,7 @@ final class SonyCamera {
     }
 }
 
-/// Thread-sicheres Signal fuer PTP-Events (gesetzt vom Delegaten, gelesen in der Aufnahmeschleife).
+/// Thread-safe signal for PTP events (set by the delegate, read in the capture loop).
 final class EventSignal: @unchecked Sendable {
     private let lock = NSLock()
     private var flag = false

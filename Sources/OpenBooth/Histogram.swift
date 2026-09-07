@@ -2,8 +2,8 @@
 //  Histogram.swift
 //  OpenBooth
 //
-//  RGB- und Luminanz-Histogramm aus einem verkleinerten Bild (160x90 RGBA, 64 Klassen). Rechnet im Liveview-Task,
-//  Anzeige als kleines Overlay; im Admin schaltbar.
+//  RGB and luminance histogram from a downscaled image (160x90 RGBA, 64 bins). Computed in the live view task,
+//  shown as a small overlay; switchable in the admin.
 //
 
 import UIKit
@@ -35,14 +35,14 @@ struct Histogram: Equatable {
             l[((R * 299 + G * 587 + B * 114) / 1000) >> shift] += 1
             i += 4
         }
-        // Normierung auf das Maximum aller Kanaele, mit leichter Wurzel, damit kleine Werte sichtbar bleiben
+        // Normalize to the maximum of all channels, with a mild square root so small values stay visible
         let m = Float(max(r.max() ?? 1, g.max() ?? 1, b.max() ?? 1, l.max() ?? 1, 1))
         func norm(_ a: [Int]) -> [Float] { a.map { sqrt(Float($0) / m) } }
         return Histogram(r: norm(r), g: norm(g), b: norm(b), luma: norm(l))
     }
 }
 
-/// Kleines Histogramm-Overlay: Farbkanaele additiv, Luminanz als weisse Linie, Markierungen fuer Clipping.
+/// Small histogram overlay: color channels additive, luminance as a white line, markers for clipping.
 struct HistogramView: View {
     let histogram: Histogram
     var body: some View {

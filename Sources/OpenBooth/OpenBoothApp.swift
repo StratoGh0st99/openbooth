@@ -2,7 +2,7 @@
 //  OpenBoothApp.swift
 //  OpenBooth
 //
-//  Offene Fotobox-App fuer das iPad: Kamera per USB-C (PTP), Liveview, Ausloesen, Galerie.
+//  Open photo booth app for the iPad: camera via USB-C (PTP), live view, shutter, gallery.
 //
 
 import SwiftUI

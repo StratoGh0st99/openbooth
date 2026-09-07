@@ -2,8 +2,8 @@
 //  ReportSender.swift
 //  OpenBooth
 //
-//  Schickt einen Diagnosebericht an den OpenBooth-Endpunkt. Nur auf Wunsch des Nutzers (Knopf) oder, wenn
-//  eingeschaltet, bei Fehlern (hoechstens alle 10 Minuten). Der Token filtert nur Bots; das Repo ist oeffentlich.
+//  Sends a diagnostics report to the OpenBooth endpoint. Only on the user's request (button) or, if
+//  enabled, on errors (at most every 10 minutes). The token only filters bots; the repo is public.
 //
 
 import Foundation
@@ -12,7 +12,7 @@ enum ReportSender {
     static let endpoint = URL(string: "https://openbooth.reingrubers.de/report")!
     static let token = "et63HKQSOVVEHIfAWTzrVt0KkjckOUSl"
 
-    /// Kamera-Seriennummer kuerzen, sonst geht der Bericht unveraendert.
+    /// Shorten the camera serial number; otherwise the report goes unchanged.
     static func sanitize(_ text: String) -> String {
         var out = text
         if let r = out.range(of: #"Seriennummer (\S+)"#, options: .regularExpression) {
@@ -22,7 +22,7 @@ enum ReportSender {
         return out
     }
 
-    /// Liefert die Kennung des Servers oder wirft.
+    /// Returns the server's ID or throws.
     static func send(fileURL: URL, appVersion: String) async throws -> String {
         let raw = try String(contentsOf: fileURL, encoding: .utf8)
         let body = Data(sanitize(raw).utf8)

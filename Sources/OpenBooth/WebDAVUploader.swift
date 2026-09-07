@@ -2,8 +2,8 @@
 //  WebDAVUploader.swift
 //  OpenBooth
 //
-//  Laedt Fotos per WebDAV (PUT) in einen Ordner, z. B. Nextcloud, Synology, Hetzner Storage Box.
-//  Warteschlange auf Platte, Wiederholung bei Fehlern. Passwort im Schluesselbund.
+//  Uploads photos via WebDAV (PUT) into a folder, e.g. Nextcloud, Synology, Hetzner Storage Box.
+//  Queue on disk, retries on errors. Password in the keychain.
 //
 
 import Foundation
@@ -11,7 +11,7 @@ import Foundation
 @MainActor
 final class WebDAVUploader: ObservableObject {
     struct Item: Codable, Equatable {
-        let path: String          // relativ zum Documents-Ordner
+        let path: String          // relative to the Documents folder
         var attempts: Int = 0
     }
 
@@ -57,13 +57,13 @@ final class WebDAVUploader: ObservableObject {
         kick()
     }
 
-    /// Sofort erneut versuchen: laufenden Worker (der evtl. in der Wartezeit schlaeft) abbrechen und neu starten
+    /// Retry now: cancel the running worker (which may be sleeping in the backoff) and restart
     func retryNow() {
         worker?.cancel(); worker = nil
         for i in pending.indices { pending[i].attempts = 0 }
         kick()
     }
-    /// Warteschlange verwerfen (Dateien bleiben liegen, bis das Aufraeumen sie holt)
+    /// Drop the queue (files stay until the cleanup removes them)
     func clearQueue() {
         worker?.cancel(); worker = nil
         pending = []; saveQueue()
@@ -125,7 +125,7 @@ final class WebDAVUploader: ObservableObject {
 
     private func status(_ resp: URLResponse) -> Int { (resp as? HTTPURLResponse)?.statusCode ?? 0 }
 
-    /// Ordner anlegen, falls er fehlt (MKCOL; 405 = existiert schon).
+    /// Create the folder if missing (MKCOL; 405 = already exists).
     private func ensureFolder() async throws {
         if folderChecked { return }
         var probe = try request("/", method: "PROPFIND")
@@ -146,7 +146,7 @@ final class WebDAVUploader: ObservableObject {
         log?("WebDAV: folder created")
     }
 
-    /// Verbindungstest: Ordner erreichbar oder anlegbar.
+    /// Connection test: folder reachable or creatable.
     func test() async -> String {
         do {
             folderChecked = false

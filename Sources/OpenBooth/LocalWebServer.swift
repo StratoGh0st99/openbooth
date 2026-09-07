@@ -2,9 +2,9 @@
 //  LocalWebServer.swift
 //  OpenBooth
 //
-//  Kleine Statusseite im lokalen WLAN (Stufe 1, nur lesend): Verbindung, Bildrate, Fotos, Warteschlangen,
-//  letzte Protokollzeilen, Diagnose senden. Eigener HTTP-Server auf Network.framework, kein Fremdcode.
-//  Geschuetzt mit der Admin-PIN (Login setzt ein Sitzungs-Cookie), Sperre nach Fehlversuchen.
+//  Small status page on the local Wi-Fi (stage 1, read-only): connection, frame rate, photos, queues,
+//  last log lines, send diagnostics. Own HTTP server on Network.framework, no third-party code.
+//  Protected by the admin PIN (login sets a session cookie), lockout after failed attempts.
 //
 
 import Foundation
@@ -13,14 +13,14 @@ import UIKit
 
 struct WebStatus: Encodable {
     var event: String
-    var camera: String          // Modell oder "none"
+    var camera: String          // model or "none"
     var state: String
     var status: String
     var fps: Int
     var idle: Bool
     var photos: Int
-    var lastPhoto: String?      // Uhrzeit des letzten Fotos
-    var immich: String?         // Statusmeldung oder nil, wenn aus
+    var lastPhoto: String?      // time of the last photo
+    var immich: String?         // status message or nil when off
     var webdav: String?
     var brightness: Int         // Prozent
     var log: [String]
@@ -39,11 +39,11 @@ final class LocalWebServer: @unchecked Sendable {
     private var failedAttempts: [String: (count: Int, until: Date)] = [:]
     private let started = Date()
 
-    /// Datenlieferanten, gesetzt vom CameraManager (laufen auf dem MainActor)
+    /// Data providers, set by CameraManager (run on the MainActor)
     var statusProvider: (@MainActor () -> WebStatus)?
     var pinProvider: (@MainActor () -> String)?
     var diagnoseAction: (@MainActor () async -> String?)?
-    var settingsAction: (@MainActor (String, Int) -> Bool)?   // wenige Werte aenderbar (Schluessel, Wert)
+    var settingsAction: (@MainActor (String, Int) -> Bool)?   // a few values changeable (key, value)
     var log: ((String) -> Void)?
 
     private(set) var running = false
@@ -75,7 +75,7 @@ final class LocalWebServer: @unchecked Sendable {
         listener?.cancel(); listener = nil; running = false
     }
 
-    /// IPv4-Adressen des iPads (WLAN), fuer die Anzeige der URL im Admin
+    /// IPv4 addresses of the iPad (Wi-Fi), for showing the URL in the admin
     static func localAddresses() -> [String] {
         var out: [String] = []
         var ifap: UnsafeMutablePointer<ifaddrs>?

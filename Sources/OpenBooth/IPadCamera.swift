@@ -2,8 +2,8 @@
 //  IPadCamera.swift
 //  OpenBooth
 //
-//  Ersatzkamera: Front- oder Rueckkamera des iPads ueber AVFoundation, wenn keine Kamera per USB da ist.
-//  Liefert Liveview-Bilder als UIImage (wie die Sony) und JPEG-Aufnahmen als CapturedObject.
+//  Fallback camera: front or rear camera of the iPad via AVFoundation when no USB camera is present.
+//  Delivers live view frames as UIImage (like the Sony) and JPEG captures as CapturedObject.
 //
 
 import AVFoundation
@@ -28,7 +28,7 @@ final class IPadCamera: NSObject, @unchecked Sendable {
         }
     }
 
-    /// Kamera oeffnen; `front` = Frontkamera (zeigt zu den Gaesten, wenn das iPad im Gehaeuse steckt).
+    /// Open the camera; `front` = front camera (faces the guests when the iPad sits in the enclosure).
     func start(front: Bool, onFrame: @escaping (UIImage) -> Void) throws {
         position = front ? .front : .back
         frameHandler = onFrame
@@ -56,7 +56,7 @@ final class IPadCamera: NSObject, @unchecked Sendable {
         queue.async { [session] in session.startRunning() }
     }
 
-    /// Bilddrehung an die Lage des iPads anpassen (Querformat links oder rechts), fuer Liveview und Foto.
+    /// Adapt image rotation to the iPad's orientation (landscape left or right), for live view and photo.
     @objc private func orientationChanged() { applyRotation() }
     private func applyRotation() {
         let angle: CGFloat
@@ -80,7 +80,7 @@ final class IPadCamera: NSObject, @unchecked Sendable {
         queue.async { [session] in if session.isRunning { session.stopRunning() } }
     }
 
-    /// Foto als JPEG (volle Aufloesung der iPad-Kamera).
+    /// Photo as JPEG (full resolution of the iPad camera).
     func capture() async throws -> CapturedObject {
         let data: Data = try await withCheckedThrowingContinuation { cont in
             queue.async {
@@ -97,15 +97,15 @@ final class IPadCamera: NSObject, @unchecked Sendable {
 
 extension IPadCamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePhotoCaptureDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        // ~15 Bilder/s reichen fuer den Liveview, spart Rechenzeit
+        // ~15 fps is enough for the live view, saves CPU
         frameSkip += 1
         if frameSkip % 2 == 0 { return }
         guard let handler = frameHandler, let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let ci = CIImage(cvPixelBuffer: pb)
-        // Querformat-Orientierung: Landscape-Right (Home-Button rechts) entspricht der Fotobox-Aufstellung
+        // Landscape orientation: landscape right (home button right) matches the booth setup
         let ctx = Self.ciContext
         guard let cg = ctx.createCGImage(ci, from: ci.extent) else { return }
-        // nicht spiegeln: die Spiegelung fuer die Gaeste macht die Buehne (Einstellung "Mirror live view"), wie bei der Sony
+        // do not mirror: the stage mirrors for the guests ("Mirror live view" setting), same as with the Sony
         handler(UIImage(cgImage: cg, scale: 1, orientation: .up))
     }
     private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
@@ -117,7 +117,7 @@ extension IPadCamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePho
         guard let data = photo.fileDataRepresentation() else {
             cont.resume(throwing: NSError(domain: "IPadCamera", code: 3, userInfo: [NSLocalizedDescriptionKey: "No image from the iPad camera"])); return
         }
-        // Foto bleibt ungespiegelt, wie ein Kamerafoto (die Sony spiegelt auch nicht)
+        // Photo stays unmirrored, like a camera photo (the Sony does not mirror either)
         cont.resume(returning: data)
     }
 

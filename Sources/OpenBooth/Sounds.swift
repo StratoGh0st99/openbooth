@@ -2,8 +2,8 @@
 //  Sounds.swift
 //  OpenBooth
 //
-//  Kleine, selbst erzeugte Toene (Sinus mit Huellkurve, 44,1 kHz), kein Asset noetig:
-//  Willkommensklang beim Aufwachen aus der Collage, Countdown-Piep, Ausloesesignal.
+//  Small self-generated tones (sine with envelope, 44.1 kHz), no asset needed:
+//  welcome chime when waking from the collage, countdown beep, shutter signal.
 //
 
 import AVFoundation
@@ -32,7 +32,7 @@ final class Sounds {
         p.play()
     }
 
-    /// Sinusnoten (Frequenz, Startzeit s, Dauer s) zu einer WAV-Datei im Speicher mischen.
+    /// Mix sine notes (frequency, start s, duration s) into an in-memory WAV file.
     private func make(notes: [(Double, Double, Double)], volume: Float) -> AVAudioPlayer? {
         let rate = 44100.0
         let total = (notes.map { $0.1 + $0.2 }.max() ?? 0.5) + 0.05
@@ -45,7 +45,7 @@ final class Sounds {
                 let attack = min(1.0, t / 0.012)
                 let release = min(1.0, (dur - t) / (dur * 0.6))
                 let env = attack * max(0, release)
-                // Grundton plus leiser Oberton fuer etwas Waerme
+                // Fundamental plus a quiet overtone for some warmth
                 let v = sin(2 * .pi * f * t) + 0.25 * sin(2 * .pi * f * 2 * t)
                 samples[s0 + i] += Float(v * env) * 0.5
             }

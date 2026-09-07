@@ -2,9 +2,9 @@
 //  ThumbnailStore.swift
 //  OpenBooth
 //
-//  Kleine Vorschauen (800 px) fuer Galerie und Collage. Ein 33-MP-JPEG (~12 MB) vollstaendig zu dekodieren dauert
-//  auf dem iPad je Kachel spuerbar; ImageIO liest per Subsampling nur so viel wie noetig. Ergebnis liegt im
-//  Speicher (NSCache) und auf Platte unter <Eventordner>/.thumbs/<name>.jpg, wird beim Speichern schon erzeugt.
+//  Small thumbnails (800 px) for gallery and collage. Fully decoding a 33 MP JPEG (~12 MB) takes
+//  noticeable time per tile on the iPad; ImageIO reads only as much as needed via subsampling. The result lives in
+//  memory (NSCache) and on disk under <event folder>/.thumbs/<name>.jpg, created already when saving.
 //
 
 import UIKit
@@ -19,7 +19,7 @@ enum ThumbnailStore {
             .appendingPathComponent(url.deletingPathExtension().lastPathComponent + ".jpg")
     }
 
-    /// Vorschau holen: Speicher, dann Platte, sonst erzeugen (im Hintergrund).
+    /// Get a thumbnail: memory, then disk, otherwise generate (in the background).
     static func thumbnail(for url: URL) async -> UIImage? {
         if let img = cache.object(forKey: url as NSURL) { return img }
         let img = await Task.detached(priority: .userInitiated) { () -> UIImage? in
@@ -31,7 +31,7 @@ enum ThumbnailStore {
         return img
     }
 
-    /// Vorschau erzeugen und auf Platte legen. Laeuft synchron, daher von einem Hintergrund-Task aufrufen.
+    /// Generate a thumbnail and store it on disk. Runs synchronously, so call from a background task.
     @discardableResult
     nonisolated static func generate(for url: URL) -> UIImage? {
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
@@ -49,7 +49,7 @@ enum ThumbnailStore {
         return img
     }
 
-    /// Beim Speichern eines Fotos: Vorschau im Hintergrund vorbereiten.
+    /// When saving a photo: prepare the thumbnail in the background.
     static func prepare(_ url: URL) {
         Task.detached(priority: .utility) {
             if let img = generate(for: url) { await MainActor.run { cache.setObject(img, forKey: url as NSURL) } }

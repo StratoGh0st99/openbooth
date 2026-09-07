@@ -2,7 +2,7 @@
 //  AppSettings.swift
 //  OpenBooth
 //
-//  App-Einstellungen, in UserDefaults gespeichert. Kamera-Einstellungen liegen in der Kamera selbst.
+//  App settings, stored in UserDefaults. Camera settings live in the camera itself.
 //
 
 import Foundation
@@ -22,7 +22,7 @@ final class AppSettings: ObservableObject {
     @Published var ipadFallback: Bool { didSet { d.set(ipadFallback, forKey: "ipadFallback") } }
     @Published var ipadFrontCamera: Bool { didSet { d.set(ipadFrontCamera, forKey: "ipadFrontCamera") } }
     @Published var restoreCameraSettings: Bool { didSet { d.set(restoreCameraSettings, forKey: "restoreCameraSettings") } }
-    /// Zuletzt in der App gesetzte Kamerawerte je Modell: [Modell: [Code(hex): Wert]]
+    /// Camera values last set in the app, per model: [model: [code(hex): value]]
     @Published var rememberedCamera: [String: [String: Int]] { didSet { d.set(rememberedCamera, forKey: "rememberedCamera") } }
     @Published var autoConnect: Bool { didSet { d.set(autoConnect, forKey: "autoConnect") } }
     @Published var countdownSeconds: Int { didSet { d.set(countdownSeconds, forKey: "countdownSeconds") } }
@@ -42,7 +42,7 @@ final class AppSettings: ObservableObject {
     @Published var saveToPhotos: Bool { didSet { d.set(saveToPhotos, forKey: "saveToPhotos") } }
     @Published var immichEnabled: Bool { didSet { d.set(immichEnabled, forKey: "immichEnabled") } }
     @Published var immichURL: String { didSet { d.set(immichURL, forKey: "immichURL") } }
-    /// true = Original in voller Groesse, false = Web-Version (2000 px lange Kante)
+    /// true = full-size original, false = web version (2000 px long edge)
     @Published var photosOriginal: Bool { didSet { d.set(photosOriginal, forKey: "photosOriginal") } }
     @Published var immichOriginal: Bool { didSet { d.set(immichOriginal, forKey: "immichOriginal") } }
     @Published var webdavOriginal: Bool { didSet { d.set(webdavOriginal, forKey: "webdavOriginal") } }
@@ -102,19 +102,19 @@ final class AppSettings: ObservableObject {
         soundCountdown = d.object(forKey: "soundCountdown") as? Bool ?? true
         maxBrightness = d.object(forKey: "maxBrightness") as? Bool ?? false
         motionWake = d.object(forKey: "motionWake") as? Bool ?? true
-        // Standard 6 (Dauerlauf 2026-09-06: Ruhepegel max 2,9, Treffer ab 8,8); alter Standard 8 wird einmalig migriert
+        // Default 6 (endurance run 2026-09-06: idle level max 2.9, hits from 8.8); old default 8 is migrated once
         var mt = d.object(forKey: "motionThreshold") as? Int ?? 6
         if mt == 8, !d.bool(forKey: "motionThresholdV2") { mt = 6 }
         d.set(true, forKey: "motionThresholdV2")
         motionThreshold = mt
     }
 
-    /// Bekommt irgendein Ziel das Original? Sonst bleiben die Originale im App-Ordner, damit nichts verloren geht.
+    /// Does any target receive the original? Used for the admin warning.
     var anyTargetKeepsOriginal: Bool {
         (saveToPhotos && photosOriginal) || (immichEnabled && immichOriginal) || (webdavEnabled && webdavOriginal)
     }
 
-    /// Alle Werte neu aus UserDefaults lesen (nach einem Import)
+    /// Re-read all values from UserDefaults (after an import)
     func reloadFromDefaults() {
         let name = d.string(forKey: "eventName") ?? d.string(forKey: "immichAlbum") ?? String(localized: "Photo Booth")
         var ev = d.stringArray(forKey: "events") ?? []
@@ -159,14 +159,14 @@ final class AppSettings: ObservableObject {
         soundCountdown = d.object(forKey: "soundCountdown") as? Bool ?? true
         maxBrightness = d.object(forKey: "maxBrightness") as? Bool ?? false
         motionWake = d.object(forKey: "motionWake") as? Bool ?? true
-        // Standard 6 (Dauerlauf 2026-09-06: Ruhepegel max 2,9, Treffer ab 8,8); alter Standard 8 wird einmalig migriert
+        // Default 6 (endurance run 2026-09-06: idle level max 2.9, hits from 8.8); old default 8 is migrated once
         var mt = d.object(forKey: "motionThreshold") as? Int ?? 6
         if mt == 8, !d.bool(forKey: "motionThresholdV2") { mt = 6 }
         d.set(true, forKey: "motionThresholdV2")
         motionThreshold = mt
     }
 
-    /// Exportierbare Schluessel (ohne PIN und ohne Schluesselbund-Inhalte)
+    /// Exportable keys (without PIN and without keychain contents)
     static let exportKeys: [String] = ["autoConnect", "autoReports", "countdownSeconds", "debugMode", "eventName", "events", "gallerySeconds", "guestGallery", "idleSeconds", "immichAlbum", "immichEnabled", "immichOriginal", "immichURL", "ipadFallback", "ipadFrontCamera", "maxBrightness", "mirrorLiveView", "motionThreshold", "motionWake", "photosOriginal", "phrases", "pickupExternal", "qrEnabled", "rememberedCamera", "restoreCameraSettings", "resultSeconds", "saveToPhotos", "shotInterval", "shotsPerCapture", "showHistogram", "slideshowInterval", "soundCountdown", "soundWelcome", "soundsEnabled", "webEnabled", "webdavEnabled", "webdavOriginal", "webdavURL", "webdavUser", "welcomeText", "welcomeTitle"]
 
     func exportJSON() -> Data? {
@@ -176,7 +176,7 @@ final class AppSettings: ObservableObject {
         return try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys])
     }
 
-    /// Import: nur bekannte Schluessel uebernehmen, danach neu laden. Liefert die Zahl der uebernommenen Werte.
+    /// Import: take only known keys, then reload. Returns the number of values taken over.
     func importJSON(_ data: Data) -> Int {
         guard let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any], dict["_openbooth"] as? String == "settings" else { return 0 }
         var n = 0

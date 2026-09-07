@@ -2,8 +2,8 @@
 //  PTP.swift
 //  OpenBooth
 //
-//  Minimaler PTP-Container-Codec (ISO 15740) fuer das Durchreichen ueber ImageCaptureCore.
-//  Alle Werte sind Little Endian.
+//  Minimal PTP container codec (ISO 15740) for pass-through via ImageCaptureCore.
+//  All values are little endian.
 //
 
 import Foundation
@@ -53,8 +53,8 @@ enum PTP {
         static let string: UInt16 = 0xFFFF
     }
 
-    /// Baut einen Command-Container. Die Transaction-ID setzt die ImageCaptureCore-Schicht selbst,
-    /// wir uebergeben 0.
+    /// Builds a command container. The transaction ID is set by the ImageCaptureCore layer itself,
+    /// we pass 0.
     static func command(_ code: UInt16, params: [UInt32] = [], transactionID: UInt32 = 0) -> Data {
         var d = Data()
         d.appendLE(UInt32(12 + 4 * params.count))
@@ -65,7 +65,7 @@ enum PTP {
         return d
     }
 
-    /// Zerlegt einen Response-Container.
+    /// Parses a response container.
     struct Response {
         let code: UInt16
         let transactionID: UInt32
@@ -81,7 +81,7 @@ enum PTP {
         let code = d.readLE(UInt16.self, at: 6)
         let tid = d.readLE(UInt32.self, at: 8)
         guard type == typeResponse || type == typeCommand else {
-            // Manche Schichten liefern nur den Code, ohne Typ 3 - trotzdem versuchen
+            // Some layers deliver only the code, without type 3 - try anyway
             return Response(code: code, transactionID: tid, params: [])
         }
         var params: [UInt32] = []
@@ -93,7 +93,7 @@ enum PTP {
         return Response(code: code, transactionID: tid, params: params)
     }
 
-    /// Entfernt einen eventuell vorhandenen Data-Container-Header (12 Byte) vom Data-In-Payload.
+    /// Strips a possibly present data container header (12 bytes) from the data-in payload.
     static func stripDataHeader(_ d: Data) -> Data {
         guard d.count >= 12 else { return d }
         let len = d.readLE(UInt32.self, at: 0)
@@ -104,7 +104,7 @@ enum PTP {
         return d
     }
 
-    /// PTP-String: uint8 Anzahl Zeichen (inkl. Nullterminator), dann UTF-16LE.
+    /// PTP string: uint8 character count (incl. null terminator), then UTF-16LE.
     static func readString(_ d: Data, at offset: inout Int) -> String {
         guard offset < d.count else { return "" }
         let n = Int(d[d.startIndex + offset]); offset += 1
@@ -130,7 +130,7 @@ enum PTP {
         return out
     }
 
-    /// Groesse eines Datentyps in Byte (0 = variabel / unbekannt).
+    /// Size of a data type in bytes (0 = variable / unknown).
     static func size(of dtc: UInt16) -> Int {
         switch dtc {
         case DTC.int8, DTC.uint8: return 1
@@ -141,14 +141,14 @@ enum PTP {
         }
     }
 
-    /// Liest einen Property-Wert als Int64 (Strings ergeben nil, Offset wird trotzdem weitergeschoben).
+    /// Reads a property value as Int64 (strings yield nil, the offset is still advanced).
     static func readValue(_ d: Data, type dtc: UInt16, at offset: inout Int) -> Int64? {
         if dtc == DTC.string {
             _ = readString(d, at: &offset)
             return nil
         }
         if (dtc & 0x4000) != 0 {
-            // Array: u32 Anzahl, dann Elemente des Basistyps
+            // Array: u32 count, then elements of the base type
             guard offset + 4 <= d.count else { return nil }
             let n = Int(d.readLE(UInt32.self, at: offset)); offset += 4
             let base = dtc & 0x00FF
@@ -175,7 +175,7 @@ enum PTP {
         return v
     }
 
-    /// Kodiert einen Wert fuer die Data-Out-Phase (roher Wert, ohne Container).
+    /// Encodes a value for the data-out phase (raw value, no container).
     static func encodeValue(_ v: Int64, type dtc: UInt16) -> Data {
         var d = Data()
         switch dtc {

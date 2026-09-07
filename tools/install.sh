@@ -1,7 +1,7 @@
 #!/bin/zsh
-# Baut OpenBooth, installiert und startet es auf dem iPad (Kabel oder WLAN nach Kopplung).
-# Voraussetzungen: Xcode, xcodegen (brew install xcodegen), Local.xcconfig mit eigenem Team,
-# Geraete-ID in .device (xcrun devicectl list devices) oder Umgebungsvariable OPENBOOTH_DEVICE.
+# Builds OpenBooth, installs and launches it on the iPad (cable or Wi-Fi after pairing).
+# Requirements: Xcode, xcodegen (brew install xcodegen), Local.xcconfig with your own team,
+# device ID in .device (xcrun devicectl list devices) or environment variable OPENBOOTH_DEVICE.
 set -e -o pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}

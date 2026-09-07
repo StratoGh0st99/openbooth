@@ -3,7 +3,7 @@
 //  OpenBooth
 //
 //  Gaestemodus: Vollbild-Liveview, roter Knopf, Galerie, Leerlauf-Collage.
-//  Zwei-Finger-Wischen von oben nach unten -> PIN -> Admin-Panel. Debug-Modus blendet die Seitenleiste dauerhaft ein.
+//  Two-finger swipe down -> PIN -> admin panel. Debug mode opens the admin at launch.
 //
 
 import SwiftUI
@@ -21,20 +21,20 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showPinPad = false
     @State private var adminUnlocked = false
-    /// QR-Code nur, wenn gewuenscht und der Freigabelink des Albums existiert.
+    /// QR code only if enabled and the album share link exists.
     private var qrLink: String? { settings.qrEnabled ? cam.immich.shareURL : nil }
 
     var body: some View {
         GeometryReader { geo in
             HStack(spacing: 0) {
                 if adminUnlocked {
-                    // Admin nimmt die Breite, die Gaestesicht laeuft verkleinert oben rechts weiter
+                    // Admin takes the width, the guest view keeps running scaled down at the top right
                     AdminPanel(adminUnlocked: $adminUnlocked)
                         .frame(maxWidth: .infinity)
                         .background(Color(.secondarySystemBackground))
                         .transition(.move(edge: .leading))
                     Divider()
-                    // Vorschau-Spalte: 400 pt auf grossen iPads, auf dem iPad mini schmaler, damit der Admin Platz behaelt
+                    // Preview column: 400 pt on large iPads, narrower on the iPad mini so the admin keeps its space
                     let w: CGFloat = min(400, geo.size.width * 0.3)
                     let sc = w / max(1, geo.size.width)
                     VStack(spacing: 6) {
@@ -57,13 +57,13 @@ struct ContentView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: adminUnlocked)
         .onAppear {
-            adminUnlocked = settings.debugMode   // Debug-Modus: Admin beim Start offen, Wischgeste ohne PIN
+            adminUnlocked = settings.debugMode   // debug mode: admin open at launch, swipe gesture without PIN
             cam.settingsRef = settings
             cam.start()
             cam.updateBrightness()
         }
         .fullScreenCover(isPresented: $showGallery) { GalleryView(photos: cam.sessionPhotos, autoClose: settings.gallerySeconds, onActivity: { cam.noteInteraction() }) }
-        // Leerlauf beginnt oder endet: Galerie und QR-Seite schliessen, die Buehne gehoert wieder der Fotobox
+        // Idle starts or ends: close gallery and QR page, the stage belongs to the booth again
         .onChange(of: cam.idle) { _, _ in showGallery = false; showQR = false; cam.qrShown = false }
         .overlay {
             if showPinPad {
@@ -96,7 +96,7 @@ struct ContentView: View {
                 Image(systemName: "camera.aperture").font(.system(size: 80)).foregroundStyle(.gray).offset(y: -140)
             }
 
-            // Begruessung: ohne Liveview mittig gross, mit Liveview als Schriftzug oben ueber dem Bild
+            // Welcome: large and centered without live view, as a caption above the image with live view
             if cam.banner == nil, cam.countdown == nil, cam.capturePhrase == nil {
                 if cam.liveFrame == nil {
                     VStack(spacing: 12) {
@@ -121,14 +121,14 @@ struct ContentView: View {
                 }
             }
 
-            // Leerlauf-Collage ueber dem Liveview
+            // Idle collage above the live view
             if cam.idle && !cam.sessionPhotos.isEmpty {
                 CollageView(photos: cam.sessionPhotos, interval: settings.slideshowInterval, title: settings.welcomeTitle)
                     .transition(.opacity)
                     .onTapGesture { cam.noteInteraction() }
             }
 
-            // Abbrechen waehrend Countdown und Serie (nicht waehrend das Bild gerade von der Kamera kommt)
+            // Cancel during countdown and series (not while the image is being fetched from the camera)
             if cam.capturing, !cam.captureCancelled, cam.countdown != nil || (cam.shotTotal > 1 && cam.shotNumber < cam.shotTotal) {
                 VStack {
                     HStack {
@@ -168,7 +168,7 @@ struct ContentView: View {
                     .transition(.scale.combined(with: .opacity))
             }
 
-            // Histogramm zum Liveview (Admin-Option), unten links ueber der Leiste
+            // Histogram for the live view (admin option), bottom left above the bar
             if settings.showHistogram, !cam.idle, cam.resultPhotos.isEmpty, cam.countdown == nil, let h = cam.liveHistogram {
                 VStack { Spacer(); HStack { HistogramView(histogram: h).frame(width: 220, height: 90).padding(.leading, 20).padding(.bottom, 110); Spacer() } }
                     .allowsHitTesting(false)
@@ -222,7 +222,7 @@ struct ContentView: View {
                 }
             }
 
-            // QR-Code zum Immich-Album
+            // QR code to the Immich album
             if showQR, let link = qrLink {
                 ZStack {
                     Color.black.opacity(0.92)
@@ -240,14 +240,14 @@ struct ContentView: View {
                 .onTapGesture { showQR = false; cam.qrShown = false }
             }
 
-            // Grosse Vorschau nach der Aufnahme (ein Bild oder Serie)
+            // Large review after the capture (single image or series)
             if !cam.resultPhotos.isEmpty {
                 ZStack {
                     Color.black.opacity(0.92)
                     VStack(spacing: 16) {
                         // Restzeit-Balken
                         if let shownAt = cam.resultShownAt {
-                            // Jede Bildwiederholung neu (kein minimumInterval), Breite per Transform statt Layout: fluessig
+                            // Updated every frame (no minimumInterval), width via transform instead of layout: smooth
                             TimelineView(.animation(paused: cam.resultPausedAt != nil)) { ctx in
                                 let total = max(1, Double(settings.resultSeconds))
                                 let now = cam.resultPausedAt ?? ctx.date
@@ -329,7 +329,7 @@ struct ContentView: View {
                     }
                 }
                 .transition(.opacity)
-                // Ein Gestenpfad fuer Tipp und Halten: kurz = schliessen, lang = pausieren, Loslassen nach Halten = weiterlaufen
+                // One gesture path for tap and hold: short = dismiss, long = pause, release after hold = resume
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { _ in
@@ -349,7 +349,7 @@ struct ContentView: View {
                 )
             }
 
-            // Ressourcen-Warnung oben rechts: Akku oder Speicher knapp, bleibt bis behoben
+            // Resource warning top right: battery or storage low, stays until resolved
             if !cam.resourceWarnings.isEmpty, cam.resultPhotos.isEmpty {
                 VStack {
                     HStack {
@@ -366,7 +366,7 @@ struct ContentView: View {
                 .allowsHitTesting(false)
             }
 
-            // Statusbanner oben (nur wenn etwas nicht laeuft)
+            // Status banner at the top (only when something is off)
             if let b = cam.banner, cam.resultPhotos.isEmpty {
                 VStack {
                     HStack(spacing: 12) {
@@ -390,7 +390,7 @@ struct ContentView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            // Aufnahmefehler fuer Gaeste
+            // Capture error for guests
             if let err = cam.captureError {
                 ZStack {
                     Color.black.opacity(0.85)
@@ -412,7 +412,7 @@ struct ContentView: View {
                 .task { try? await Task.sleep(nanoseconds: 20_000_000_000); cam.captureError = nil }
             }
 
-            // Versteckter Admin-Zugang: mit zwei Fingern von oben nach unten wischen (UIKit-Erkenner am Fenster)
+            // Hidden admin access: two-finger swipe down (UIKit recognizer on the window)
             TwoFingerSwipeDown {
                 cam.noteInteraction()
                 if adminUnlocked { adminUnlocked = false } else if settings.debugMode { adminUnlocked.toggle() } else { showPinPad = true }
@@ -436,7 +436,7 @@ struct AdminPanel: View {
     @EnvironmentObject var cam: CameraManager
     @EnvironmentObject var settings: AppSettings
     @Binding var adminUnlocked: Bool
-    // Startabschnitt per Startargument waehlbar (-adminSection "Camera"), fuer Screenshots im Simulator
+    // Start section selectable via launch argument (-adminSection "Camera"), for simulator screenshots
     @State private var section: Section = Section(rawValue: UserDefaults.standard.string(forKey: "adminSection") ?? "") ?? .event
     @State private var newPin = ""
     @State private var diagnosticsURL: URL?
@@ -664,7 +664,7 @@ struct AdminPanel: View {
 
     @ViewBuilder private var storageSection: some View {
         SwiftUI.Section {
-            // Eine Zeile je Ziel: Symbol, Name, Schalter; darunter kompakt Groesse und RAW, nur wenn eingeschaltet
+            // One row per target: icon, name, toggle; below it the size choice, only when enabled
             DestinationRow(title: "App gallery", icon: "internaldrive", enabled: .constant(true), fixed: "Web 2000 px", original: nil)
             DestinationRow(title: "iPad photo library", icon: "photo.on.rectangle.angled", enabled: $settings.saveToPhotos, original: $settings.photosOriginal)
             DestinationRow(title: "Immich", icon: "server.rack", enabled: $settings.immichEnabled, original: $settings.immichOriginal)
@@ -747,7 +747,7 @@ struct AdminPanel: View {
 
     @ViewBuilder private var logSection: some View {
         SwiftUI.Section {
-            // Datei wird beim Antippen frisch erzeugt, dann Teilen-Menue (AirDrop, Mail, …)
+            // The file is created fresh on tap, then the share sheet (AirDrop, Mail, …)
             Button { diagnosticsURL = cam.makeDiagnosticsFile() } label: { Label("Share diagnostics…", systemImage: "square.and.arrow.up") }
                 .buttonStyle(.bordered)
             HStack {
@@ -916,7 +916,7 @@ struct GalleryView: View {
 
     var body: some View {
         galleryBody
-            // Beruehrungen ueber einen UIKit-Beobachter zaehlen: eine SwiftUI-DragGesture stoerte das Einrasten der Seiten
+            // Count touches via a UIKit observer: a SwiftUI DragGesture broke page snapping
             .background(TouchActivity { lastTouch = Date(); onActivity() })
             .task {
                 while !Task.isCancelled {
@@ -942,8 +942,8 @@ struct GalleryView: View {
                 if selected != nil {
                     ZStack {
                         Color.black.opacity(0.97).ignoresSafeArea()
-                        // Durchwischen: horizontaler ScrollView mit Seiten-Einrasten, jede Seite exakt Containerbreite
-                        // (TabView im Seitenstil blieb im Vollbild zwischen zwei Seiten stehen)
+                        // Swiping: horizontal ScrollView with page snapping, each page exactly the container width
+                        // (a page-style TabView got stuck between two pages in full screen)
                         GeometryReader { g in
                             ScrollView(.horizontal) {
                                 LazyHStack(spacing: 0) {
@@ -1031,7 +1031,7 @@ struct TouchActivity: UIViewRepresentable {
 
     static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) { coordinator.detach() }
 
-    /// Erkenner, der bei jedem Touch-Beginn meldet und sofort fehlschlaegt, damit Scrollen und Paging unberuehrt bleiben.
+    /// Recognizer that reports every touch start and fails immediately so scrolling and paging stay untouched.
     final class Observer: UIGestureRecognizer {
         var onTouch: (() -> Void)?
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) { onTouch?(); state = .failed }
@@ -1157,7 +1157,7 @@ struct PhraseEditor: View {
 
 // MARK: - Immich-Einstellungen
 
-/// Auswahl eines Kamerawerts in einem scrollbaren Popover (Menus mit 40+ Eintraegen liessen sich nicht scrollen).
+/// Pick a camera value in a scrollable popover (menus with 40+ entries could not be scrolled).
 struct SettingPicker: View {
     let setting: CameraSetting
     let apply: (Int64) -> Void
@@ -1195,7 +1195,7 @@ struct SettingPicker: View {
     }
 }
 
-/// Systemweites Teilen-Menue (UIActivityViewController) fuer eine Datei.
+/// System share sheet (UIActivityViewController) for a file.
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController { UIActivityViewController(activityItems: items, applicationActivities: nil) }
@@ -1204,13 +1204,13 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 extension URL: @retroactive Identifiable { public var id: String { absoluteString } }
 
-/// Ein Speicherziel als kompakte Zeile: Schalter rechts, darunter Groesse (Original/Web) und RAW, nur wenn aktiv.
+/// A destination as a compact row: toggle on the right, size (original/web) below, only when active.
 struct DestinationRow: View {
     let title: LocalizedStringKey
     let icon: String
     @Binding var enabled: Bool
     var fixed: LocalizedStringKey? = nil          // fester Hinweis statt Schalter (App-Galerie)
-    var original: Binding<Bool>?                  // nil = keine Groessenwahl
+    var original: Binding<Bool>?                  // nil = no size choice
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1290,7 +1290,7 @@ struct EventPanel: View {
     }
 }
 
-/// QR-Code aus CoreImage, scharf skaliert.
+/// QR code from CoreImage, scaled crisply.
 struct QRCodeView: View {
     let text: String
     var body: some View {

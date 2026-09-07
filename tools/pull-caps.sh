@@ -1,8 +1,8 @@
 #!/bin/zsh
-# Holt den Faehigkeitsbericht der Kamera vom iPad nach ./logs/capabilities.log
+# Fetches the camera capability report from the iPad to ./logs/capabilities.log
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 cd "$(dirname "$0")/.." || exit 1
-# Geraete-ID: Argument, Umgebung OPENBOOTH_DEVICE oder Datei .device (siehe tools/install.sh)
+# Device ID: argument, environment OPENBOOTH_DEVICE or file .device (see tools/install.sh)
 ID=${1:-${OPENBOOTH_DEVICE:-$(cat .device 2>/dev/null)}}
 [ -z "$ID" ] && { echo "Keine Geraete-ID: xcrun devicectl list devices, dann ID in .device schreiben"; exit 1; }
 mkdir -p logs; rm -f logs/capabilities.log

@@ -2,8 +2,8 @@
 //  Capabilities.swift
 //  OpenBooth
 //
-//  Faehigkeiten der Kamera als lesbarer Bericht: Standard-Operationen, Events, Properties aus DeviceInfo,
-//  Sony-Vendor-Properties und Steuercodes aus 0x9202, sowie alle 0x9209-Properties mit Typ, Wert und Auswahl.
+//  Camera capabilities as a readable report: standard operations, events, properties from DeviceInfo,
+//  Sony vendor properties and control codes from 0x9202, plus all 0x9209 properties with type, value and choices.
 //
 
 import Foundation
@@ -74,7 +74,7 @@ enum PTPNames {
 }
 
 extension SonyCamera {
-    /// Vollstaendiger Faehigkeitsbericht nach dem Handshake.
+    /// Full capability report after the handshake.
     func capabilitiesReport() -> String {
         var out: [String] = []
         let di = deviceInfo
@@ -132,7 +132,7 @@ extension SonyCamera {
     }
 }
 
-/// Umgebung fuer den Diagnosebericht: iPad, System, App-Version, Einstellungen ohne Geheimnisse.
+/// Environment for the diagnostics report: iPad, OS, app version, settings without secrets.
 enum Diagnostics {
     @MainActor static func environment(_ s: AppSettings?) -> String {
         let dev = UIDevice.current

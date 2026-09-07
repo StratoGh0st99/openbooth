@@ -2,7 +2,7 @@
 //  ImmichUploader.swift
 //  OpenBooth
 //
-//  Laedt Fotos automatisch in ein Immich-Album. Warteschlange auf Platte, Wiederholung bei Fehlern.
+//  Uploads photos to an Immich album automatically. Queue on disk, retries on errors.
 //  API: POST /api/assets (multipart), GET/POST /api/albums, PUT /api/albums/{id}/assets, Header x-api-key.
 //
 
@@ -10,7 +10,7 @@ import Foundation
 import Security
 import UIKit
 
-/// API-Key im Schluesselbund, nicht in UserDefaults.
+/// API key in the keychain, not in UserDefaults.
 enum Keychain {
     private static let service = "de.reingruber.openbooth"
 
@@ -37,7 +37,7 @@ enum Keychain {
 @MainActor
 final class ImmichUploader: ObservableObject {
     struct Item: Codable, Equatable {
-        let path: String          // relativ zum Documents-Ordner
+        let path: String          // relative to the Documents folder
         let createdAt: Date
         var attempts: Int = 0
     }
@@ -47,7 +47,7 @@ final class ImmichUploader: ObservableObject {
     @Published private(set) var lastMessage = String(localized: "off")
     @Published private(set) var busy = false
 
-    @Published private(set) var shareURL: String?   // oeffentlicher Freigabelink des Albums (fuer den QR-Code)
+    @Published private(set) var shareURL: String?   // public share link of the album (for the QR code)
 
     var enabled = false
     var serverURL = ""      // z. B. https://immich.example.de
@@ -78,7 +78,7 @@ final class ImmichUploader: ObservableObject {
         if enabled { kick() }
     }
 
-    /// Datei in die Warteschlange (wird sofort verarbeitet, wenn moeglich).
+    /// Enqueue a file (processed immediately when possible).
     func enqueue(_ fileURL: URL) {
         guard enabled else { return }
         let rel = fileURL.path.replacingOccurrences(of: docs.path + "/", with: "")
@@ -88,13 +88,13 @@ final class ImmichUploader: ObservableObject {
         kick()
     }
 
-    /// Sofort erneut versuchen: laufenden Worker (der evtl. in der Wartezeit schlaeft) abbrechen und neu starten
+    /// Retry now: cancel the running worker (which may be sleeping in the backoff) and restart
     func retryNow() {
         worker?.cancel(); worker = nil
         for i in pending.indices { pending[i].attempts = 0 }
         kick()
     }
-    /// Warteschlange verwerfen (Dateien bleiben liegen, bis das Aufraeumen sie holt)
+    /// Drop the queue (files stay until the cleanup removes them)
     func clearQueue() {
         worker?.cancel(); worker = nil
         pending = []; saveQueue()
@@ -131,7 +131,7 @@ final class ImmichUploader: ObservableObject {
                 lastMessage = String(localized: "Error: \(error.localizedDescription)")
                 log?("Immich: \(error.localizedDescription) (attempt \(pending[0].attempts), waiting \(backoff) s)")
                 if pending[0].attempts >= 8 {
-                    // Datei ans Ende, damit andere durchkommen
+                    // Move the file to the end so others get through
                     let it = pending.removeFirst(); pending.append(Item(path: it.path, createdAt: it.createdAt, attempts: 0)); saveQueue()
                 }
                 try? await Task.sleep(nanoseconds: backoff * 1_000_000_000)
@@ -154,7 +154,7 @@ final class ImmichUploader: ObservableObject {
         return r
     }
 
-    /// Verbindungstest: Serverantwort und Benutzer.
+    /// Connection test: server response and user.
     func test() async -> String {
         do {
             var r = try request("/api/users/me")
@@ -194,7 +194,7 @@ final class ImmichUploader: ObservableObject {
         return id
     }
 
-    /// Oeffentlichen Freigabelink des Albums holen oder anlegen (fuer den QR-Code der Gaeste).
+    /// Fetch or create the public share link of the album (for the guests' QR code).
     @discardableResult
     func ensureShareLink() async throws -> String {
         if let shareURL { return shareURL }
