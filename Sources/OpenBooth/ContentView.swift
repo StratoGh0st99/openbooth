@@ -649,14 +649,17 @@ struct AdminPanel: View {
     @ViewBuilder private var storageSection: some View {
         SwiftUI.Section {
             // Eine Zeile je Ziel: Symbol, Name, Schalter; darunter kompakt Groesse und RAW, nur wenn eingeschaltet
-            DestinationRow(title: "App gallery", icon: "internaldrive", enabled: .constant(true), fixed: "Web 2000 px", original: nil, raw: nil)
-            DestinationRow(title: "iPad photo library", icon: "photo.on.rectangle.angled", enabled: $settings.saveToPhotos, original: $settings.photosOriginal, raw: nil)
-            DestinationRow(title: "Immich", icon: "server.rack", enabled: $settings.immichEnabled, original: $settings.immichOriginal, raw: $settings.immichUploadRAW)
+            DestinationRow(title: "App gallery", icon: "internaldrive", enabled: .constant(true), fixed: "Web 2000 px", original: nil)
+            DestinationRow(title: "iPad photo library", icon: "photo.on.rectangle.angled", enabled: $settings.saveToPhotos, original: $settings.photosOriginal)
+            DestinationRow(title: "Immich", icon: "server.rack", enabled: $settings.immichEnabled, original: $settings.immichOriginal)
                 .onChange(of: settings.immichEnabled) { _, _ in cam.syncImmich() }
-            DestinationRow(title: "WebDAV", icon: "externaldrive.connected.to.line.below", enabled: $settings.webdavEnabled, original: $settings.webdavOriginal, raw: $settings.webdavUploadRAW)
+            DestinationRow(title: "WebDAV", icon: "externaldrive.connected.to.line.below", enabled: $settings.webdavEnabled, original: $settings.webdavOriginal)
                 .onChange(of: settings.webdavEnabled) { _, _ in cam.syncWebDAV() }
             if !settings.anyTargetKeepsOriginal {
                 Label("No target keeps the original. Full-size photos are discarded.", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+            }
+            if cam.cameraDeliversRAW {
+                Label("Camera delivers RAW: every enabled target also receives the ARW file (~30 MB per photo).", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
         } header: { Text("Targets") }
         if settings.immichEnabled {
@@ -1171,7 +1174,6 @@ struct DestinationRow: View {
     @Binding var enabled: Bool
     var fixed: LocalizedStringKey? = nil          // fester Hinweis statt Schalter (App-Galerie)
     var original: Binding<Bool>?                  // nil = keine Groessenwahl
-    var raw: Binding<Bool>?                       // nil = keine RAW-Option
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1180,13 +1182,10 @@ struct DestinationRow: View {
                 Spacer()
                 if let fixed { Text(fixed).foregroundStyle(.secondary) } else { Toggle("", isOn: $enabled).labelsHidden() }
             }
-            if enabled, fixed == nil, original != nil || raw != nil {
+            if enabled, fixed == nil, let original {
                 HStack(spacing: 16) {
-                    if let original {
-                        Picker("", selection: original) { Text("Original").tag(true); Text("Web 2000 px").tag(false) }
-                            .pickerStyle(.segmented).labelsHidden().frame(width: 240)
-                    }
-                    if let raw { Toggle("RAW", isOn: raw).toggleStyle(.button).buttonStyle(.bordered) }
+                    Picker("", selection: original) { Text("Original").tag(true); Text("Web 2000 px").tag(false) }
+                        .pickerStyle(.segmented).labelsHidden().frame(width: 240)
                     Spacer()
                 }
                 .padding(.leading, 30)

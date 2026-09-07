@@ -60,7 +60,7 @@ Localization: strings are English in code, German lives in `Sources/OpenBooth/Lo
   Event, Camera, Flow, Display & Sounds, Destinations, Phrases, Access, Log.
 - **Camera settings** (ISO, aperture, shutter, focus, setting effect, save destination) are set directly in the camera;
   values set in the app are remembered per model and restored on reconnect.
-- **RAW**: set image quality to RAW+JPEG or RAW; both objects are fetched from camera RAM (the counter `0xD215` reports
+- **RAW**: set image quality to RAW+JPEG or RAW; both objects are fetched from camera RAM and the ARW goes to every enabled target (the admin warns about the size) (the counter `0xD215` reports
   `0x8001` after the first fetch); the ARW is stored as its own asset in the library and under `Fotos/raw`.
   With “RAW only”, the embedded 1616×1080 preview of the ARW is used for display.
 - **Event**: the event name is the Immich album and the WebDAV folder; both are created automatically.

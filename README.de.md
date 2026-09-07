@@ -56,7 +56,7 @@ Personal Team reicht, die App läuft dann 7 Tage und muss neu installiert werden
   Spiegelung, Galerie für Gäste, Debug-Modus.
 - **Debug-Modus**: Seitenleiste mit Kamera-Schritten und PTP-Log bleibt dauerhaft sichtbar.
 - Kamera wird automatisch verbunden, Liveview wird bei Aussetzern neu gestartet, das iPad bleibt wach.
-- **RAW**: Bildqualität in den Kameraeinstellungen auf RAW+JPEG oder RAW stellen; beide Objekte werden aus dem Kamera-RAM
+- **RAW**: Bildqualität in den Kameraeinstellungen auf RAW+JPEG oder RAW stellen; beide Objekte werden aus dem Kamera-RAM geholt, die ARW geht an jedes aktive Ziel (der Admin warnt wegen der Größe); beide Objekte werden aus dem Kamera-RAM
   geholt (der Zähler `0xD215` meldet nach dem ersten Abruf `0x8001`), das ARW landet als eigener Eintrag in der
   Mediathek und unter `Fotos/raw`. Bei „nur RAW" dient die eingebettete 1616×1080-Vorschau der ARW als Anzeige.
 - **Immich-Upload** (optional): Server, API-Key (Schlüsselbund) und Album im Admin, jedes Foto geht per

@@ -292,6 +292,16 @@
         }
       }
     },
+    "Camera delivers RAW: every enabled target also receives the ARW file (~30 MB per photo).": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Kamera liefert RAW: jedes aktive Ziel bekommt zusätzlich die ARW-Datei (~30 MB pro Foto)."
+          }
+        }
+      }
+    },
     "Camera disconnected": {
       "localizations": {
         "de": {
@@ -1438,16 +1448,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Programm"
-          }
-        }
-      }
-    },
-    "RAW": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RAW"
           }
         }
       }

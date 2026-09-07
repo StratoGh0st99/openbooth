@@ -42,7 +42,6 @@ final class AppSettings: ObservableObject {
     @Published var saveToPhotos: Bool { didSet { d.set(saveToPhotos, forKey: "saveToPhotos") } }
     @Published var immichEnabled: Bool { didSet { d.set(immichEnabled, forKey: "immichEnabled") } }
     @Published var immichURL: String { didSet { d.set(immichURL, forKey: "immichURL") } }
-    @Published var immichUploadRAW: Bool { didSet { d.set(immichUploadRAW, forKey: "immichUploadRAW") } }
     /// true = Original in voller Groesse, false = Web-Version (2000 px lange Kante)
     @Published var photosOriginal: Bool { didSet { d.set(photosOriginal, forKey: "photosOriginal") } }
     @Published var immichOriginal: Bool { didSet { d.set(immichOriginal, forKey: "immichOriginal") } }
@@ -50,7 +49,6 @@ final class AppSettings: ObservableObject {
     @Published var webdavEnabled: Bool { didSet { d.set(webdavEnabled, forKey: "webdavEnabled") } }
     @Published var webdavURL: String { didSet { d.set(webdavURL, forKey: "webdavURL") } }
     @Published var webdavUser: String { didSet { d.set(webdavUser, forKey: "webdavUser") } }
-    @Published var webdavUploadRAW: Bool { didSet { d.set(webdavUploadRAW, forKey: "webdavUploadRAW") } }
     @Published var soundsEnabled: Bool { didSet { d.set(soundsEnabled, forKey: "soundsEnabled") } }
     @Published var soundWelcome: Bool { didSet { d.set(soundWelcome, forKey: "soundWelcome") } }
     @Published var soundCountdown: Bool { didSet { d.set(soundCountdown, forKey: "soundCountdown") } }
@@ -93,14 +91,12 @@ final class AppSettings: ObservableObject {
         saveToPhotos = d.object(forKey: "saveToPhotos") as? Bool ?? true
         immichEnabled = d.object(forKey: "immichEnabled") as? Bool ?? false
         immichURL = d.string(forKey: "immichURL") ?? ""
-        immichUploadRAW = d.object(forKey: "immichUploadRAW") as? Bool ?? false
         photosOriginal = d.object(forKey: "photosOriginal") as? Bool ?? true
         immichOriginal = d.object(forKey: "immichOriginal") as? Bool ?? true
         webdavOriginal = d.object(forKey: "webdavOriginal") as? Bool ?? true
         webdavEnabled = d.object(forKey: "webdavEnabled") as? Bool ?? false
         webdavURL = d.string(forKey: "webdavURL") ?? ""
         webdavUser = d.string(forKey: "webdavUser") ?? ""
-        webdavUploadRAW = d.object(forKey: "webdavUploadRAW") as? Bool ?? false
         soundsEnabled = d.object(forKey: "soundsEnabled") as? Bool ?? true
         soundWelcome = d.object(forKey: "soundWelcome") as? Bool ?? true
         soundCountdown = d.object(forKey: "soundCountdown") as? Bool ?? true

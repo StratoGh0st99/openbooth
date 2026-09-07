@@ -183,10 +183,15 @@ final class CameraManager: NSObject, ObservableObject {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: "\\", with: "-")
         return t.isEmpty ? String(localized: "Photo Booth") : t
     }
-    /// RAW-Datei an die Ziele geben, die RAW wollen.
+    /// RAW-Datei an alle aktiven Upload-Ziele: was von der Kamera kommt, wird weggespeichert.
     private func upload(_ url: URL, isRAW: Bool) {
-        if !isRAW || settingsRef?.immichUploadRAW == true { immich.enqueue(url) }
-        if !isRAW || settingsRef?.webdavUploadRAW == true { webdav.enqueue(url) }
+        if settingsRef?.immichEnabled == true { immich.enqueue(url) }
+        if settingsRef?.webdavEnabled == true { webdav.enqueue(url) }
+    }
+    /// Liefert die Kamera RAW (Bildqualitaet RAW oder RAW+JPEG)?
+    var cameraDeliversRAW: Bool {
+        guard let v = sony?.currentValue(SonyProp.imageQuality) else { return false }
+        return v == 1 || v == 2
     }
 
     func syncImmich() {

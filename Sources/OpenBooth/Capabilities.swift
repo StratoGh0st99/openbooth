@@ -141,7 +141,7 @@ enum Diagnostics {
         var out = ["# OpenBooth diagnostics, \(DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium)) (\(TimeZone.current.identifier))",
                    "App \(v) (\(b)), \(dev.systemName) \(dev.systemVersion), device \(Self.modelIdentifier()), locale \(Locale.current.identifier)"]
         if let s {
-            out.append("Settings: autoConnect=\(s.autoConnect) countdown=\(s.countdownSeconds) shots=\(s.shotsPerCapture)/\(s.shotInterval)s result=\(s.resultSeconds)s idle=\(s.idleSeconds)s slideshow=\(s.slideshowInterval)s mirror=\(s.mirrorLiveView) pickupExternal=\(s.pickupExternal) motionWake=\(s.motionWake)/\(s.motionThreshold) saveToPhotos=\(s.saveToPhotos) immich=\(s.immichEnabled)(\(s.immichURL.isEmpty ? "empty" : "set"), raw=\(s.immichUploadRAW)) webdav=\(s.webdavEnabled)(\(s.webdavURL.isEmpty ? "empty" : "set"), raw=\(s.webdavUploadRAW)) sounds=\(s.soundsEnabled) maxBrightness=\(s.maxBrightness) debug=\(s.debugMode)")
+            out.append("Settings: autoConnect=\(s.autoConnect) countdown=\(s.countdownSeconds) shots=\(s.shotsPerCapture)/\(s.shotInterval)s result=\(s.resultSeconds)s idle=\(s.idleSeconds)s slideshow=\(s.slideshowInterval)s mirror=\(s.mirrorLiveView) pickupExternal=\(s.pickupExternal) motionWake=\(s.motionWake)/\(s.motionThreshold) saveToPhotos=\(s.saveToPhotos) immich=\(s.immichEnabled)(\(s.immichURL.isEmpty ? "empty" : "set")) webdav=\(s.webdavEnabled)(\(s.webdavURL.isEmpty ? "empty" : "set")) sounds=\(s.soundsEnabled) maxBrightness=\(s.maxBrightness) debug=\(s.debugMode)")
         }
         return out.joined(separator: "\n") + "\n"
     }
