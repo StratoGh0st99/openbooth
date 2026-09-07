@@ -760,6 +760,7 @@ final class CameraManager: NSObject, ObservableObject {
         let interval = max(0, settingsRef?.shotInterval ?? 3)
         if seconds > 0 { countdown = seconds }
         capturing = true
+        captureCancelled = false
         shotTotal = shots
         shotNumber = 0
         Task {
@@ -767,16 +768,20 @@ final class CameraManager: NSObject, ObservableObject {
             var taken: [UIImage] = []
             var takenURLs: [URL] = []
             for shot in 1...shots {
+                if captureCancelled { break }
                 shotNumber = shot
                 // Countdown: beim ersten Bild der eingestellte, danach die Pause
                 let cd = shot == 1 ? seconds : interval
                 if wasLive, liveTask == nil, cd >= 2 { startLiveView() }   // Pause mit Liveview ueberbruecken
                 let beep = (settingsRef?.soundsEnabled ?? true) && (settingsRef?.soundCountdown ?? true)
                 for n in stride(from: cd, through: 1, by: -1) {
+                    if captureCancelled { break }
                     countdown = n
                     if beep { Sounds.shared.play("tick") }
-                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    // in 100-ms-Schritten schlafen, damit ein Abbruch sofort greift
+                    for _ in 0..<10 { if captureCancelled { break }; try? await Task.sleep(nanoseconds: 100_000_000) }
                 }
+                if captureCancelled { countdown = nil; break }
                 capturePhrase = nextPhrase()
                 if beep { Sounds.shared.play("shot") }
                 countdown = nil
@@ -807,13 +812,27 @@ final class CameraManager: NSObject, ObservableObject {
                 capturePhrase = nil
             }
             shotNumber = 0
+            countdown = nil
+            if captureCancelled { appendLog("Capture cancelled by user after \(taken.count) photo(s)") }
             if !taken.isEmpty {
                 showResult(taken, urls: takenURLs)
                 status = taken.count == 1 ? String(localized: "Photo saved") : "\(taken.count) photos saved"
+            } else if captureCancelled {
+                status = String(localized: "Cancelled")
             }
             capturing = false
+            captureCancelled = false
             if wasLive { startLiveView() }
         }
+    }
+
+    /// Abbruch durch den Gast: wirkt sofort im Countdown und zwischen den Bildern einer Serie.
+    /// Ein gerade laufender Kameraabruf wird noch zu Ende gefuehrt, damit die Kamera sauber bleibt.
+    @Published private(set) var captureCancelled = false
+    func cancelCapture() {
+        guard capturing else { return }
+        captureCancelled = true
+        noteInteraction()
     }
 
     /// Objekte einer Aufnahme sichern: App-Galerie (immer), Mediathek und Immich nach Einstellung.

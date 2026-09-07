@@ -125,6 +125,21 @@ struct ContentView: View {
                     .onTapGesture { cam.noteInteraction() }
             }
 
+            // Abbrechen waehrend Countdown und Serie (nicht waehrend das Bild gerade von der Kamera kommt)
+            if cam.capturing, !cam.captureCancelled, cam.countdown != nil || (cam.shotTotal > 1 && cam.shotNumber < cam.shotTotal) {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button { cam.cancelCapture() } label: {
+                            Label("Cancel", systemImage: "xmark").frame(width: 160, height: 56)
+                        }
+                        .buttonStyle(.borderedProminent).tint(Color(white: 0.22))
+                        .padding(24)
+                    }
+                    Spacer()
+                }
+            }
+
             // Countdown
             if let n = cam.countdown {
                 VStack(spacing: 0) {
