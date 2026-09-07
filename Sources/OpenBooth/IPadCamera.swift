@@ -97,12 +97,14 @@ final class IPadCamera: NSObject, @unchecked Sendable {
 
 extension IPadCamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePhotoCaptureDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        // ~15 fps is enough for the live view, saves CPU
+        // every 2nd frame (~15 fps) is enough for the live view, saves CPU
         frameSkip += 1
         if frameSkip % 2 == 0 { return }
         guard let handler = frameHandler, let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        let ci = CIImage(cvPixelBuffer: pb)
-        // Landscape orientation: landscape right (home button right) matches the booth setup
+        var ci = CIImage(cvPixelBuffer: pb)
+        // The .photo preset delivers ~12 MP frames; scale to ~1600 px wide before rendering, that is all the live view needs
+        let scale = min(1, 1600 / max(1, ci.extent.width))
+        if scale < 1 { ci = ci.transformed(by: CGAffineTransform(scaleX: scale, y: scale)) }
         let ctx = Self.ciContext
         guard let cg = ctx.createCGImage(ci, from: ci.extent) else { return }
         // do not mirror: the stage mirrors for the guests ("Mirror live view" setting), same as with the Sony
