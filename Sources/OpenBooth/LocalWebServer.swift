@@ -22,7 +22,7 @@ struct WebStatus: Encodable {
     var lastPhoto: String?      // time of the last photo
     var immich: String?         // status message or nil when off
     var webdav: String?
-    var brightness: Int         // Prozent
+    var brightness: Int         // percent
     var log: [String]
     var uptime: String
     var ipadBattery: String
@@ -35,8 +35,39 @@ final class LocalWebServer: @unchecked Sendable {
     static let port: UInt16 = 8787
     private let queue = DispatchQueue(label: "openbooth.web")
     private var listener: NWListener?
-    private var sessions: Set<String> = []
+    // Sessions and login attempts are touched from concurrent connection tasks: guard them with a lock.
+    private let lock = NSLock()
+    private var sessions: [String: Date] = [:]       // token -> expiry
     private var failedAttempts: [String: (count: Int, until: Date)] = [:]
+    private static let sessionTTL: TimeInterval = 12 * 3600
+
+    private func isAuthed(_ token: String?) -> Bool {
+        guard let token else { return false }
+        lock.lock(); defer { lock.unlock() }
+        sessions = sessions.filter { $0.value > Date() }
+        return sessions[token] != nil
+    }
+    private func openSession() -> String {
+        let t = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        lock.lock(); sessions[t] = Date().addingTimeInterval(Self.sessionTTL); lock.unlock()
+        return t
+    }
+    private func closeSession(_ token: String?) {
+        guard let token else { return }
+        lock.lock(); sessions[token] = nil; lock.unlock()
+    }
+    private func blocked(_ ip: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if let b = failedAttempts[ip], b.until > Date() { return true }
+        return false
+    }
+    private func loginSucceeded(_ ip: String) { lock.lock(); failedAttempts[ip] = nil; lock.unlock() }
+    private func loginFailed(_ ip: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        let n = (failedAttempts[ip]?.count ?? 0) + 1
+        failedAttempts[ip] = (n, n >= 5 ? Date().addingTimeInterval(60) : Date())
+        return n
+    }
     private let started = Date()
 
     /// Data providers, set by CameraManager (run on the MainActor)
@@ -145,11 +176,11 @@ final class LocalWebServer: @unchecked Sendable {
         let cookie = headers["cookie"] ?? ""
         let token = cookie.components(separatedBy: ";").map { $0.trimmingCharacters(in: .whitespaces) }
             .first { $0.hasPrefix("ob=") }?.dropFirst(3).description
-        let authed = token.map { sessions.contains($0) } ?? false
+        let authed = isAuthed(token)
 
         switch (method, p) {
         case ("POST", "/login"):
-            if let block = failedAttempts[ip], block.until > Date() {
+            if blocked(ip) {
                 return http(429, html(loginPage(error: String(localized: "Too many attempts, please wait a minute."))))
             }
             let form = String(decoding: body, as: UTF8.self)
@@ -158,17 +189,15 @@ final class LocalWebServer: @unchecked Sendable {
             }.first ?? ""
             let expected = await MainActor.run { pinProvider?() ?? "" }
             if !expected.isEmpty, pin == expected {
-                let t = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-                sessions.insert(t); failedAttempts[ip] = nil
+                let t = openSession(); loginSucceeded(ip)
                 log?("Remote: login from \(ip)")
                 return http(303, Data(), extra: ["Location": "/", "Set-Cookie": "ob=\(t); Path=/; HttpOnly; SameSite=Strict"])
             }
-            let n = (failedAttempts[ip]?.count ?? 0) + 1
-            failedAttempts[ip] = (n, n >= 5 ? Date().addingTimeInterval(60) : Date())
+            let n = loginFailed(ip)
             log?("Remote: wrong PIN from \(ip) (\(n))")
             return http(200, html(loginPage(error: String(localized: "Wrong PIN."))))
         case ("GET", "/logout"):
-            if let token { sessions.remove(token) }
+            closeSession(token)
             return http(303, Data(), extra: ["Location": "/", "Set-Cookie": "ob=; Path=/; Max-Age=0"])
         case ("GET", "/"):
             return http(200, html(authed ? statusPage : loginPage(error: nil)))

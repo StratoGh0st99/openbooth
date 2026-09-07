@@ -15,6 +15,8 @@ protocol CameraDriver: AnyObject {
     var deviceInfo: PTP.DeviceInfo { get }
     /// Fired by the PTP event delegate when the camera reports a new object (image ready).
     var objectAdded: EventSignal { get }
+    /// Vendor event codes that mean "new object" (Sony 0xC201, Canon 0xC181, standard PTP 0x4002)
+    var objectAddedEventCodes: Set<UInt16> { get }
     /// false = probe and report only, no live view, capture or settings
     var supportsRemoteControl: Bool { get }
     /// One line for the log after a successful connect
@@ -83,6 +85,7 @@ final class GenericPTPCamera: CameraDriver {
     let transport: PTPTransport
     private(set) var deviceInfo: PTP.DeviceInfo
     let objectAdded = EventSignal()
+    var objectAddedEventCodes: Set<UInt16> { [0x4002] }
     var supportsRemoteControl: Bool { false }
     var deliversRAW: Bool { false }
     var vendorPropertyCount: Int { 0 }

@@ -50,7 +50,7 @@ final class ImmichUploader: ObservableObject {
     @Published private(set) var shareURL: String?   // public share link of the album (for the QR code)
 
     var enabled = false
-    var serverURL = ""      // z. B. https://immich.example.de
+    var serverURL = ""      // e.g. https://immich.example.de
     var albumName = ""
     var log: ((String) -> Void)?
 
@@ -114,18 +114,23 @@ final class ImmichUploader: ObservableObject {
         busy = true
         defer { busy = false }
         var backoff: UInt64 = 2
-        while enabled, let item = pending.first {
+        // The queue can change under us while awaiting (clearQueue, retryNow cancels this worker): always re-check
+        // the head by path instead of trusting indices, and stop as soon as the task is cancelled.
+        while enabled, !Task.isCancelled, let item = pending.first {
             do {
                 try await upload(item)
-                pending.removeFirst()
+                if Task.isCancelled { return }
+                removeHead(item)
                 uploaded += 1
                 saveQueue()
                 lastMessage = pending.isEmpty ? String(localized: "all uploaded (\(uploaded))") : String(localized: "\(pending.count) pending")
                 backoff = 2
             } catch {
+                if Task.isCancelled { return }
                 if (error as NSError).domain == "Immich", (error as NSError).code == 4 {
-                    log?("Immich: \(error.localizedDescription), entry dropped"); pending.removeFirst(); saveQueue(); continue
+                    log?("Immich: \(error.localizedDescription), entry dropped"); removeHead(item); saveQueue(); continue
                 }
+                guard pending.first?.path == item.path else { continue }
                 pending[0].attempts += 1
                 saveQueue()
                 lastMessage = String(localized: "Error: \(error.localizedDescription)")
@@ -138,6 +143,9 @@ final class ImmichUploader: ObservableObject {
                 backoff = min(backoff * 2, 120)
             }
         }
+    }
+    private func removeHead(_ item: Item) {
+        if pending.first?.path == item.path { pending.removeFirst() }
     }
 
     // MARK: API

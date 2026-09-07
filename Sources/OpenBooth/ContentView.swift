@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  OpenBooth
 //
-//  Gaestemodus: Vollbild-Liveview, roter Knopf, Galerie, Leerlauf-Collage.
+//  Guest mode: full-screen live view, shutter button, gallery, idle collage.
 //  Two-finger swipe down -> PIN -> admin panel. Debug mode opens the admin at launch.
 //
 
@@ -21,6 +21,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showPinPad = false
     @State private var adminUnlocked = false
+    @State private var deleteIndex: Int?          // review photo awaiting delete confirmation
     /// QR code only if enabled and the album share link exists.
     private var qrLink: String? { settings.qrEnabled ? cam.immich.shareURL : nil }
 
@@ -78,6 +79,12 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .statusBarHidden()
+    }
+
+    /// Guests can hit Delete by accident: pause the review and ask once.
+    private func askDelete(_ index: Int) {
+        cam.setResultPaused(true)
+        deleteIndex = index
     }
 
     // MARK: Stage
@@ -174,7 +181,7 @@ struct ContentView: View {
                     .allowsHitTesting(false)
             }
 
-            // Bedienleiste unten
+            // Bottom bar
             VStack {
                 Spacer()
                 HStack(alignment: .bottom) {
@@ -197,8 +204,13 @@ struct ContentView: View {
                         cam.capture(withCountdown: settings.countdownSeconds)
                     } label: {
                         VStack {
-                            Image(systemName: "camera.fill").font(.system(size: 40))
-                            Text("Take a photo").font(.headline)
+                            if cam.capturing, cam.countdown == nil {
+                                ProgressView().tint(.white).controlSize(.large)
+                                Text("One moment…").font(.headline)
+                            } else {
+                                Image(systemName: "camera.fill").font(.system(size: 40))
+                                Text("Take a photo").font(.headline)
+                            }
                         }
                         .frame(width: 240, height: 120)
                     }
@@ -245,7 +257,7 @@ struct ContentView: View {
                 ZStack {
                     Color.black.opacity(0.92)
                     VStack(spacing: 16) {
-                        // Restzeit-Balken
+                        // Remaining-time bar
                         if let shownAt = cam.resultShownAt {
                             // Updated every frame (no minimumInterval), width via transform instead of layout: smooth
                             TimelineView(.animation(paused: cam.resultPausedAt != nil)) { ctx in
@@ -260,6 +272,11 @@ struct ContentView: View {
                                 .frame(height: 8)
                             }
                             .padding(.horizontal, 40)
+                            .overlay(alignment: .trailing) {
+                                if cam.resultPausedAt != nil {
+                                    Text("Paused").font(.caption.bold()).foregroundStyle(.orange).padding(.trailing, 40).offset(y: 18)
+                                }
+                            }
                         }
                         if cam.resultPhotos.count == 1, let result = cam.resultPhotos.first {
                             Image(uiImage: result)
@@ -281,7 +298,7 @@ struct ContentView: View {
                                         .clipShape(RoundedRectangle(cornerRadius: 10))
                                         .shadow(radius: 10)
                                         .overlay(alignment: .topTrailing) {
-                                            Button { cam.deleteResult(at: i) } label: {
+                                            Button { askDelete(i) } label: {
                                                 Image(systemName: "xmark").font(.headline.bold())
                                                     .frame(width: 40, height: 40)
                                                     .background(.black.opacity(0.65), in: Circle())
@@ -296,7 +313,7 @@ struct ContentView: View {
                         HStack(spacing: 24) {
                             if cam.resultPhotos.count == 1 {
                                 Button(role: .destructive) {
-                                    cam.deleteResult(at: 0)
+                                    askDelete(0)
                                 } label: {
                                     Label("Delete", systemImage: "trash").frame(width: 160, height: 56)
                                 }
@@ -421,6 +438,10 @@ struct ContentView: View {
         }
         .contentShape(Rectangle())
         .simultaneousGesture(TapGesture().onEnded { cam.noteInteraction() })
+        .alert("Delete this photo?", isPresented: Binding(get: { deleteIndex != nil }, set: { if !$0 { deleteIndex = nil } })) {
+            Button("Delete", role: .destructive) { if let i = deleteIndex { cam.deleteResult(at: i) }; deleteIndex = nil }
+            Button("Keep", role: .cancel) { deleteIndex = nil; cam.setResultPaused(false) }
+        } message: { Text("It is removed from the booth gallery only.") }
         .animation(.spring(duration: 0.3), value: cam.capturePhrase)
         .animation(.easeInOut(duration: 0.3), value: cam.banner)
         .animation(.easeInOut(duration: 0.25), value: cam.captureError == nil)
@@ -430,7 +451,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Admin-Panel (Seitenleiste)
+// MARK: - Admin panel (sidebar)
 
 struct AdminPanel: View {
     @EnvironmentObject var cam: CameraManager
@@ -439,6 +460,7 @@ struct AdminPanel: View {
     // Start section selectable via launch argument (-adminSection "Camera"), for simulator screenshots
     @State private var section: Section = Section(rawValue: UserDefaults.standard.string(forKey: "adminSection") ?? "") ?? .event
     @State private var newPin = ""
+    @State private var pinChanged = false
     @State private var diagnosticsURL: URL?
     @State private var exportURL: URL?
     @State private var importing = false
@@ -466,7 +488,7 @@ struct AdminPanel: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Seitenleiste
+            // Sidebar
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 10) {
                     Image("Logo").resizable().frame(width: 34, height: 34).clipShape(RoundedRectangle(cornerRadius: 8))
@@ -493,7 +515,7 @@ struct AdminPanel: View {
                     .padding(.horizontal, 8)
                 }
                 Spacer()
-                // Kamerastatus kompakt
+                // Compact camera status
                 HStack(spacing: 8) {
                     Circle().fill(statusColor).frame(width: 9, height: 9)
                     Text(cam.status).font(.caption).foregroundStyle(.secondary).lineLimit(2)
@@ -510,7 +532,7 @@ struct AdminPanel: View {
 
             Divider()
 
-            // Inhalt
+            // Content
             Form {
                 switch section {
                 case .event: eventSection
@@ -548,7 +570,7 @@ struct AdminPanel: View {
         }
     }
 
-    // MARK: Abschnitte
+    // MARK: Sections
 
     private var eventSection: some View {
         SwiftUI.Section {
@@ -585,7 +607,7 @@ struct AdminPanel: View {
             Toggle("Histogram in live view and review", isOn: $settings.showHistogram)
             Button { cam.capture(withCountdown: 0) } label: { Label("Test photo", systemImage: "camera") }
                 .buttonStyle(.borderedProminent).disabled(cam.state != .connected || cam.capturing)
-            HStack {
+            if settings.debugMode { HStack {
                 Button("PTP test") { cam.probe() }
                     .disabled(!(cam.state == .sessionOpen || cam.state == .probed || cam.state == .connected))
                 Button("Handshake") { cam.connect() }.disabled(!(cam.state == .probed || cam.state == .connected))
@@ -593,7 +615,7 @@ struct AdminPanel: View {
                     cam.liveRunning ? cam.stopLiveView() : cam.startLiveView()
                 }.disabled(cam.state != .connected)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered) }
         }
         if cam.state == .connected && !cam.settings.isEmpty {
             SwiftUI.Section {
@@ -702,8 +724,9 @@ struct AdminPanel: View {
             }
             HStack {
                 SecureField("New PIN (at least 4 digits)", text: $newPin).keyboardType(.numberPad)
-                Button("Set") { if newPin.count >= 4 { settings.pin = newPin; newPin = "" } }
+                Button("Set") { if newPin.count >= 4 { settings.pin = newPin; newPin = ""; pinChanged = true } }
                     .buttonStyle(.bordered).disabled(newPin.count < 4)
+                if pinChanged { Label("PIN changed", systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.callout) }
             }
         } header: { Text("PIN") } footer: { Text("Admin: two-finger swipe down, then PIN.") }
         SwiftUI.Section {
@@ -724,7 +747,7 @@ struct AdminPanel: View {
                     }
                 }
             }
-        } header: { Text("Remote access") } footer: { Text("Read-only status page, same Wi‑Fi, admin PIN.") }
+        } header: { Text("Remote access") } footer: { Text("Status page on the same Wi‑Fi, protected by the admin PIN.") }
         SwiftUI.Section {
             HStack(spacing: 12) {
                 Button { exportURL = writeExport() } label: { Label("Export settings…", systemImage: "square.and.arrow.up") }.buttonStyle(.bordered)
@@ -951,7 +974,7 @@ struct GalleryView: View {
                             ScrollView(.horizontal) {
                                 LazyHStack(spacing: 0) {
                                     ForEach(photos, id: \.self) { url in
-                                        LargePhoto(url: url)
+                                        LargePhoto(url: url) { selected = nil }
                                             .frame(width: g.size.width, height: g.size.height)
                                             .id(url)
                                     }
@@ -986,11 +1009,15 @@ struct GalleryView: View {
 
     struct LargePhoto: View {
         let url: URL
+        var onTap: () -> Void = {}
         @State private var image: UIImage?
         var body: some View {
             Group {
                 if let image { Image(uiImage: image).resizable().scaledToFit().padding() } else { ProgressView() }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .onTapGesture { onTap() }
             .task(id: url) {
                 if let data = try? Data(contentsOf: url) { image = await CameraManager.previewImage(from: data) }
             }
@@ -1112,7 +1139,7 @@ struct TwoFingerSwipeDown: UIViewRepresentable {
 }
 
 
-// MARK: - Phrases bearbeiten
+// MARK: - Phrase editor
 
 struct PhraseEditor: View {
     @EnvironmentObject var settings: AppSettings
@@ -1212,7 +1239,7 @@ struct DestinationRow: View {
     let title: LocalizedStringKey
     let icon: String
     @Binding var enabled: Bool
-    var fixed: LocalizedStringKey? = nil          // fester Hinweis statt Schalter (App-Galerie)
+    var fixed: LocalizedStringKey? = nil          // fixed note instead of a toggle (app gallery)
     var original: Binding<Bool>?                  // nil = no size choice
 
     var body: some View {

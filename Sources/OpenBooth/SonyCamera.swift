@@ -105,7 +105,7 @@ actor PTPTransport {
         Task { await self.emit(s) }
     }
 
-    /// Eine komplette Transaktion: Command (+ optional Data-Out) -> (Response, Data-In).
+    /// One complete transaction: command (+ optional data-out) -> (response, data-in).
     func transaction(_ op: UInt16, params: [UInt32] = [], dataOut: Data? = nil) async throws -> (PTP.Response, Data) {
         let tid = transactionID
         transactionID &+= 1
@@ -145,7 +145,7 @@ actor PTPTransport {
     }
 }
 
-/// Der Sony-Treiber: Handshake, Liveview, Ausloesen, Bildabruf.
+/// The Sony driver: handshake, live view, shutter release, image retrieval.
 final class SonyCamera: CameraDriver {
     let transport: PTPTransport
     private(set) var deviceInfo = PTP.DeviceInfo()
@@ -175,6 +175,7 @@ final class SonyCamera: CameraDriver {
     }
 
     var supportsRemoteControl: Bool { true }
+    var objectAddedEventCodes: Set<UInt16> { [0xC201] }
     var vendorPropertyCount: Int { max(vendorProps.count, props.count) }
     var controlCodeCount: Int { controlCodes.count }
     var connectSummary: String { "Handshake OK, protocol 0x\(String(protocolVersion, radix: 16)), \(vendorCodes.count) vendor codes, \(props.count) properties" }
@@ -251,7 +252,7 @@ final class SonyCamera: CameraDriver {
     static func parseAllProps(_ d: Data) -> [UInt16: SonyPropDesc] {
         var out: [UInt16: SonyPropDesc] = [:]
         guard d.count > 8 else { return out }
-        var off = 8 // u32 Anzahl, u32 0
+        var off = 8 // u32 count, u32 0
         while off + 6 <= d.count {
             let code = d.readLE(UInt16.self, at: off)
             let dtc = d.readLE(UInt16.self, at: off + 2)
@@ -273,7 +274,7 @@ final class SonyCamera: CameraDriver {
                     enumVals = readEnum(d, type: dtc, at: &off)
                 default: break
                 }
-                // zweite Liste?
+                // second list?
                 if form == 2, off + 2 <= d.count, d.readLE(UInt16.self, at: off) < 0x200 {
                     let second = readEnum(d, type: dtc, at: &off)
                     if !second.isEmpty { enumVals = second }
@@ -300,7 +301,7 @@ final class SonyCamera: CameraDriver {
 
     func currentValue(_ code: UInt16) -> Int64? { props[code]?.currentValue }
 
-    /// ControlDeviceA: Property-Wert setzen (z. B. ISO, Blende, PriorityMode).
+    /// ControlDeviceA: set a property value (e.g. ISO, aperture, PriorityMode).
     func setValue(_ code: UInt16, value: Int64, type: UInt16) async throws {
         try await transport.run(SonyOp.setExtDevicePropValue, params: [UInt32(code)],
                                 dataOut: PTP.encodeValue(value, type: type))
@@ -356,7 +357,7 @@ final class SonyCamera: CameraDriver {
         return nil
     }
 
-    // MARK: Ausloesen
+    // MARK: Capture
 
     /// Releases the shutter and returns all objects from camera RAM (JPEG, plus the ARW with RAW+JPEG).
     /// Flow like libgphoto2 camera_sony_capture; multiple objects as in ptp_wait_event: while 0xD215 > 0x8000,
@@ -392,13 +393,14 @@ final class SonyCamera: CameraDriver {
             }
         }
 
+        // Arm the signal before releasing: the ObjectAdded event can arrive while the release commands are still in flight
+        objectAdded.reset()
         try await control(SonyProp.shutterRelease, value: 1)
         try await control(SonyProp.shutterHalfRelease, value: 1)
 
         // Wait for the image: the camera reports ObjectAdded (0xC201) immediately; as long as no events have been
         // observed, poll every 100 ms, otherwise only once a second as a safety net. At most 35 s (long exposure).
         progress?("Waiting for the image…")
-        objectAdded.reset()
         let start = Date()
         var ready = false
         var lastPoll = Date.distantPast

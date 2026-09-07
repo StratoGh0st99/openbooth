@@ -20,7 +20,7 @@ final class WebDAVUploader: ObservableObject {
     @Published private(set) var lastMessage = String(localized: "off")
 
     var enabled = false
-    var baseURL = ""        // Basis-URL plus Eventordner, z. B. https://cloud.example.de/remote.php/dav/files/paul/Hochzeit
+    var baseURL = ""        // base URL plus event folder, e.g. https://cloud.example.de/remote.php/dav/files/paul/Hochzeit
     var user = ""
     var log: ((String) -> Void)?
 
@@ -81,29 +81,38 @@ final class WebDAVUploader: ObservableObject {
 
     private func drain() async {
         var backoff: UInt64 = 2
-        while enabled, let item = pending.first {
+        // The queue can change under us while awaiting (clearQueue, retryNow cancels this worker): always re-check
+        // the head by path instead of trusting indices, and stop as soon as the task is cancelled.
+        while enabled, !Task.isCancelled, let item = pending.first {
             do {
                 try await upload(item)
-                pending.removeFirst()
+                if Task.isCancelled { return }
+                removeHead(item)
                 uploaded += 1
                 saveQueue()
                 lastMessage = pending.isEmpty ? String(localized: "all uploaded (\(uploaded))") : String(localized: "\(pending.count) pending")
                 backoff = 2
             } catch {
+                if Task.isCancelled { return }
                 if (error as NSError).domain == "WebDAV", (error as NSError).code == 4 {
-                    log?("WebDAV: \(error.localizedDescription), entry dropped"); pending.removeFirst(); saveQueue(); continue
+                    log?("WebDAV: \(error.localizedDescription), entry dropped"); removeHead(item); saveQueue(); continue
                 }
+                guard pending.first?.path == item.path else { continue }
                 pending[0].attempts += 1
                 saveQueue()
                 lastMessage = String(localized: "Error: \(error.localizedDescription)")
                 log?("WebDAV: \(error.localizedDescription) (attempt \(pending[0].attempts), waiting \(backoff) s)")
                 if pending[0].attempts >= 8 {
+                    // Move the file to the end so others get through
                     let it = pending.removeFirst(); pending.append(Item(path: it.path)); saveQueue()
                 }
                 try? await Task.sleep(nanoseconds: backoff * 1_000_000_000)
                 backoff = min(backoff * 2, 120)
             }
         }
+    }
+    private func removeHead(_ item: Item) {
+        if pending.first?.path == item.path { pending.removeFirst() }
     }
 
     // MARK: HTTP

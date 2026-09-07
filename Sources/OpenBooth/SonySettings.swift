@@ -8,7 +8,7 @@
 
 import Foundation
 
-/// Eine anzeigbare, aenderbare Kameraeinstellung.
+/// A displayable, changeable camera setting.
 struct CameraSetting: Identifiable, Equatable {
     let code: UInt16
     let title: String
@@ -37,7 +37,7 @@ enum SonyFormat {
         0x8050: "Movie P", 0x8051: "Movie A", 0x8052: "Movie S", 0x8053: "Movie M",
     ]
     static let focusModes: [Int64: String] = [
-        1: String(localized: "Manual"), 2: "AF-S", 3: "AF Makro", 0x8004: "AF-C", 0x8005: "AF-A", 0x8006: "DMF",
+        1: String(localized: "Manual"), 2: "AF-S", 3: "AF Macro", 0x8004: "AF-C", 0x8005: "AF-A", 0x8006: "DMF",
         0x8007: String(localized: "Manual (reversed)"), 0x8008: "AF-D", 0x8009: String(localized: "Preset focus"),
     ]
     static let onOff12: [Int64: String] = [1: String(localized: "On"), 2: String(localized: "Off")]
@@ -52,7 +52,7 @@ enum SonyFormat {
         (SonyProp.iso, "ISO"),
         (SonyProp.fNumber, String(localized: "Aperture")),
         (SonyProp.shutterSpeed, String(localized: "Shutter speed")),
-        (SonyProp.focusMode, "Fokus"),
+        (SonyProp.focusMode, "Focus"),
         (SonyProp.liveViewSettingEffect, String(localized: "Setting effect in live view")),
         (SonyProp.imageQuality, String(localized: "Image quality")),
         (SonyProp.pcSaveImageFormat, String(localized: "Transfer to the app")),
@@ -91,7 +91,7 @@ enum SonyFormat {
 
     static func setting(from desc: SonyPropDesc, title: String) -> CameraSetting {
         let opts = desc.enumValues.map { CameraSetting.Option(value: $0, label: label(code: desc.code, value: $0)) }
-        // GetSet 1 = setzbar; isEnabled 0 = ausgegraut
+        // GetSet 1 = writable; isEnabled 0 = greyed out
         let writable = desc.getSet == 1 && desc.isEnabled != 0
         return CameraSetting(code: desc.code, title: title, options: opts, current: desc.currentValue, writable: writable)
     }

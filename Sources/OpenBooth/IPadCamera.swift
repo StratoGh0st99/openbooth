@@ -69,18 +69,10 @@ final class IPadCamera: NSObject, @unchecked Sendable {
     }
 
     /// Format with at least 30 fps video and the largest photo size: smooth live view, full-resolution photos.
-    private(set) var formatList: [String] = []
     private(set) var deviceList: [String] = []
     private func pickFormat(_ dev: AVCaptureDevice) {
         var best: AVCaptureDevice.Format?
         var bestPhoto = 0
-        // list every format once (for the log), so we can see what the sensor offers
-        formatList = dev.formats.map { f in
-            let d = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
-            let fps = Int(f.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0)
-            let p = f.supportedMaxPhotoDimensions.last.map { "\($0.width)x\($0.height)" } ?? "-"
-            return "\(d.width)x\(d.height)@\(fps) photo \(p)\(f.isVideoBinned ? " binned" : "")"
-        }
         for f in dev.formats {
             let dims = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
             guard dims.width >= 1280, f.videoSupportedFrameRateRanges.contains(where: { $0.maxFrameRate >= 30 }) else { continue }
@@ -111,8 +103,8 @@ final class IPadCamera: NSObject, @unchecked Sendable {
     private func applyRotation() {
         let angle: CGFloat
         switch UIDevice.current.orientation {
-        case .landscapeLeft: angle = 0        // USB-C rechts
-        case .landscapeRight: angle = 180     // USB-C links
+        case .landscapeLeft: angle = 0        // USB-C on the right
+        case .landscapeRight: angle = 180     // USB-C on the left
         case .portrait: angle = 90
         case .portraitUpsideDown: angle = 270
         default: angle = lastAngle
@@ -131,14 +123,26 @@ final class IPadCamera: NSObject, @unchecked Sendable {
     }
 
     /// Photo as JPEG (full resolution of the iPad camera).
+    private var photoID = 0
     func capture() async throws -> CapturedObject {
         let data: Data = try await withCheckedThrowingContinuation { cont in
             queue.async {
+                guard self.session.isRunning, self.photoContinuation == nil else {
+                    cont.resume(throwing: NSError(domain: "IPadCamera", code: 4, userInfo: [NSLocalizedDescriptionKey: "iPad camera not running"])); return
+                }
+                self.photoID += 1
+                let id = self.photoID
                 self.photoContinuation = cont
                 let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
                 s.photoQualityPrioritization = .quality
                 s.maxPhotoDimensions = self.photo.maxPhotoDimensions   // otherwise iOS captures at the video size
                 self.photo.capturePhoto(with: s, delegate: self)
+                // Safety net: never leave the capture flow hanging if the delegate is not called
+                self.queue.asyncAfter(deadline: .now() + 10) {
+                    guard self.photoID == id, let c = self.photoContinuation else { return }
+                    self.photoContinuation = nil
+                    c.resume(throwing: NSError(domain: "IPadCamera", code: 5, userInfo: [NSLocalizedDescriptionKey: "Timeout: iPad camera delivered no photo"]))
+                }
             }
         }
         let f = DateFormatter(); f.dateFormat = "yyyyMMdd-HHmmss"
@@ -161,14 +165,17 @@ extension IPadCamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePho
     private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard let cont = photoContinuation else { return }
-        photoContinuation = nil
-        if let error { cont.resume(throwing: error); return }
-        guard let data = photo.fileDataRepresentation() else {
-            cont.resume(throwing: NSError(domain: "IPadCamera", code: 3, userInfo: [NSLocalizedDescriptionKey: "No image from the iPad camera"])); return
+        let data = photo.fileDataRepresentation()
+        queue.async {
+            guard let cont = self.photoContinuation else { return }
+            self.photoContinuation = nil
+            if let error { cont.resume(throwing: error); return }
+            guard let data else {
+                cont.resume(throwing: NSError(domain: "IPadCamera", code: 3, userInfo: [NSLocalizedDescriptionKey: "No image from the iPad camera"])); return
+            }
+            // Photo stays unmirrored, like a camera photo (the Sony does not mirror either)
+            cont.resume(returning: data)
         }
-        // Photo stays unmirrored, like a camera photo (the Sony does not mirror either)
-        cont.resume(returning: data)
     }
 
 }

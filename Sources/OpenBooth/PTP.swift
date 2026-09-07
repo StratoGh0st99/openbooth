@@ -243,7 +243,7 @@ enum PTP {
         oi.storageID = d.readLE(UInt32.self, at: 0)
         oi.objectFormat = d.readLE(UInt16.self, at: 4)
         oi.compressedSize = d.readLE(UInt32.self, at: 8)
-        // Feste Felder bis Offset 52, danach Filename (String)
+        // Fixed fields up to offset 52, then the filename (string)
         var off = 52
         oi.filename = readString(d, at: &off)
         return oi

@@ -21,7 +21,7 @@ final class Sounds {
         players["welcome"] = make(notes: [(523.25, 0.0, 0.55), (659.25, 0.16, 0.55), (783.99, 0.32, 0.7)], volume: 0.5)
         // Countdown: kurzer Piep A5
         players["tick"] = make(notes: [(880, 0, 0.09)], volume: 0.6)
-        // Ausloesen: hoeherer Doppelton
+        // Shutter: higher double tone
         players["shot"] = make(notes: [(1318.5, 0, 0.12), (1760, 0.10, 0.22)], volume: 0.7)
         players.values.forEach { $0.prepareToPlay() }
     }

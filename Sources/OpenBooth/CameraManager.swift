@@ -25,7 +25,7 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var liveRunning = false
     @Published var lastPhoto: UIImage?
     @Published var status = String(localized: "Connect a camera")
-    @Published var authorization = "unbekannt"
+    @Published var authorization = "unknown"
     @Published var settings: [CameraSetting] = []
     @Published var settingsBusy = false
     var autoConnect: Bool { settingsRef?.autoConnect ?? true }
@@ -376,7 +376,6 @@ final class CameraManager: NSObject, ObservableObject {
         if forcingBrightness { UIScreen.main.brightness = userBrightness; forcingBrightness = false }
     }
 
-    /// Diagnostics file for sharing: environment, current capability report with raw data, full log.
     // MARK: Event storage usage
 
     /// Size of the event folder in bytes (gallery, originals, RAW, thumbnails)
@@ -392,6 +391,7 @@ final class CameraManager: NSObject, ObservableObject {
         dismissResult()
         immich.clearQueue(); webdav.clearQueue()
         let n = sessionPhotos.count
+        sessionPhotos.forEach { ThumbnailStore.remove($0) }
         try? FileManager.default.removeItem(at: Self.photosDir)
         sessionPhotos = []
         lastPhoto = nil
@@ -517,7 +517,7 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: Suche
+    // MARK: Discovery
 
     func start() {
         appendLog("Requesting authorization…")
@@ -603,7 +603,7 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    /// Meilenstein 1: GetDeviceInfo durchreichen. Entscheidet, ob iPadOS PTP-Passthrough erlaubt.
+    /// Pass GetDeviceInfo through. Decides whether iPadOS allows PTP pass-through.
     func probe() { Task { _ = await probeAsync() } }
 
     @discardableResult
@@ -784,7 +784,7 @@ final class CameraManager: NSObject, ObservableObject {
             banner = Banner(kind: .error, text: String(localized: "Camera not responding"), detail: String(localized: "Power-cycle the camera or reconnect USB"))
             autoReport("camera not responding after 5 attempts")
             recoverTask = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: 20_000_000_000)   // danach weiter versuchen, aber langsamer
+                try? await Task.sleep(nanoseconds: 20_000_000_000)   // keep trying afterwards, but slower
                 await MainActor.run { self?.recoverTask = nil; self?.recoverAttempts = 3; self?.scheduleRecover(reason: "retry") }
             }
             return
@@ -947,7 +947,7 @@ final class CameraManager: NSObject, ObservableObject {
         return result
     }
 
-    // MARK: PTP-Events (zuhoeren statt fragen)
+    // MARK: PTP events (listen instead of polling)
 
     private var eventCounts: [UInt16: Int] = [:]
     private(set) var eventsWorking = false      // at least one ObjectAdded received: external shutter runs via events
@@ -956,8 +956,9 @@ final class CameraManager: NSObject, ObservableObject {
     private func handleEvent(code: UInt16, params: [UInt32]) {
         eventCounts[code, default: 0] += 1
         lastEventAt = Date()
+        let objectAdded = driver?.objectAddedEventCodes ?? [0xC201]
         switch code {
-        case 0xC201:   // Sony ObjectAdded: new image in RAM (handle in param 1)
+        case _ where objectAdded.contains(code):   // ObjectAdded: new image in RAM (handle in param 1)
             appendLog(String(format: "Event ObjectAdded 0x%08X", params.first ?? 0))
             if !eventsWorking { eventsWorking = true; appendLog("Camera events arrive, external shutter now reacts instantly") }
             driver?.objectAdded.fire()
@@ -965,7 +966,7 @@ final class CameraManager: NSObject, ObservableObject {
         case 0xC203:   // PropertyChanged: arrives on every setting change and while focusing, just count
             break
         default:
-            if eventCounts[code] == 1 { appendLog(String(format: "PTP-Event 0x%04X %@", code, params.map { String(format: "0x%X", $0) }.joined(separator: " "))) }
+            if eventCounts[code] == 1 { appendLog(String(format: "PTP event 0x%04X %@", code, params.map { String(format: "0x%X", $0) }.joined(separator: " "))) }
         }
     }
 
@@ -1109,6 +1110,7 @@ final class CameraManager: NSObject, ObservableObject {
         resultPhotos = []
         resultURLs = []
         resultShownAt = nil
+        resultPausedAt = nil
     }
 
     /// Deletes a review image from the app gallery. The Apple photo library stays unchanged.
@@ -1125,11 +1127,9 @@ final class CameraManager: NSObject, ObservableObject {
         resultPhotos.remove(at: index)
         resultPhoto = resultPhotos.first
         lastPhoto = resultPhotos.last ?? lastPhoto
-        if resultPhotos.isEmpty { dismissResult() } else { resultShownAt = Date(); resultTask?.cancel()
-            resultTask = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: UInt64((self?.resultSeconds ?? 10) * 1_000_000_000))
-                if !Task.isCancelled { await MainActor.run { self?.dismissResult() } }
-            }
+        if resultPhotos.isEmpty { dismissResult() } else {
+            resultShownAt = Date(); resultPausedAt = nil
+            startResultTimer(seconds: Double(resultSeconds))
         }
     }
 
@@ -1279,7 +1279,7 @@ extension CameraManager: ICDeviceBrowserDelegate {
     }
 }
 
-// MARK: - ICCameraDeviceDelegate (Pflichtmethoden, groesstenteils ungenutzt)
+// MARK: - ICCameraDeviceDelegate (required methods, mostly unused)
 
 extension CameraManager: ICCameraDeviceDelegate {
     nonisolated func didRemove(_ device: ICDevice) {}
