@@ -63,7 +63,10 @@ Personal Team reicht, die App läuft dann 7 Tage und muss neu installiert werden
   `POST /api/assets` in die Warteschlange und danach ins Album (`PUT /api/albums/{id}/assets`). Ohne Netz wird
   nachgeholt, „Verbindung testen" prüft Key und Album. RAW optional mit.
 - **Veranstaltung**: der Eventname im Admin ist Immich-Album und WebDAV-Ordner zugleich, beides wird automatisch angelegt.
-- **Speicherorte** im Admin: App-Galerie (immer, Quelle für Rückschau und Collage), iPad-Mediathek, Immich und WebDAV einzeln schaltbar.
+- **Speicherorte** im Admin: App-Galerie (immer, Web-Kopie 2000 px, Quelle für Rückschau und Collage), iPad-Mediathek, Immich und
+  WebDAV einzeln schaltbar; Immich und WebDAV bekommen wahlweise Original oder Web-Kopie (gut für LTE). Originale bleiben nur so lange
+  im App-Ordner, bis jedes Ziel sie hat; bekommt kein Ziel Originale, bleiben sie liegen.
+- **Warnungen**: iPad-Akku, Kamera-Akku und freier Speicher erscheinen als Hinweis auf dem Gästebildschirm, wenn sie knapp werden.
 - **WebDAV-Upload** (optional): Ordner-URL, Benutzer, Passwort (Schlüsselbund). Ordner wird per `MKCOL` angelegt, Dateien per `PUT`,
   eigene Warteschlange mit Wiederholung. Getestet mit Nextcloud (`remote.php/dav/files/NAME/Ordner`).
 - **Collage endet bei Bewegung**: Liveview wird im Leerlauf auf 32×18 Graustufen verkleinert, die mittlere Änderung zum Vorbild

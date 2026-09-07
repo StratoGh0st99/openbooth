@@ -348,6 +348,23 @@ struct ContentView: View {
                 )
             }
 
+            // Ressourcen-Warnung oben rechts: Akku oder Speicher knapp, bleibt bis behoben
+            if !cam.resourceWarnings.isEmpty, cam.resultPhotos.isEmpty {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Label(cam.resourceWarnings.joined(separator: "  ·  "), systemImage: "exclamationmark.triangle.fill")
+                            .font(.callout.bold()).foregroundStyle(.yellow)
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(.black.opacity(0.75), in: Capsule())
+                            .overlay(Capsule().stroke(Color.yellow.opacity(0.7), lineWidth: 1))
+                            .padding(16)
+                    }
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+            }
+
             // Statusbanner oben (nur wenn etwas nicht laeuft)
             if let b = cam.banner, cam.resultPhotos.isEmpty {
                 VStack {
@@ -546,6 +563,7 @@ struct AdminPanel: View {
                 if cam.usingIPadCamera { Label("iPad camera active", systemImage: "ipad.and.arrow.forward").foregroundStyle(.orange) }
             }
             LabeledContent("Battery", value: "iPad \(cam.batteryText(cam.iPadBattery()))" + (cam.cameraBattery().map { String(localized: ", camera \($0) %") } ?? ""))
+            LabeledContent("Free storage", value: CameraManager.freeDiskGB().map { String(format: "%.1f GB", $0) } ?? "?")
             Toggle("Mirror live view", isOn: $settings.mirrorLiveView)
             Toggle("Histogram in live view and review", isOn: $settings.showHistogram)
             HStack {
@@ -636,7 +654,10 @@ struct AdminPanel: View {
                 .onChange(of: settings.immichEnabled) { _, _ in cam.syncImmich() }
             Toggle(isOn: $settings.webdavEnabled) { Label("WebDAV folder (Nextcloud, NAS, Storage Box)", systemImage: "externaldrive.connected.to.line.below") }
                 .onChange(of: settings.webdavEnabled) { _, _ in cam.syncWebDAV() }
-        } header: { Text("Targets") }
+            if !settings.anyTargetKeepsOriginal {
+                Label("No target keeps the original; originals stay in the app folder.", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+            }
+        } header: { Text("Targets") } footer: { Text("Gallery keeps a 2000 px web copy.") }
         if settings.immichEnabled {
             SwiftUI.Section("Immich server") { ImmichPanel() }
         }
@@ -1233,6 +1254,8 @@ struct WebDAVPanel: View {
                     runTest()
                 }.buttonStyle(.bordered).disabled(password.isEmpty || testing)
             }
+            Picker("Size", selection: $settings.webdavOriginal) { Text("Original").tag(true); Text("Web (2000 px)").tag(false) }
+                .pickerStyle(.segmented)
             Toggle("Upload RAW files too", isOn: $settings.webdavUploadRAW)
             HStack {
                 Button(testing ? "Testing…" : "Test connection") { cam.syncWebDAV(); runTest() }
@@ -1279,6 +1302,8 @@ struct ImmichPanel: View {
             if let link = cam.immich.shareURL {
                 Text("Share link: \(link)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             }
+            Picker("Size", selection: $settings.immichOriginal) { Text("Original").tag(true); Text("Web (2000 px)").tag(false) }
+                .pickerStyle(.segmented)
             Toggle("Upload RAW files too", isOn: $settings.immichUploadRAW)
             HStack {
                 Button(testing ? "Testing…" : "Test connection") { cam.syncImmich(); runTest() }

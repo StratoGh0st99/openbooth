@@ -272,6 +272,16 @@
         }
       }
     },
+    "Camera battery %lld %": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera-Akku %lld %"
+          }
+        }
+      }
+    },
     "Camera capabilities and log, no credentials.": {
       "localizations": {
         "de": {
@@ -732,6 +742,16 @@
         }
       }
     },
+    "Free storage": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freier Speicher"
+          }
+        }
+      }
+    },
     "Front camera": {
       "localizations": {
         "de": {
@@ -768,6 +788,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Galerie für Gäste"
+          }
+        }
+      }
+    },
+    "Gallery keeps a 2000 px web copy.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Galerie behält eine Web-Kopie mit 2000 px."
           }
         }
       }
@@ -1102,6 +1132,16 @@
         }
       }
     },
+    "No target keeps the original; originals stay in the app folder.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein Ziel bekommt das Original; Originale bleiben im App-Ordner."
+          }
+        }
+      }
+    },
     "OK, folder reachable": {
       "localizations": {
         "de": {
@@ -1158,6 +1198,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Admin öffnen: mit zwei Fingern von oben nach unten wischen, dann PIN."
+          }
+        }
+      }
+    },
+    "Original": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original"
           }
         }
       }
@@ -1752,6 +1802,16 @@
         }
       }
     },
+    "Size": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Größe"
+          }
+        }
+      }
+    },
     "Sony handshake…": {
       "localizations": {
         "de": {
@@ -1828,6 +1888,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Liveview stoppen"
+          }
+        }
+      }
+    },
+    "Storage %@ GB free": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speicher %@ GB frei"
           }
         }
       }
@@ -2022,6 +2092,16 @@
         }
       }
     },
+    "Web (2000 px)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web (2000 px)"
+          }
+        }
+      }
+    },
     "WebDAV folder": {
       "localizations": {
         "de": {
@@ -2108,6 +2188,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bilder/s"
+          }
+        }
+      }
+    },
+    "iPad battery %lld %": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPad-Akku %lld %"
           }
         }
       }

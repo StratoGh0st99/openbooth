@@ -180,7 +180,7 @@ final class CameraManager: NSObject, ObservableObject {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: "\\", with: "-")
         return t.isEmpty ? String(localized: "Photo Booth") : t
     }
-    /// Datei an alle aktiven Upload-Ziele geben.
+    /// RAW-Datei an die Ziele geben, die RAW wollen.
     private func upload(_ url: URL, isRAW: Bool) {
         if !isRAW || settingsRef?.immichUploadRAW == true { immich.enqueue(url) }
         if !isRAW || settingsRef?.webdavUploadRAW == true { webdav.enqueue(url) }
@@ -272,6 +272,8 @@ final class CameraManager: NSObject, ObservableObject {
     private func tick() {
         tickCount += 1
         sampleUserBrightness()
+        if tickCount % 30 == 0 { cleanupOriginals() }
+        if tickCount % 15 == 0 { checkResources() }
         if tickCount % 150 == 0 { appendLog("Battery: iPad \(batteryText(iPadBattery())), camera \(cameraBattery().map { "\($0) %" } ?? "unknown")") }
         if tickCount % 3 == 0 { Self.logFile.snapshot() }
         if tickCount % 15 == 0, liveRunning { lastFPS = frameCount / 30; appendLog("Live view: \(lastFPS) fps"); frameCount = 0 }
@@ -365,6 +367,26 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     /// Diagnosedatei zum Teilen: Umgebung, aktueller Faehigkeitsbericht mit Rohdaten, komplettes Protokoll.
+    // MARK: Akku und Speicher: Warnungen fuer den Gaestebildschirm
+
+    @Published var resourceWarnings: [String] = []
+    static func freeDiskGB() -> Double? {
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        guard let v = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]), let cap = v.volumeAvailableCapacityForImportantUsage else { return nil }
+        return Double(cap) / 1_000_000_000
+    }
+    private func checkResources() {
+        var w: [String] = []
+        let ipad = iPadBattery()
+        if ipad.0 >= 0, ipad.0 <= 20, !ipad.1 { w.append(String(localized: "iPad battery \(ipad.0) %")) }
+        if let cb = cameraBattery(), cb <= 20 { w.append(String(localized: "Camera battery \(cb) %")) }
+        if let free = Self.freeDiskGB(), free < 5 { w.append(String(localized: "Storage \(String(format: "%.1f", free)) GB free")) }
+        if w != resourceWarnings {
+            resourceWarnings = w
+            if !w.isEmpty { appendLog("WARNING: " + w.joined(separator: ", ")) } else { appendLog("Resource warnings cleared") }
+        }
+    }
+
     // MARK: Akku
 
     /// iPad-Akku in Prozent (-1 unbekannt) und ob es laedt
@@ -849,14 +871,21 @@ final class CameraManager: NSObject, ObservableObject {
             upload(rawURL!, isRAW: true)
         }
         if let jpeg = jpegObj?.data {
-            let url = try Self.saveToDocuments(jpeg, stamp: stamp)
+            // Galerie bekommt die Web-Version (2000 px), das Original liegt unter originals/ bis alle Ziele es haben
+            let origURL = try Self.saveOriginal(jpeg, stamp: stamp)
+            let web = await Task.detached(priority: .userInitiated) { Self.downscaleJPEG(jpeg, maxEdge: 2000) }.value ?? jpeg
+            let url = try Self.saveToDocuments(web, stamp: stamp)
             ThumbnailStore.prepare(url)
             sessionPhotos.insert(url, at: 0)
-            upload(url, isRAW: false)
+            appendLog("Saved: original \(jpeg.count / 1_000_000) MB, web \(web.count / 1024) KB")
+            if let s = settingsRef {
+                if s.immichEnabled { immich.enqueue(s.immichOriginal ? origURL : url) }
+                if s.webdavEnabled { webdav.enqueue(s.webdavOriginal ? origURL : url) }
+            }
             if settingsRef?.saveToPhotos ?? true {
                 Self.saveToPhotos(jpeg, raw: rawObj?.data) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
             }
-            if let img = await Self.previewImage(from: jpeg) { result = (img, url); lastPhoto = img }
+            if let img = UIImage(data: web) { result = (img, url); lastPhoto = img }
         } else if let raw = rawObj, let rawURL {
             // Nur RAW: ARW als RAW in die Mediathek, Vorschau aus dem eingebetteten Bild
             if settingsRef?.saveToPhotos ?? true {
@@ -1072,6 +1101,46 @@ final class CameraManager: NSObject, ObservableObject {
     nonisolated static func stamp() -> String {
         let f = DateFormatter(); f.dateFormat = "yyyyMMdd-HHmmss-SSS"
         return f.string(from: Date())
+    }
+
+    static var originalsDir: URL { photosDir.appendingPathComponent("originals", isDirectory: true) }
+    static func saveOriginal(_ jpeg: Data, stamp: String) throws -> URL {
+        try FileManager.default.createDirectory(at: originalsDir, withIntermediateDirectories: true)
+        let url = originalsDir.appendingPathComponent("openbooth-\(stamp).jpg")
+        try jpeg.write(to: url)
+        return url
+    }
+    /// JPEG auf eine lange Kante verkleinern (ImageIO-Subsampling, EXIF-Ausrichtung angewandt), Qualitaet 0.9
+    nonisolated static func downscaleJPEG(_ data: Data, maxEdge: Int) -> Data? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+              let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxEdge] as CFDictionary) else { return nil }
+        return UIImage(cgImage: cg).jpegData(compressionQuality: 0.9)
+    }
+
+    /// Originale (und RAWs) loeschen, die kein Ziel mehr braucht: nicht in einer Warteschlange, mindestens ein Ziel
+    /// bekommt Originale (Mediathek oder Upload in Originalgroesse), aelter als 2 Minuten. Sonst bleiben sie liegen.
+    private func cleanupOriginals() {
+        guard let s = settingsRef, s.anyTargetKeepsOriginal else { return }
+        let fm = FileManager.default
+        let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].path + "/"
+        let pending = Set(immich.pending.map { $0.path } + webdav.pending.map { $0.path })
+        var freed = 0, n = 0
+        for dir in [Self.originalsDir, Self.rawDir] {
+            for f in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey])) ?? [] {
+                let rel = f.path.replacingOccurrences(of: docs, with: "")
+                guard !pending.contains(rel) else { continue }
+                let vals = try? f.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+                guard let mod = vals?.contentModificationDate, Date().timeIntervalSince(mod) > 120 else { continue }
+                // RAW nur loeschen, wenn ein Ziel es hat (Mediathek oder RAW-Upload)
+                if dir == Self.rawDir, !(s.saveToPhotos || (s.immichEnabled && s.immichUploadRAW) || (s.webdavEnabled && s.webdavUploadRAW)) { continue }
+                freed += vals?.fileSize ?? 0; n += 1
+                try? fm.removeItem(at: f)
+            }
+        }
+        if n > 0 { appendLog("Cleanup: \(n) original file(s) removed, \(freed / 1_000_000) MB freed") }
     }
 
     @discardableResult

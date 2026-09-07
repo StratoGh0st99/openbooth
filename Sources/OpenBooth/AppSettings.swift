@@ -43,6 +43,9 @@ final class AppSettings: ObservableObject {
     @Published var immichEnabled: Bool { didSet { d.set(immichEnabled, forKey: "immichEnabled") } }
     @Published var immichURL: String { didSet { d.set(immichURL, forKey: "immichURL") } }
     @Published var immichUploadRAW: Bool { didSet { d.set(immichUploadRAW, forKey: "immichUploadRAW") } }
+    /// true = Original in voller Groesse, false = Web-Version (2000 px lange Kante)
+    @Published var immichOriginal: Bool { didSet { d.set(immichOriginal, forKey: "immichOriginal") } }
+    @Published var webdavOriginal: Bool { didSet { d.set(webdavOriginal, forKey: "webdavOriginal") } }
     @Published var webdavEnabled: Bool { didSet { d.set(webdavEnabled, forKey: "webdavEnabled") } }
     @Published var webdavURL: String { didSet { d.set(webdavURL, forKey: "webdavURL") } }
     @Published var webdavUser: String { didSet { d.set(webdavUser, forKey: "webdavUser") } }
@@ -90,6 +93,8 @@ final class AppSettings: ObservableObject {
         immichEnabled = d.object(forKey: "immichEnabled") as? Bool ?? false
         immichURL = d.string(forKey: "immichURL") ?? ""
         immichUploadRAW = d.object(forKey: "immichUploadRAW") as? Bool ?? false
+        immichOriginal = d.object(forKey: "immichOriginal") as? Bool ?? true
+        webdavOriginal = d.object(forKey: "webdavOriginal") as? Bool ?? true
         webdavEnabled = d.object(forKey: "webdavEnabled") as? Bool ?? false
         webdavURL = d.string(forKey: "webdavURL") ?? ""
         webdavUser = d.string(forKey: "webdavUser") ?? ""
@@ -104,5 +109,10 @@ final class AppSettings: ObservableObject {
         if mt == 8, !d.bool(forKey: "motionThresholdV2") { mt = 6 }
         d.set(true, forKey: "motionThresholdV2")
         motionThreshold = mt
+    }
+
+    /// Bekommt irgendein Ziel das Original? Sonst bleiben die Originale im App-Ordner, damit nichts verloren geht.
+    var anyTargetKeepsOriginal: Bool {
+        saveToPhotos || (immichEnabled && immichOriginal) || (webdavEnabled && webdavOriginal)
     }
 }
