@@ -19,7 +19,9 @@ confirmed, Sony handshake, live view, capture, RAW, uploads, remote shutter via 
   handshake `0x9201` phases 1/2, `0x9202`, phase 3, PriorityMode; live view via object `0xFFFFC002`;
   shutter via `0x9207` with `0xD2C1`/`0xD2C2`; image from RAM via `0xFFFFC001` once `0xD215 >= 0x8000`.
 - Cameras: Sony ILCE-7M4 first, ILCE-6400 next. Canon later via the EOS PTP extension.
-- iPad camera (front or rear) as a fallback when no USB camera is present.
+- iPad camera (front or rear, standard or ultra-wide lens) as a fallback when no USB camera is present.
+- `CameraDriver` protocol: Sony is the first implementation; unknown vendors get a generic driver that writes the
+  capability report and asks for diagnostics instead of looping through recovery.
 
 ## Building
 
