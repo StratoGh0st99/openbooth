@@ -334,7 +334,7 @@ final class CameraManager: NSObject, ObservableObject {
         let report = cam.capabilitiesReport()
         try? report.data(using: .utf8)?.write(to: Self.capabilitiesURL, options: .atomic)
         let di = cam.deviceInfo
-        appendLog("Capabilities: \(di.operations.count) operations, \(di.events.count) events, \(di.properties.count) properties → openbooth-capabilities.log")
+        appendLog("Capabilities: \(di.operations.count) operations, \(di.events.count) events, \(di.properties.count) standard + \(cam.vendorPropertyCount) vendor properties, \(cam.controlCodeCount) control codes → openbooth-capabilities.log")
         appendLog("Operations: " + di.operations.sorted().map { PTPNames.hex($0) }.joined(separator: " "))
     }
 

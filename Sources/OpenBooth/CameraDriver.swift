@@ -19,6 +19,9 @@ protocol CameraDriver: AnyObject {
     var supportsRemoteControl: Bool { get }
     /// One line for the log after a successful connect
     var connectSummary: String { get }
+    /// Vendor-specific property and control code counts for the capability log line (0 when unknown)
+    var vendorPropertyCount: Int { get }
+    var controlCodeCount: Int { get }
     /// Does the camera currently deliver RAW files?
     var deliversRAW: Bool { get }
 
@@ -82,6 +85,8 @@ final class GenericPTPCamera: CameraDriver {
     let objectAdded = EventSignal()
     var supportsRemoteControl: Bool { false }
     var deliversRAW: Bool { false }
+    var vendorPropertyCount: Int { 0 }
+    var controlCodeCount: Int { 0 }
     private(set) var rawDumps: [(name: String, data: Data)] = []
 
     init(transport: PTPTransport, deviceInfo: PTP.DeviceInfo) {

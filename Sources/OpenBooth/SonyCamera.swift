@@ -175,6 +175,8 @@ final class SonyCamera: CameraDriver {
     }
 
     var supportsRemoteControl: Bool { true }
+    var vendorPropertyCount: Int { max(vendorProps.count, props.count) }
+    var controlCodeCount: Int { controlCodes.count }
     var connectSummary: String { "Handshake OK, protocol 0x\(String(protocolVersion, radix: 16)), \(vendorCodes.count) vendor codes, \(props.count) properties" }
     /// Image quality RAW (1) or RAW+JPEG (2)
     var deliversRAW: Bool { let v = currentValue(SonyProp.imageQuality); return v == 1 || v == 2 }
