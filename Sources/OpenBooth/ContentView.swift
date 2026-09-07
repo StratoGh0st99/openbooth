@@ -15,6 +15,8 @@ struct ContentView: View {
     @EnvironmentObject var settings: AppSettings
     @State private var showGallery = false
     @State private var showQR = false
+    @State private var pressStart: Date?
+    @State private var pressTask: Task<Void, Never>?
     @Environment(\.scenePhase) private var scenePhase
     @State private var showPinPad = false
     @State private var adminUnlocked = false
@@ -326,10 +328,24 @@ struct ContentView: View {
                     }
                 }
                 .transition(.opacity)
-                .onTapGesture { cam.dismissResult() }
-                .onLongPressGesture(minimumDuration: 0.2, maximumDistance: 60, perform: {}, onPressingChanged: { pressing in
-                    cam.setResultPaused(pressing)
-                })
+                // Ein Gestenpfad fuer Tipp und Halten: kurz = schliessen, lang = pausieren, Loslassen nach Halten = weiterlaufen
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in
+                            guard pressStart == nil else { return }
+                            pressStart = Date()
+                            pressTask = Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 200_000_000)
+                                if !Task.isCancelled, pressStart != nil { cam.setResultPaused(true) }
+                            }
+                        }
+                        .onEnded { _ in
+                            pressTask?.cancel()
+                            let held = pressStart.map { Date().timeIntervalSince($0) } ?? 0
+                            pressStart = nil
+                            if cam.resultPausedAt != nil || held >= 0.2 { cam.setResultPaused(false) } else { cam.dismissResult() }
+                        }
+                )
             }
 
             // Statusbanner oben (nur wenn etwas nicht laeuft)
