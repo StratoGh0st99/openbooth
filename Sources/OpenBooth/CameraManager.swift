@@ -331,12 +331,13 @@ final class CameraManager: NSObject, ObservableObject {
 
     /// Camera capability report to Documents/openbooth-capabilities.log (fetch with tools/pull-caps.sh).
     static var capabilitiesURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("openbooth-capabilities.log") }
-    private func writeCapabilities(_ cam: CameraDriver) {
+    private func writeCapabilities(_ cam: CameraDriver, log: Bool = true) {
         let report = cam.capabilitiesReport()
         try? report.data(using: .utf8)?.write(to: Self.capabilitiesURL, options: .atomic)
+        guard log else { return }
         let di = cam.deviceInfo
+        // The operation list is already in the log from the probe; here only the summary line
         appendLog("Capabilities: \(di.operations.count) operations, \(di.events.count) events, \(di.properties.count) standard + \(cam.vendorPropertyCount) vendor properties, \(cam.controlCodeCount) control codes → openbooth-capabilities.log")
-        appendLog("Operations: " + di.operations.sorted().map { PTPNames.hex($0) }.joined(separator: " "))
     }
 
     // MARK: Display brightness
@@ -621,7 +622,9 @@ final class CameraManager: NSObject, ObservableObject {
                 appendLog("Operations: \(ops)")
                 appendLog("Events: " + info.events.map { String(format: "%04X", $0) }.joined(separator: " "))
                 appendLog("Properties: " + info.properties.map { String(format: "%04X", $0) }.joined(separator: " "))
-                if let d = driver { writeCapabilities(d) }   // already after the probe so unknown cameras (handshake fails) end up in the report too
+                // Write the file already after the probe so unknown cameras (handshake fails) end up in the report too;
+                // the log summary follows once the handshake has filled in the vendor counts.
+                if let d = driver { writeCapabilities(d, log: d.supportsRemoteControl == false) }
                 state = .probed
                 status = String(localized: "PTP pass-through works")
                 return true
