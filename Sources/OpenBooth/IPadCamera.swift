@@ -16,7 +16,6 @@ final class IPadCamera: NSObject, @unchecked Sendable {
     private let photo = AVCapturePhotoOutput()
     private var frameHandler: ((UIImage) -> Void)?
     private var photoContinuation: CheckedContinuation<Data, Error>?
-    private var frameSkip = 0
     private(set) var position: AVCaptureDevice.Position = .front
     var running: Bool { session.isRunning }
 
@@ -33,7 +32,8 @@ final class IPadCamera: NSObject, @unchecked Sendable {
         position = front ? .front : .back
         frameHandler = onFrame
         session.beginConfiguration()
-        session.sessionPreset = .photo
+        // inputPriority: we pick the device format ourselves (30 fps video + full-size photos), see pickFormat()
+        session.sessionPreset = .inputPriority
         session.inputs.forEach { session.removeInput($0) }
         session.outputs.forEach { session.removeOutput($0) }
         guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) ?? AVCaptureDevice.default(for: .video) else {
@@ -49,12 +49,41 @@ final class IPadCamera: NSObject, @unchecked Sendable {
         if session.canAddOutput(video) { session.addOutput(video) }
         if session.canAddOutput(photo) { session.addOutput(photo) }
         photo.maxPhotoQualityPrioritization = .quality
+        pickFormat(dev)
         session.commitConfiguration()
         if let c = video.connection(with: .video) { c.isVideoMirrored = false }
         applyRotation()
         NotificationCenter.default.addObserver(self, selector: #selector(orientationChanged), name: UIDevice.orientationDidChangeNotification, object: nil)
         queue.async { [session] in session.startRunning() }
     }
+
+    /// Format with at least 30 fps video and the largest photo size: smooth live view, full-resolution photos.
+    private func pickFormat(_ dev: AVCaptureDevice) {
+        var best: AVCaptureDevice.Format?
+        var bestPhoto = 0
+        for f in dev.formats {
+            let dims = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
+            guard dims.width >= 1280, f.videoSupportedFrameRateRanges.contains(where: { $0.maxFrameRate >= 30 }) else { continue }
+            let photoDims = f.supportedMaxPhotoDimensions.last ?? dims
+            let px = Int(photoDims.width) * Int(photoDims.height)
+            // prefer the largest photo size; among equals the smallest video size (cheaper to process)
+            if px > bestPhoto || (px == bestPhoto && best.map({ dims.width < CMVideoFormatDescriptionGetDimensions($0.formatDescription).width }) == true) {
+                best = f; bestPhoto = px
+            }
+        }
+        guard let f = best else { return }
+        do {
+            try dev.lockForConfiguration()
+            dev.activeFormat = f
+            dev.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
+            dev.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+            dev.unlockForConfiguration()
+            if let pd = f.supportedMaxPhotoDimensions.last { photo.maxPhotoDimensions = pd }
+            let vd = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
+            formatSummary = "video \(vd.width)x\(vd.height) @30, photo \(photo.maxPhotoDimensions.width)x\(photo.maxPhotoDimensions.height)"
+        } catch {}
+    }
+    private(set) var formatSummary = ""
 
     /// Adapt image rotation to the iPad's orientation (landscape left or right), for live view and photo.
     @objc private func orientationChanged() { applyRotation() }
@@ -87,6 +116,7 @@ final class IPadCamera: NSObject, @unchecked Sendable {
                 self.photoContinuation = cont
                 let s = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
                 s.photoQualityPrioritization = .quality
+                s.maxPhotoDimensions = self.photo.maxPhotoDimensions   // otherwise iOS captures at the video size
                 self.photo.capturePhoto(with: s, delegate: self)
             }
         }
@@ -97,9 +127,6 @@ final class IPadCamera: NSObject, @unchecked Sendable {
 
 extension IPadCamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePhotoCaptureDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        // every 2nd frame (~15 fps) is enough for the live view, saves CPU
-        frameSkip += 1
-        if frameSkip % 2 == 0 { return }
         guard let handler = frameHandler, let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         var ci = CIImage(cvPixelBuffer: pb)
         // The .photo preset delivers ~12 MP frames; scale to ~1600 px wide before rendering, that is all the live view needs
