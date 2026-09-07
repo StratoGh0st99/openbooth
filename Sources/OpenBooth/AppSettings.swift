@@ -44,6 +44,7 @@ final class AppSettings: ObservableObject {
     @Published var immichURL: String { didSet { d.set(immichURL, forKey: "immichURL") } }
     @Published var immichUploadRAW: Bool { didSet { d.set(immichUploadRAW, forKey: "immichUploadRAW") } }
     /// true = Original in voller Groesse, false = Web-Version (2000 px lange Kante)
+    @Published var photosOriginal: Bool { didSet { d.set(photosOriginal, forKey: "photosOriginal") } }
     @Published var immichOriginal: Bool { didSet { d.set(immichOriginal, forKey: "immichOriginal") } }
     @Published var webdavOriginal: Bool { didSet { d.set(webdavOriginal, forKey: "webdavOriginal") } }
     @Published var webdavEnabled: Bool { didSet { d.set(webdavEnabled, forKey: "webdavEnabled") } }
@@ -93,6 +94,7 @@ final class AppSettings: ObservableObject {
         immichEnabled = d.object(forKey: "immichEnabled") as? Bool ?? false
         immichURL = d.string(forKey: "immichURL") ?? ""
         immichUploadRAW = d.object(forKey: "immichUploadRAW") as? Bool ?? false
+        photosOriginal = d.object(forKey: "photosOriginal") as? Bool ?? true
         immichOriginal = d.object(forKey: "immichOriginal") as? Bool ?? true
         webdavOriginal = d.object(forKey: "webdavOriginal") as? Bool ?? true
         webdavEnabled = d.object(forKey: "webdavEnabled") as? Bool ?? false
@@ -113,6 +115,6 @@ final class AppSettings: ObservableObject {
 
     /// Bekommt irgendein Ziel das Original? Sonst bleiben die Originale im App-Ordner, damit nichts verloren geht.
     var anyTargetKeepsOriginal: Bool {
-        saveToPhotos || (immichEnabled && immichOriginal) || (webdavEnabled && webdavOriginal)
+        (saveToPhotos && photosOriginal) || (immichEnabled && immichOriginal) || (webdavEnabled && webdavOriginal)
     }
 }

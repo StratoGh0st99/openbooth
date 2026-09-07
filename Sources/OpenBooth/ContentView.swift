@@ -650,6 +650,10 @@ struct AdminPanel: View {
         SwiftUI.Section {
             LabeledContent { Text("always").foregroundStyle(.secondary) } label: { Label("App gallery on the iPad", systemImage: "internaldrive") }
             Toggle(isOn: $settings.saveToPhotos) { Label("iPad photo library (Photos app)", systemImage: "photo.on.rectangle.angled") }
+            if settings.saveToPhotos {
+                Picker("Size", selection: $settings.photosOriginal) { Text("Original").tag(true); Text("Web (2000 px)").tag(false) }
+                    .pickerStyle(.segmented).padding(.leading, 20)
+            }
             Toggle(isOn: $settings.immichEnabled) { Label("Immich server", systemImage: "server.rack") }
                 .onChange(of: settings.immichEnabled) { _, _ in cam.syncImmich() }
             Toggle(isOn: $settings.webdavEnabled) { Label("WebDAV folder (Nextcloud, NAS, Storage Box)", systemImage: "externaldrive.connected.to.line.below") }

@@ -883,7 +883,8 @@ final class CameraManager: NSObject, ObservableObject {
                 if s.webdavEnabled { webdav.enqueue(s.webdavOriginal ? origURL : url) }
             }
             if settingsRef?.saveToPhotos ?? true {
-                Self.saveToPhotos(jpeg, raw: rawObj?.data) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
+                let forLibrary = (settingsRef?.photosOriginal ?? true) ? jpeg : web
+                Self.saveToPhotos(forLibrary, raw: rawObj?.data) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
             }
             if let img = UIImage(data: web) { result = (img, url); lastPhoto = img }
         } else if let raw = rawObj, let rawURL {
