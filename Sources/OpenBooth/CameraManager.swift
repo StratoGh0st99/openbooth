@@ -53,6 +53,9 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
     private func startIPadCamera() async {
+        #if targetEnvironment(simulator)
+        return   // der Simulator hat keine Kamera
+        #endif
         guard ipadCam == nil, settingsRef?.ipadFallback ?? true else { return }
         guard await IPadCamera.authorized() else { appendLog("iPad camera: no access (Settings › OpenBooth › Camera)"); return }
         let cam = IPadCamera()

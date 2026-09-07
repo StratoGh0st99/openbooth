@@ -648,20 +648,17 @@ struct AdminPanel: View {
 
     @ViewBuilder private var storageSection: some View {
         SwiftUI.Section {
-            LabeledContent { Text("always").foregroundStyle(.secondary) } label: { Label("App gallery on the iPad", systemImage: "internaldrive") }
-            Toggle(isOn: $settings.saveToPhotos) { Label("iPad photo library (Photos app)", systemImage: "photo.on.rectangle.angled") }
-            if settings.saveToPhotos {
-                Picker("Size", selection: $settings.photosOriginal) { Text("Original").tag(true); Text("Web (2000 px)").tag(false) }
-                    .pickerStyle(.segmented).padding(.leading, 20)
-            }
-            Toggle(isOn: $settings.immichEnabled) { Label("Immich server", systemImage: "server.rack") }
+            // Eine Zeile je Ziel: Symbol, Name, Schalter; darunter kompakt Groesse und RAW, nur wenn eingeschaltet
+            DestinationRow(title: "App gallery", icon: "internaldrive", enabled: .constant(true), fixed: "Web 2000 px", original: nil, raw: nil)
+            DestinationRow(title: "iPad photo library", icon: "photo.on.rectangle.angled", enabled: $settings.saveToPhotos, original: $settings.photosOriginal, raw: nil)
+            DestinationRow(title: "Immich", icon: "server.rack", enabled: $settings.immichEnabled, original: $settings.immichOriginal, raw: $settings.immichUploadRAW)
                 .onChange(of: settings.immichEnabled) { _, _ in cam.syncImmich() }
-            Toggle(isOn: $settings.webdavEnabled) { Label("WebDAV folder (Nextcloud, NAS, Storage Box)", systemImage: "externaldrive.connected.to.line.below") }
+            DestinationRow(title: "WebDAV", icon: "externaldrive.connected.to.line.below", enabled: $settings.webdavEnabled, original: $settings.webdavOriginal, raw: $settings.webdavUploadRAW)
                 .onChange(of: settings.webdavEnabled) { _, _ in cam.syncWebDAV() }
             if !settings.anyTargetKeepsOriginal {
                 Label("No target keeps the original. Full-size photos are discarded.", systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
-        } header: { Text("Targets") } footer: { Text("Gallery keeps a 2000 px web copy.") }
+        } header: { Text("Targets") }
         if settings.immichEnabled {
             SwiftUI.Section("Immich server") { ImmichPanel() }
         }
@@ -1167,6 +1164,38 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 extension URL: @retroactive Identifiable { public var id: String { absoluteString } }
 
+/// Ein Speicherziel als kompakte Zeile: Schalter rechts, darunter Groesse (Original/Web) und RAW, nur wenn aktiv.
+struct DestinationRow: View {
+    let title: LocalizedStringKey
+    let icon: String
+    @Binding var enabled: Bool
+    var fixed: LocalizedStringKey? = nil          // fester Hinweis statt Schalter (App-Galerie)
+    var original: Binding<Bool>?                  // nil = keine Groessenwahl
+    var raw: Binding<Bool>?                       // nil = keine RAW-Option
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(title, systemImage: icon)
+                Spacer()
+                if let fixed { Text(fixed).foregroundStyle(.secondary) } else { Toggle("", isOn: $enabled).labelsHidden() }
+            }
+            if enabled, fixed == nil, original != nil || raw != nil {
+                HStack(spacing: 16) {
+                    if let original {
+                        Picker("", selection: original) { Text("Original").tag(true); Text("Web 2000 px").tag(false) }
+                            .pickerStyle(.segmented).labelsHidden().frame(width: 240)
+                    }
+                    if let raw { Toggle("RAW", isOn: raw).toggleStyle(.button).buttonStyle(.bordered) }
+                    Spacer()
+                }
+                .padding(.leading, 30)
+                .font(.callout)
+            }
+        }
+    }
+}
+
 struct EventPanel: View {
     @EnvironmentObject var cam: CameraManager
     @EnvironmentObject var settings: AppSettings
@@ -1258,9 +1287,6 @@ struct WebDAVPanel: View {
                     runTest()
                 }.buttonStyle(.bordered).disabled(password.isEmpty || testing)
             }
-            Picker("Size", selection: $settings.webdavOriginal) { Text("Original").tag(true); Text("Web (2000 px)").tag(false) }
-                .pickerStyle(.segmented)
-            Toggle("Upload RAW files too", isOn: $settings.webdavUploadRAW)
             HStack {
                 Button(testing ? "Testing…" : "Test connection") { cam.syncWebDAV(); runTest() }
                     .buttonStyle(.bordered).disabled(testing || settings.webdavURL.isEmpty)
@@ -1306,9 +1332,6 @@ struct ImmichPanel: View {
             if let link = cam.immich.shareURL {
                 Text("Share link: \(link)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             }
-            Picker("Size", selection: $settings.immichOriginal) { Text("Original").tag(true); Text("Web (2000 px)").tag(false) }
-                .pickerStyle(.segmented)
-            Toggle("Upload RAW files too", isOn: $settings.immichUploadRAW)
             HStack {
                 Button(testing ? "Testing…" : "Test connection") { cam.syncImmich(); runTest() }
                     .buttonStyle(.bordered).disabled(testing || settings.immichURL.isEmpty)

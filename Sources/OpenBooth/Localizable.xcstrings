@@ -192,12 +192,12 @@
         }
       }
     },
-    "App gallery on the iPad": {
+    "App gallery": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "App-Galerie auf dem iPad"
+            "value": "App-Galerie"
           }
         }
       }
@@ -792,16 +792,6 @@
         }
       }
     },
-    "Gallery keeps a 2000 px web copy.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Die Galerie behält eine Web-Kopie mit 2000 px."
-          }
-        }
-      }
-    },
     "Guest view (live)": {
       "localizations": {
         "de": {
@@ -878,6 +868,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bildqualität"
+          }
+        }
+      }
+    },
+    "Immich": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Immich"
           }
         }
       }
@@ -1438,6 +1438,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Programm"
+          }
+        }
+      }
+    },
+    "RAW": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RAW"
           }
         }
       }
@@ -2062,16 +2072,6 @@
         }
       }
     },
-    "Upload RAW files too": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RAW-Dateien mit hochladen"
-          }
-        }
-      }
-    },
     "Use the iPad camera as fallback when no USB camera is present": {
       "localizations": {
         "de": {
@@ -2092,12 +2092,22 @@
         }
       }
     },
-    "Web (2000 px)": {
+    "Web 2000 px": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Web (2000 px)"
+            "value": "Web 2000 px"
+          }
+        }
+      }
+    },
+    "WebDAV": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WebDAV"
           }
         }
       }
@@ -2108,16 +2118,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "WebDAV-Ordner"
-          }
-        }
-      }
-    },
-    "WebDAV folder (Nextcloud, NAS, Storage Box)": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "WebDAV-Ordner (Nextcloud, NAS, Storage Box)"
           }
         }
       }
@@ -2232,12 +2232,12 @@
         }
       }
     },
-    "iPad photo library (Photos app)": {
+    "iPad photo library": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPad-Mediathek (Fotos-App)"
+            "value": "iPad-Mediathek"
           }
         }
       }
