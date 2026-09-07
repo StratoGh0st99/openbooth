@@ -81,6 +81,12 @@ struct ContentView: View {
         .statusBarHidden()
     }
 
+    /// Writable camera settings the driver marks as quick controls (program, ISO, aperture, shutter, flash)
+    private var quickSettings: [CameraSetting] {
+        let q = cam.quickSettingCodes
+        return cam.settings.filter { q.contains($0.code) && $0.writable && !$0.options.isEmpty }
+    }
+
     /// Guests can hit Delete by accident: pause the review and ask once.
     private func askDelete(_ index: Int) {
         cam.setResultPaused(true)
@@ -176,9 +182,41 @@ struct ContentView: View {
             }
 
             // Histogram for the live view (admin option), bottom left above the bar
-            if settings.showHistogram, !cam.idle, cam.resultPhotos.isEmpty, cam.countdown == nil, let h = cam.liveHistogram {
+            if settings.operatorOverlay, !cam.idle, cam.resultPhotos.isEmpty, cam.countdown == nil, let h = cam.liveHistogram {
                 VStack { Spacer(); HStack { HistogramView(histogram: h).frame(width: 220, height: 90).padding(.leading, 20).padding(.bottom, 110); Spacer() } }
                     .allowsHitTesting(false)
+            }
+
+            // Operator overlay (admin option): batteries top left, quick camera controls bottom right
+            if settings.operatorOverlay, !cam.idle, cam.resultPhotos.isEmpty, cam.countdown == nil, cam.capturePhrase == nil {
+                VStack {
+                    HStack {
+                        Label(cam.batteryLine, systemImage: "battery.75percent")
+                            .font(.callout.monospacedDigit()).foregroundStyle(.white.opacity(0.85))
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(.black.opacity(0.55), in: Capsule())
+                            .padding(16)
+                        Spacer()
+                    }
+                    Spacer()
+                    if !quickSettings.isEmpty {
+                        HStack {
+                            Spacer()
+                            HStack(alignment: .bottom, spacing: 10) {
+                                ForEach(quickSettings) { st in
+                                    VStack(spacing: 3) {
+                                        Text(st.title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                                        SettingPicker(setting: st) { cam.apply(st.code, value: $0) }
+                                    }
+                                }
+                            }
+                            .disabled(cam.settingsBusy || cam.capturing)
+                            .padding(10)
+                            .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+                            .padding(.trailing, 20).padding(.bottom, 110)
+                        }
+                    }
+                }
             }
 
             // Bottom bar
@@ -285,7 +323,7 @@ struct ContentView: View {
                                 .shadow(radius: 20)
                                 .padding(.horizontal, 40)
                                 .overlay(alignment: .bottomLeading) {
-                                    if settings.showHistogram, let h = cam.resultHistogram {
+                                    if settings.operatorOverlay, let h = cam.resultHistogram {
                                         HistogramView(histogram: h).frame(width: 220, height: 90).padding(56)
                                     }
                                 }
@@ -497,7 +535,16 @@ struct AdminPanel: View {
                         Text(settings.eventName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
-                .padding(.horizontal, 16).padding(.top, 18).padding(.bottom, 14)
+                .padding(.horizontal, 16).padding(.top, 18).padding(.bottom, 8)
+                // Batteries: iPad and camera (camera only while a USB camera reports it)
+                HStack(spacing: 5) {
+                    Image(systemName: "ipad.landscape")
+                    Text(cam.batteryText(cam.iPadBattery()))
+                    Image(systemName: "camera").padding(.leading, 8)
+                    Text(cam.cameraBattery().map { "\($0) %" } ?? "–")
+                }
+                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                .padding(.horizontal, 16).padding(.bottom, 12)
                 ForEach(Section.allCases) { sec in
                     Button { section = sec } label: {
                         HStack(spacing: 10) {
@@ -601,10 +648,10 @@ struct AdminPanel: View {
                     .onChange(of: settings.ipadUltraWide) { _, _ in cam.syncFallback() }
                 if cam.usingIPadCamera { Label("iPad camera active", systemImage: "ipad.and.arrow.forward").foregroundStyle(.orange) }
             }
-            LabeledContent("Battery", value: "iPad \(cam.batteryText(cam.iPadBattery()))" + (cam.cameraBattery().map { String(localized: ", camera \($0) %") } ?? ""))
             LabeledContent("Free storage", value: CameraManager.freeDiskGB().map { String(format: "%.1f GB", $0) } ?? "?")
             Toggle("Mirror live view", isOn: $settings.mirrorLiveView)
-            Toggle("Histogram in live view and review", isOn: $settings.showHistogram)
+            Toggle("Operator overlay on the guest screen", isOn: $settings.operatorOverlay)
+            if settings.operatorOverlay { Text("Histogram, batteries and quick camera controls.").font(.caption).foregroundStyle(.secondary) }
             Button { cam.capture(withCountdown: 0) } label: { Label("Test photo", systemImage: "camera") }
                 .buttonStyle(.borderedProminent).disabled(cam.state != .connected || cam.capturing)
             if settings.debugMode { HStack {

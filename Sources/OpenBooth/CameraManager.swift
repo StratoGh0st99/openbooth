@@ -215,7 +215,9 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var motionLevel: Double = 0    // last image change while idle (debug)
     @Published var liveHistogram: Histogram?  // every 3rd live view frame, when enabled in the admin
     @Published var resultHistogram: Histogram?
-    private var wantHistogram: Bool { settingsRef?.showHistogram ?? false }
+    private var wantHistogram: Bool { settingsRef?.operatorOverlay ?? false }
+    /// Quick controls for the operator overlay, as chosen by the driver
+    var quickSettingCodes: Set<UInt16> { driver?.quickSettingCodes ?? [] }
     /// Motion detection armed? Read by the live view task (runs there in the background, not on the main thread).
     private var motionArmed: Bool { idle && (settingsRef?.motionWake ?? true) }
     private var motionThreshold: Double { Double(settingsRef?.motionThreshold ?? 8) }
@@ -433,6 +435,12 @@ final class CameraManager: NSObject, ObservableObject {
     func cameraBattery() -> Int? {
         return driver?.batteryPercent()
     }
+    /// One line for the overlay: "iPad 75 % · Camera 88 %"
+    var batteryLine: String {
+        var s = String(localized: "iPad \(batteryText(iPadBattery()))")
+        if let c = cameraBattery() { s += String(localized: " · Camera \(c) %") }
+        return s
+    }
 
     /// Send diagnostics to the OpenBooth endpoint. Returns the server's ID.
     @Published private(set) var reportStatus = ""
@@ -646,6 +654,9 @@ final class CameraManager: NSObject, ObservableObject {
                 status = String(localized: "Camera handshake…")
                 try await cam.connect()
                 appendLog(cam.connectSummary)
+                if let s = cam as? SonyCamera {
+                    s.propWatch = { [weak self] line in Task { @MainActor in if self?.settingsRef?.debugMode == true { self?.appendLog(line) } } }
+                }
                 writeCapabilities(cam)
                 if let iso = cam.currentValue(SonyProp.iso) { appendLog("ISO = \(iso)") }
                 if let f = cam.currentValue(SonyProp.fNumber) { appendLog("Aperture = f/\(Double(f) / 100)") }
@@ -966,10 +977,23 @@ final class CameraManager: NSObject, ObservableObject {
             if !eventsWorking { eventsWorking = true; appendLog("Camera events arrive, external shutter now reacts instantly") }
             driver?.objectAdded.fire()
             if !capturing { pollExternalCapture() }
-        case 0xC203:   // PropertyChanged: arrives on every setting change and while focusing, just count
-            break
+        case 0xC203:   // PropertyChanged: dial turned or menu changed, also while focusing
+            schedulePropRefresh()
         default:
             if eventCounts[code] == 1 { appendLog(String(format: "PTP event 0x%04X %@", code, params.map { String(format: "0x%X", $0) }.joined(separator: " "))) }
+        }
+    }
+
+    /// After PropertyChanged events: re-read the properties once, at most every second, so the admin and the
+    /// operator overlay follow what is set on the camera itself.
+    private var propRefreshTask: Task<Void, Never>?
+    private func schedulePropRefresh() {
+        guard propRefreshTask == nil, state == .connected, driver?.supportsRemoteControl == true else { return }
+        propRefreshTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if let self, !self.capturing, !self.settingsBusy, self.pickupTask == nil, let cam = self.driver,
+               (try? await cam.refreshProps()) != nil { self.settings = cam.settings() }
+            self?.propRefreshTask = nil
         }
     }
 

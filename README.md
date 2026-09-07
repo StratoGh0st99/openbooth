@@ -55,7 +55,7 @@ GUI: `xcrun devicectl list devices`, write the ID to `.device`, then `tools/inst
 - **Idle collage**: after a configurable time without activity, a changing collage of the evening’s photos; the button stays visible.
 - **Admin**: swipe down with two fingers, enter the PIN (default `0000`, change it in Admin). Sidebar with sections
   Event, Camera, Flow, Display & Sounds, Destinations, Phrases, Access, Log.
-- **Camera settings** (ISO, aperture, shutter, focus, setting effect, save destination) are set directly in the camera;
+- **Camera settings** (program, ISO, aperture, shutter, flash mode, flash compensation, focus, setting effect, save destination) are set directly in the camera;
   values set in the app are remembered per model and restored on reconnect.
 - **RAW**: set image quality to RAW+JPEG or RAW; both objects are fetched from camera RAM and the ARW goes to every enabled target (the admin warns about the size) (the counter `0xD215` reports
   `0x8001` after the first fetch); the ARW is stored as its own asset in the library and under `Fotos/raw`.
@@ -77,7 +77,7 @@ GUI: `xcrun devicectl list devices`, write the ID to `.device`, then `tools/inst
   800 px thumbnails via ImageIO cached in `.thumbs/`.
 - **Sounds** (switchable): welcome chime on wake-up, countdown beeps, shutter signal, all synthesized.
 - **Display**: QR page always at full brightness, optionally permanent; the idle collage restores the previous value.
-- **Histogram** (RGB and luminance) in live view and review, Admin › Camera.
+- **Operator overlay** (Admin › Camera): histogram (RGB and luminance) in live view and review, iPad and camera battery, and quick controls for program, ISO, aperture, shutter, flash mode and flash compensation on the guest screen.
 - **Capability report**: after the handshake the app writes `openbooth-capabilities.log` (operations, events, properties),
   fetch with `tools/pull-caps.sh`.
 - **Remote access** (optional, Admin › Access): read-only status page on Wi‑Fi on port 8787 (own HTTP server on

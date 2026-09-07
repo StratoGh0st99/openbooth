@@ -176,6 +176,11 @@ final class SonyCamera: CameraDriver {
 
     var supportsRemoteControl: Bool { true }
     var objectAddedEventCodes: Set<UInt16> { [0xC201] }
+    var quickSettingCodes: Set<UInt16> { [0x500E, SonyProp.iso, SonyProp.fNumber, SonyProp.shutterSpeed, 0x500C, 0xD200] }
+    /// Debug aid: called with one line per property whose value changed between two fetches (finds unknown codes,
+    /// e.g. change a flash setting in the camera menu and watch which 0xD2xx moves)
+    var propWatch: ((String) -> Void)?
+    private static let noisyProps: Set<UInt16> = [0xD213, 0xD215, 0xD216, 0xD218, 0xD20E, 0xD2B4]
     var vendorPropertyCount: Int { max(vendorProps.count, props.count) }
     var controlCodeCount: Int { controlCodes.count }
     var connectSummary: String { "Handshake OK, protocol 0x\(String(protocolVersion, radix: 16)), \(vendorCodes.count) vendor codes, \(props.count) properties" }
@@ -242,7 +247,17 @@ final class SonyCamera: CameraDriver {
         let (resp, d) = try await transport.runWithResponse(SonyOp.getAllExtDevicePropInfo, quiet: true)
         guard resp.ok else { throw SonyError.ptp(op: SonyOp.getAllExtDevicePropInfo, code: resp.code) }
         if !rawDumps.contains(where: { $0.name.hasPrefix("Sony GetAllExtDevicePropInfo") }) { dump("Sony GetAllExtDevicePropInfo 0x9209", d) }
-        props = Self.parseAllProps(d)
+        let new = Self.parseAllProps(d)
+        if let watch = propWatch, !props.isEmpty {
+            for (code, np) in new where !Self.noisyProps.contains(code) {
+                guard let op = props[code], op.currentValue != np.currentValue else { continue }
+                let title = SonyFormat.wanted.first { $0.code == code }?.title ?? ""
+                watch(String(format: "Prop 0x%04X %@: %@ -> %@", code, title,
+                             op.currentValue.map { SonyFormat.label(code: code, value: $0) } ?? "-",
+                             np.currentValue.map { SonyFormat.label(code: code, value: $0) } ?? "-"))
+            }
+        }
+        props = new
     }
 
     /// Format per entry (after libgphoto2 ptp_unpack_Sony_DPD):

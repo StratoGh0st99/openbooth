@@ -31,7 +31,8 @@ final class AppSettings: ObservableObject {
     @Published var idleSeconds: Int = 120 { didSet { d.set(idleSeconds, forKey: "idleSeconds") } }
     @Published var slideshowInterval: Int = 7 { didSet { d.set(slideshowInterval, forKey: "slideshowInterval") } }
     @Published var mirrorLiveView: Bool = true { didSet { d.set(mirrorLiveView, forKey: "mirrorLiveView") } }
-    @Published var showHistogram: Bool = false { didSet { d.set(showHistogram, forKey: "showHistogram") } }
+    /// Operator overlay on the guest screen: histogram, batteries, quick camera controls
+    @Published var operatorOverlay: Bool = false { didSet { d.set(operatorOverlay, forKey: "operatorOverlay") } }
     @Published var welcomeTitle: String = String(localized: "📸 Photo Booth") { didSet { d.set(welcomeTitle, forKey: "welcomeTitle") } }
     @Published var welcomeText: String = String(localized: "Step in front of the camera\nand press the button!") { didSet { d.set(welcomeText, forKey: "welcomeText") } }
     @Published var guestGallery: Bool = true { didSet { d.set(guestGallery, forKey: "guestGallery") } }
@@ -89,7 +90,7 @@ final class AppSettings: ObservableObject {
         idleSeconds = d.object(forKey: "idleSeconds") as? Int ?? 120
         slideshowInterval = d.object(forKey: "slideshowInterval") as? Int ?? 7
         mirrorLiveView = d.object(forKey: "mirrorLiveView") as? Bool ?? true
-        showHistogram = d.object(forKey: "showHistogram") as? Bool ?? false
+        operatorOverlay = d.object(forKey: "operatorOverlay") as? Bool ?? (d.object(forKey: "showHistogram") as? Bool ?? false)
         welcomeTitle = d.string(forKey: "welcomeTitle") ?? String(localized: "📸 Photo Booth")
         welcomeText = d.string(forKey: "welcomeText") ?? String(localized: "Step in front of the camera\nand press the button!")
         guestGallery = d.object(forKey: "guestGallery") as? Bool ?? true
@@ -120,7 +121,7 @@ final class AppSettings: ObservableObject {
     }
 
     /// Exportable keys (without PIN and without keychain contents)
-    static let exportKeys: [String] = ["autoConnect", "autoReports", "countdownSeconds", "debugMode", "eventName", "events", "gallerySeconds", "guestGallery", "idleSeconds", "immichAlbum", "immichEnabled", "immichOriginal", "immichURL", "ipadFallback", "ipadFrontCamera", "ipadUltraWide", "maxBrightness", "mirrorLiveView", "motionThreshold", "motionWake", "photosOriginal", "phrases", "pickupExternal", "qrEnabled", "rememberedCamera", "restoreCameraSettings", "resultSeconds", "saveToPhotos", "shotInterval", "shotsPerCapture", "showHistogram", "slideshowInterval", "soundCountdown", "soundWelcome", "soundsEnabled", "webEnabled", "webdavEnabled", "webdavOriginal", "webdavURL", "webdavUser", "welcomeText", "welcomeTitle"]
+    static let exportKeys: [String] = ["autoConnect", "autoReports", "countdownSeconds", "debugMode", "eventName", "events", "gallerySeconds", "guestGallery", "idleSeconds", "immichAlbum", "immichEnabled", "immichOriginal", "immichURL", "ipadFallback", "ipadFrontCamera", "ipadUltraWide", "maxBrightness", "mirrorLiveView", "motionThreshold", "motionWake", "photosOriginal", "phrases", "pickupExternal", "qrEnabled", "rememberedCamera", "restoreCameraSettings", "resultSeconds", "saveToPhotos", "shotInterval", "shotsPerCapture", "operatorOverlay", "slideshowInterval", "soundCountdown", "soundWelcome", "soundsEnabled", "webEnabled", "webdavEnabled", "webdavOriginal", "webdavURL", "webdavUser", "welcomeText", "welcomeTitle"]
 
     func exportJSON() -> Data? {
         var dict: [String: Any] = [:]

@@ -32,6 +32,8 @@ protocol CameraDriver: AnyObject {
     func refreshProps() async throws
     func currentValue(_ code: UInt16) -> Int64?
     func settings() -> [CameraSetting]
+    /// Codes shown as quick controls in the operator overlay on the guest screen
+    var quickSettingCodes: Set<UInt16> { get }
     func setSetting(_ code: UInt16, to target: Int64, log: ((String) -> Void)?) async throws
     func liveViewFrame() async throws -> Data?
     func capture(progress: ((String) -> Void)?) async throws -> [CapturedObject]
@@ -110,6 +112,7 @@ final class GenericPTPCamera: CameraDriver {
     func refreshProps() async throws {}
     func currentValue(_ code: UInt16) -> Int64? { nil }
     func settings() -> [CameraSetting] { [] }
+    var quickSettingCodes: Set<UInt16> { [] }
     func setSetting(_ code: UInt16, to target: Int64, log: ((String) -> Void)?) async throws { throw CameraDriverError.notAvailable("Setting") }
     func liveViewFrame() async throws -> Data? { nil }
     func capture(progress: ((String) -> Void)?) async throws -> [CapturedObject] { throw CameraDriverError.notAvailable("Capture") }
