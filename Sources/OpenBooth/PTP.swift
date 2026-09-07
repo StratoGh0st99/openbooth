@@ -15,7 +15,7 @@ enum PTP {
     static let typeResponse: UInt16 = 3
     static let typeEvent: UInt16 = 4
 
-    // Standard-Operationen
+    // Standard operations
     enum Op {
         static let getDeviceInfo: UInt16 = 0x1001
         static let openSession: UInt16 = 0x1002
@@ -27,7 +27,7 @@ enum PTP {
         static let setDevicePropValue: UInt16 = 0x1016
     }
 
-    // Response-Codes
+    // Response codes
     enum RC {
         static let ok: UInt16 = 0x2001
         static let generalError: UInt16 = 0x2002
@@ -40,7 +40,7 @@ enum PTP {
         static let deviceBusy: UInt16 = 0x2019
     }
 
-    // Datentypen
+    // Data types
     enum DTC {
         static let int8: UInt16 = 0x0001
         static let uint8: UInt16 = 0x0002
