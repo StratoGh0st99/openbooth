@@ -176,11 +176,11 @@ final class SonyCamera: CameraDriver {
 
     var supportsRemoteControl: Bool { true }
     var objectAddedEventCodes: Set<UInt16> { [0xC201] }
-    var quickSettingCodes: Set<UInt16> { [0x500E, SonyProp.iso, SonyProp.fNumber, SonyProp.shutterSpeed, 0x500C, 0xD200] }
+    var quickSettingCodes: Set<UInt16> { [0x500E, SonyProp.iso, SonyProp.fNumber, SonyProp.shutterSpeed] }
     /// Debug aid: called with one line per property whose value changed between two fetches (finds unknown codes,
-    /// e.g. change a flash setting in the camera menu and watch which 0xD2xx moves)
+    /// e.g. change a setting in the camera menu and watch which 0xD2xx moves)
     var propWatch: ((String) -> Void)?
-    private static let noisyProps: Set<UInt16> = [0xD213, 0xD215, 0xD216, 0xD218, 0xD20E, 0xD2B4]
+    private static let noisyProps: Set<UInt16> = [0xD213, 0xD215, 0xD216, 0xD218, 0xD20E, 0xD2B4, 0xD1B5, 0xD204]   // focus, RAM, metering, batteries
     var vendorPropertyCount: Int { max(vendorProps.count, props.count) }
     var controlCodeCount: Int { controlCodes.count }
     var connectSummary: String { "Handshake OK, protocol 0x\(String(protocolVersion, radix: 16)), \(vendorCodes.count) vendor codes, \(props.count) properties" }

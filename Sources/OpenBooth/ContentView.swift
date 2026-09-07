@@ -81,7 +81,7 @@ struct ContentView: View {
         .statusBarHidden()
     }
 
-    /// Writable camera settings the driver marks as quick controls (program, ISO, aperture, shutter, flash)
+    /// Writable camera settings the driver marks as quick controls (program, ISO, aperture, shutter)
     private var quickSettings: [CameraSetting] {
         let q = cam.quickSettingCodes
         return cam.settings.filter { q.contains($0.code) && $0.writable && !$0.options.isEmpty }
@@ -187,7 +187,7 @@ struct ContentView: View {
                     .allowsHitTesting(false)
             }
 
-            // Operator overlay (admin option): batteries top left, quick camera controls bottom right
+            // Operator overlay (admin option): batteries top left, quick camera controls as a vertical bar on the right
             if settings.operatorOverlay, !cam.idle, cam.resultPhotos.isEmpty, cam.countdown == nil, cam.capturePhrase == nil {
                 VStack {
                     HStack {
@@ -199,22 +199,22 @@ struct ContentView: View {
                         Spacer()
                     }
                     Spacer()
-                    if !quickSettings.isEmpty {
-                        HStack {
-                            Spacer()
-                            HStack(alignment: .bottom, spacing: 10) {
-                                ForEach(quickSettings) { st in
-                                    VStack(spacing: 3) {
-                                        Text(st.title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                                        SettingPicker(setting: st) { cam.apply(st.code, value: $0) }
-                                    }
+                }
+                if !quickSettings.isEmpty {
+                    HStack {
+                        Spacer()
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(quickSettings) { st in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(st.title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                                    SettingPicker(setting: st) { cam.apply(st.code, value: $0) }
                                 }
                             }
-                            .disabled(cam.settingsBusy || cam.capturing)
-                            .padding(10)
-                            .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
-                            .padding(.trailing, 20).padding(.bottom, 110)
                         }
+                        .disabled(cam.settingsBusy || cam.capturing)
+                        .padding(12)
+                        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.trailing, 20)
                     }
                 }
             }

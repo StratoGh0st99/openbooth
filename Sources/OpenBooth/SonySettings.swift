@@ -40,10 +40,6 @@ enum SonyFormat {
         1: String(localized: "Manual"), 2: "AF-S", 3: "AF Macro", 0x8004: "AF-C", 0x8005: "AF-A", 0x8006: "DMF",
         0x8007: String(localized: "Manual (reversed)"), 0x8008: "AF-D", 0x8009: String(localized: "Preset focus"),
     ]
-    static let flashModes: [Int64: String] = [
-        1: "Auto", 2: String(localized: "Off"), 3: String(localized: "Fill flash"), 4: String(localized: "Red-eye auto"), 5: String(localized: "Red-eye fill"),
-        0x8001: String(localized: "Slow sync"), 0x8003: String(localized: "Rear sync"), 0x8032: String(localized: "Wireless"),
-    ]
     static let onOff12: [Int64: String] = [1: String(localized: "On"), 2: String(localized: "Off")]
     static let storeDestinations: [Int64: String] = [1: String(localized: "Camera RAM"), 16: String(localized: "Memory card"), 17: String(localized: "Card + RAM")]
     static let imageQualities: [Int64: String] = [1: "RAW", 2: "RAW+JPEG", 3: "JPEG"]
@@ -56,8 +52,6 @@ enum SonyFormat {
         (SonyProp.iso, "ISO"),
         (SonyProp.fNumber, String(localized: "Aperture")),
         (SonyProp.shutterSpeed, String(localized: "Shutter speed")),
-        (0x500C, String(localized: "Flash mode")),
-        (0xD200, String(localized: "Flash compensation")),
         (SonyProp.focusMode, "Focus"),
         (SonyProp.liveViewSettingEffect, String(localized: "Setting effect in live view")),
         (SonyProp.imageQuality, String(localized: "Image quality")),
@@ -86,8 +80,6 @@ enum SonyFormat {
             return "\(x)/\(y)"
         case SonyProp.focusMode: return focusModes[v] ?? "0x\(String(v, radix: 16))"
         case 0x500E: return exposurePrograms[v] ?? "0x\(String(v, radix: 16))"
-        case 0x500C: return flashModes[v] ?? "0x\(String(v, radix: 16))"
-        case 0xD200: return v == 0 ? "0 EV" : String(format: "%+.1f EV", Double(v) / 1000)   // thousandths of an EV
         case SonyProp.liveViewSettingEffect: return onOff12[v] ?? "\(v)"
         case 0xD222: return storeDestinations[v] ?? "\(v)"
         case SonyProp.imageQuality: return imageQualities[v] ?? "\(v)"
