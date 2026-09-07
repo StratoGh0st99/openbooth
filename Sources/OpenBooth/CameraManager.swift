@@ -763,7 +763,7 @@ final class CameraManager: NSObject, ObservableObject {
         liveRunning = false
     }
 
-    // MARK: Wiederherstellung
+    // MARK: Recovery
 
     /// Re-establish the connection: close session, wait briefly, reopen. With a counter and clear feedback.
     func scheduleRecover(reason: String) {
