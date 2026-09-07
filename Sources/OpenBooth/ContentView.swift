@@ -229,14 +229,15 @@ struct ContentView: View {
                     VStack(spacing: 16) {
                         // Restzeit-Balken
                         if let shownAt = cam.resultShownAt {
-                            TimelineView(.animation(minimumInterval: 0.05)) { ctx in
+                            // Jede Bildwiederholung neu (kein minimumInterval), Breite per Transform statt Layout: fluessig
+                            TimelineView(.animation(paused: cam.resultPausedAt != nil)) { ctx in
                                 let total = max(1, Double(settings.resultSeconds))
-                                let frac = max(0, 1 - ctx.date.timeIntervalSince(shownAt) / total)
-                                GeometryReader { g in
-                                    ZStack(alignment: .leading) {
-                                        Capsule().fill(Color.white.opacity(0.15))
-                                        Capsule().fill(Color.red).frame(width: g.size.width * frac)
-                                    }
+                                let now = cam.resultPausedAt ?? ctx.date
+                                let frac = max(0, min(1, 1 - now.timeIntervalSince(shownAt) / total))
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Color.white.opacity(0.15))
+                                    Capsule().fill(cam.resultPausedAt != nil ? Color.orange : Color.red)
+                                        .scaleEffect(x: frac, y: 1, anchor: .leading)
                                 }
                                 .frame(height: 8)
                             }
@@ -311,6 +312,9 @@ struct ContentView: View {
                 }
                 .transition(.opacity)
                 .onTapGesture { cam.dismissResult() }
+                .onLongPressGesture(minimumDuration: 0.2, maximumDistance: 60, perform: {}, onPressingChanged: { pressing in
+                    cam.setResultPaused(pressing)
+                })
             }
 
             // Statusbanner oben (nur wenn etwas nicht laeuft)

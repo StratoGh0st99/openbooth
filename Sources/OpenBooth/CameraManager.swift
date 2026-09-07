@@ -925,10 +925,32 @@ final class CameraManager: NSObject, ObservableObject {
         }
         resultPhoto = imgs.first
         resultShownAt = Date()
+        resultPausedAt = nil
+        startResultTimer(seconds: Double(resultSeconds))
+    }
+
+    /// Rueckschau-Timer: laeuft bis zum Ende der Restzeit; Antippen und Halten pausiert ihn (wie eine Story).
+    @Published var resultPausedAt: Date?
+    private func startResultTimer(seconds: Double) {
         resultTask?.cancel()
         resultTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64((self?.resultSeconds ?? 10) * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
             if !Task.isCancelled { await MainActor.run { self?.dismissResult() } }
+        }
+    }
+    func setResultPaused(_ paused: Bool) {
+        guard let shownAt = resultShownAt else { return }
+        if paused {
+            guard resultPausedAt == nil else { return }
+            resultPausedAt = Date()
+            resultTask?.cancel()
+        } else if let pausedAt = resultPausedAt {
+            // Startzeit um die Pause verschieben, dann mit der Restzeit weiterlaufen
+            let pause = Date().timeIntervalSince(pausedAt)
+            resultShownAt = shownAt.addingTimeInterval(pause)
+            resultPausedAt = nil
+            let remaining = Double(resultSeconds) - Date().timeIntervalSince(resultShownAt!)
+            startResultTimer(seconds: remaining)
         }
     }
 
