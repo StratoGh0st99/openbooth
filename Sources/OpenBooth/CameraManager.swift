@@ -72,6 +72,7 @@ final class CameraManager: NSObject, ObservableObject {
         lastFrame = Date()
         banner = nil
         appendLog("iPad camera started as fallback (\(settingsRef?.ipadFrontCamera ?? true ? "front" : "rear") camera, \(cam.formatSummary))")
+        appendLog("iPad cameras: " + cam.deviceList.joined(separator: " | "))
     }
     func stopIPadCamera(reason: String) {
         fallbackTimer?.cancel(); fallbackTimer = nil

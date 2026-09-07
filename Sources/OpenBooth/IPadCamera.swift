@@ -36,7 +36,19 @@ final class IPadCamera: NSObject, @unchecked Sendable {
         session.sessionPreset = .inputPriority
         session.inputs.forEach { session.removeInput($0) }
         session.outputs.forEach { session.removeOutput($0) }
-        guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) ?? AVCaptureDevice.default(for: .video) else {
+        // Take the device with the largest photo size at this position (the front camera may be listed as ultra wide)
+        let types: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera, .builtInUltraWideCamera, .builtInDualWideCamera, .builtInTrueDepthCamera]
+        let discovered = AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: position).devices
+        deviceList = discovered.map { d in
+            let px = d.formats.compactMap { $0.supportedMaxPhotoDimensions.last }.map { Int($0.width) * Int($0.height) }.max() ?? 0
+            return "\(d.localizedName) [\(d.deviceType.rawValue)] max \(px / 1_000_000) MP"
+        }
+        let pick = discovered.max { a, b in
+            let pa = a.formats.compactMap { $0.supportedMaxPhotoDimensions.last }.map { Int($0.width) * Int($0.height) }.max() ?? 0
+            let pb = b.formats.compactMap { $0.supportedMaxPhotoDimensions.last }.map { Int($0.width) * Int($0.height) }.max() ?? 0
+            return pa < pb
+        }
+        guard let dev = pick ?? AVCaptureDevice.default(for: .video) else {
             session.commitConfiguration()
             throw NSError(domain: "IPadCamera", code: 1, userInfo: [NSLocalizedDescriptionKey: "No iPad camera found"])
         }
@@ -58,9 +70,18 @@ final class IPadCamera: NSObject, @unchecked Sendable {
     }
 
     /// Format with at least 30 fps video and the largest photo size: smooth live view, full-resolution photos.
+    private(set) var formatList: [String] = []
+    private(set) var deviceList: [String] = []
     private func pickFormat(_ dev: AVCaptureDevice) {
         var best: AVCaptureDevice.Format?
         var bestPhoto = 0
+        // list every format once (for the log), so we can see what the sensor offers
+        formatList = dev.formats.map { f in
+            let d = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
+            let fps = Int(f.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0)
+            let p = f.supportedMaxPhotoDimensions.last.map { "\($0.width)x\($0.height)" } ?? "-"
+            return "\(d.width)x\(d.height)@\(fps) photo \(p)\(f.isVideoBinned ? " binned" : "")"
+        }
         for f in dev.formats {
             let dims = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
             guard dims.width >= 1280, f.videoSupportedFrameRateRanges.contains(where: { $0.maxFrameRate >= 30 }) else { continue }
@@ -75,12 +96,13 @@ final class IPadCamera: NSObject, @unchecked Sendable {
         do {
             try dev.lockForConfiguration()
             dev.activeFormat = f
-            dev.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
-            dev.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+            // 15 fps is plenty for the guest live view (the Sony delivers ~24) and halves the work
+            dev.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 15)
+            dev.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 15)
             dev.unlockForConfiguration()
             if let pd = f.supportedMaxPhotoDimensions.last { photo.maxPhotoDimensions = pd }
             let vd = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
-            formatSummary = "video \(vd.width)x\(vd.height) @30, photo \(photo.maxPhotoDimensions.width)x\(photo.maxPhotoDimensions.height)"
+            formatSummary = "video \(vd.width)x\(vd.height) @15, photo \(photo.maxPhotoDimensions.width)x\(photo.maxPhotoDimensions.height)"
         } catch {}
     }
     private(set) var formatSummary = ""
