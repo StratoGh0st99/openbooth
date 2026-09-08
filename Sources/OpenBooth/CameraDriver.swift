@@ -70,12 +70,17 @@ enum PTPVendor {
     }
 }
 
-/// Picks the driver for a probed camera. Sony gets the full PC Remote implementation, everything else the generic one.
+/// Picks the driver for a probed camera. Sony and Canon EOS get full drivers, everything else the generic one.
 enum CameraDrivers {
     static func make(for info: PTP.DeviceInfo, transport: PTPTransport) -> CameraDriver {
         let desc = info.vendorExtensionDesc.lowercased() + " " + info.manufacturer.lowercased()
         if info.vendorExtensionID == PTPVendor.sony || desc.contains("sony") {
             return SonyCamera(transport: transport, deviceInfo: info)
+        }
+        // EOS bodies report the MTP extension id (0x6), so the manufacturer string decides; the EOS remote
+        // operations (SetRemoteMode 0x9114, GetEvent 0x9116) must be there
+        if (info.vendorExtensionID == PTPVendor.canon || desc.contains("canon")), info.supports(0x9114), info.supports(0x9116) {
+            return CanonCamera(transport: transport, deviceInfo: info)
         }
         return GenericPTPCamera(transport: transport, deviceInfo: info)
     }

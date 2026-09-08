@@ -657,6 +657,9 @@ final class CameraManager: NSObject, ObservableObject {
                 if let s = cam as? SonyCamera {
                     s.propWatch = { [weak self] line in Task { @MainActor in if self?.settingsRef?.debugMode == true { self?.appendLog(line) } } }
                 }
+                if let c = cam as? CanonCamera {
+                    c.logHandler = { [weak self] line in Task { @MainActor in self?.appendLog(line) } }
+                }
                 writeCapabilities(cam)
                 if let iso = cam.currentValue(SonyProp.iso) { appendLog("ISO = \(iso)") }
                 if let f = cam.currentValue(SonyProp.fNumber) { appendLog("Aperture = f/\(Double(f) / 100)") }
@@ -918,8 +921,9 @@ final class CameraManager: NSObject, ObservableObject {
         let rawObj = objects.first { $0.isRAW }
         let stamp = Self.stamp()
         var rawURL: URL?
+        let rawExt = rawObj?.rawExtension ?? "ARW"
         if let raw = rawObj {
-            rawURL = try Self.saveRAW(raw.data, stamp: stamp)
+            rawURL = try Self.saveRAW(raw.data, stamp: stamp, ext: rawExt)
             appendLog("RAW saved: \(rawURL!.lastPathComponent) (\(raw.data.count / 1_000_000) MB)")
             upload(rawURL!, isRAW: true)
         }
@@ -937,16 +941,16 @@ final class CameraManager: NSObject, ObservableObject {
             }
             if settingsRef?.saveToPhotos ?? true {
                 let forLibrary = (settingsRef?.photosOriginal ?? true) ? jpeg : web
-                Self.saveToPhotos(forLibrary, raw: rawObj?.data) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
+                Self.saveToPhotos(forLibrary, raw: rawObj?.data, rawExt: rawExt) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
             }
             if let img = UIImage(data: web) { result = (img, url); lastPhoto = img }
         } else if let raw = rawObj, let rawURL {
             // RAW only: ARW as RAW into the photo library, preview from the embedded image
             if settingsRef?.saveToPhotos ?? true {
-                Self.saveRAWOnlyToPhotos(raw.data) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
+                Self.saveRAWOnlyToPhotos(raw.data, ext: rawExt) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
             }
             let preview = await Self.previewImage(from: raw.data)
-            appendLog(preview == nil ? "RAW preview: no decodable preview in the ARW" : "RAW preview: \(Int(preview!.size.width))x\(Int(preview!.size.height))")
+            appendLog(preview == nil ? "RAW preview: no decodable preview in the \(rawExt)" : "RAW preview: \(Int(preview!.size.width))x\(Int(preview!.size.height))")
             if let img = preview {
                 result = (img, rawURL); lastPhoto = img
                 // Put a JPEG derivative next to the ARW for gallery and collage
@@ -1236,9 +1240,9 @@ final class CameraManager: NSObject, ObservableObject {
     static var rawDir: URL { photosDir.appendingPathComponent("raw", isDirectory: true) }
 
     @discardableResult
-    static func saveRAW(_ data: Data, stamp: String) throws -> URL {
+    static func saveRAW(_ data: Data, stamp: String, ext: String = "ARW") throws -> URL {
         try FileManager.default.createDirectory(at: rawDir, withIntermediateDirectories: true)
-        let url = rawDir.appendingPathComponent("openbooth-\(stamp).ARW")
+        let url = rawDir.appendingPathComponent("openbooth-\(stamp).\(ext)")
         try data.write(to: url)
         return url
     }
@@ -1250,7 +1254,7 @@ final class CameraManager: NSObject, ObservableObject {
 
     /// Into the photo library: JPEG and RAW as separate assets. (A combined asset with the ARW as
     /// alternatePhoto is rejected by Photos with error 3300, verified on device.)
-    static func saveToPhotos(_ jpeg: Data, raw: Data?, log: ((String) -> Void)? = nil) {
+    static func saveToPhotos(_ jpeg: Data, raw: Data?, rawExt: String = "ARW", log: ((String) -> Void)? = nil) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { st in
             guard st == .authorized || st == .limited else { log?("Photo library: no access (\(st.rawValue))"); return }
             let base = stamp()
@@ -1260,8 +1264,8 @@ final class CameraManager: NSObject, ObservableObject {
                 r1.addResource(with: .photo, data: jpeg, options: o1)
                 if let raw {
                     let r2 = PHAssetCreationRequest.forAsset()
-                    let o2 = PHAssetResourceCreationOptions(); o2.originalFilename = "openbooth-\(base).ARW"
-                    o2.uniformTypeIdentifier = "com.sony.arw-raw-image"
+                    let o2 = PHAssetResourceCreationOptions(); o2.originalFilename = "openbooth-\(base).\(rawExt)"
+                    o2.uniformTypeIdentifier = CapturedObject.rawUTI(rawExt)
                     r2.addResource(with: .photo, data: raw, options: o2)
                 }
             }) { ok, err in
@@ -1270,14 +1274,14 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    static func saveRAWOnlyToPhotos(_ raw: Data, log: ((String) -> Void)? = nil) {
+    static func saveRAWOnlyToPhotos(_ raw: Data, ext: String = "ARW", log: ((String) -> Void)? = nil) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { st in
             guard st == .authorized || st == .limited else { log?("Photo library: no access"); return }
             PHPhotoLibrary.shared().performChanges({
                 let req = PHAssetCreationRequest.forAsset()
                 let o = PHAssetResourceCreationOptions()
-                o.originalFilename = "openbooth-\(stamp()).ARW"
-                o.uniformTypeIdentifier = "com.sony.arw-raw-image"
+                o.originalFilename = "openbooth-\(stamp()).\(ext)"
+                o.uniformTypeIdentifier = CapturedObject.rawUTI(ext)
                 req.addResource(with: .photo, data: raw, options: o)
             }) { ok, err in log?(ok ? "Photo library: RAW saved" : "Photo library: RAW ERROR \(err?.localizedDescription ?? "?")") }
         }

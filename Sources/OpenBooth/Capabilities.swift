@@ -68,9 +68,37 @@ enum PTPNames {
         0x4001: "i8[]", 0x4002: "u8[]", 0x4003: "i16[]", 0x4004: "u16[]", 0x4005: "i32[]", 0x4006: "u32[]", 0xFFFF: "str",
     ]
     static func hex(_ v: UInt16) -> String { String(format: "0x%04X", v) }
-    static func op(_ v: UInt16) -> String { "\(hex(v)) \(operations[v] ?? (v >= 0x9000 ? "Vendor" : "?"))" }
-    static func ev(_ v: UInt16) -> String { "\(hex(v)) \(events[v] ?? "?")" }
-    static func prop(_ v: UInt16) -> String { "\(hex(v)) \(properties[v] ?? (v >= 0xD000 ? "Sony" : "?"))" }
+    static let canonOperations: [UInt16: String] = [
+        0x9101: "Canon GetStorageIDs", 0x9102: "Canon GetStorageInfo", 0x9103: "Canon GetObjectInfo", 0x9104: "Canon GetObject",
+        0x9107: "Canon GetPartialObjectEx", 0x910F: "Canon EOS Capture (full)", 0x9110: "Canon SetDevicePropValueEx",
+        0x9114: "Canon SetRemoteMode", 0x9115: "Canon SetEventMode", 0x9116: "Canon GetEvent", 0x9117: "Canon TransferComplete",
+        0x911B: "Canon SetUILock", 0x911C: "Canon ResetUILock", 0x9127: "Canon RequestDevicePropValue",
+        0x9128: "Canon RemoteReleaseOn", 0x9129: "Canon RemoteReleaseOff", 0x9153: "Canon GetViewFinderData",
+        0x9154: "Canon DoAf", 0x9155: "Canon DriveLens", 0x9158: "Canon Zoom", 0x9160: "Canon AfCancel",
+    ]
+    static let canonEvents: [UInt16: String] = [
+        0xC181: "Canon ObjectAddedEx", 0xC182: "Canon ObjectRemoved", 0xC183: "Canon RequestGetObjectInfoEx",
+        0xC184: "Canon StorageStatusChanged", 0xC185: "Canon StorageInfoChanged", 0xC186: "Canon RequestObjectTransfer",
+        0xC187: "Canon ObjectInfoChangedEx", 0xC188: "Canon ObjectContentChanged", 0xC189: "Canon PropValueChanged",
+        0xC18A: "Canon AvailListChanged", 0xC18B: "Canon CameraStatusChanged", 0xC18D: "Canon WillSoonShutdown",
+        0xC18E: "Canon ShutdownTimerUpdated", 0xC18F: "Canon RequestCancelTransfer", 0xC190: "Canon RequestObjectTransferDT",
+        0xC191: "Canon RequestCancelTransferDT", 0xC1A1: "Canon RequestObjectTransferFTP", 0xC1A7: "Canon ObjectAddedEx64",
+    ]
+    static let canonProperties: [UInt16: String] = [
+        0xD101: "Canon Aperture", 0xD102: "Canon ShutterSpeed", 0xD103: "Canon ISO", 0xD104: "Canon ExpCompensation",
+        0xD105: "Canon AEMode", 0xD106: "Canon DriveMode", 0xD107: "Canon MeteringMode", 0xD108: "Canon FocusMode",
+        0xD109: "Canon WhiteBalance", 0xD10A: "Canon ColorTemperature", 0xD10F: "Canon ColorSpace", 0xD110: "Canon PictureStyle",
+        0xD111: "Canon BatteryPower", 0xD113: "Canon CameraTime", 0xD115: "Canon Owner", 0xD116: "Canon ModelID",
+        0xD11B: "Canon AvailableShots", 0xD11C: "Canon CaptureDestination", 0xD11E: "Canon CurrentStorage", 0xD11F: "Canon CurrentFolder",
+        0xD120: "Canon ImageFormat", 0xD1B0: "Canon EVFOutputDevice", 0xD1B3: "Canon EVFMode", 0xD1B9: "Canon ExposureSimMode",
+        0xD1C0: "Canon FlashChargingState", 0xD1C6: "Canon BuiltinStroboMode", 0xD1D0: "Canon Artist", 0xD1D1: "Canon Copyright",
+        0xD1D8: "Canon LensName", 0xD1DA: "Canon StroboSetting", 0xD1DB: "Canon StroboWirelessSetting", 0xD1DC: "Canon StroboFiring",
+        0xD1DD: "Canon LensID", 0xD303: "Canon 0xD303", 0xD402: "MTP DeviceFriendlyName", 0xD406: "MTP SessionInitiatorInfo", 0xD407: "MTP PerceivedDeviceType",
+    ]
+    /// Canon bodies share the 0x91xx/0xC1xx/0xD1xx ranges only with themselves, so the tables can simply be merged
+    static func op(_ v: UInt16) -> String { "\(hex(v)) \(operations[v] ?? canonOperations[v] ?? (v >= 0x9000 ? "Vendor" : "?"))" }
+    static func ev(_ v: UInt16) -> String { "\(hex(v)) \(events[v] ?? canonEvents[v] ?? "?")" }
+    static func prop(_ v: UInt16) -> String { "\(hex(v)) \(properties[v] ?? canonProperties[v] ?? (v >= 0xD200 ? "Sony" : v >= 0xD100 ? "Canon" : "?"))" }
 }
 
 enum CapabilityReport {

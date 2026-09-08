@@ -40,10 +40,26 @@ enum SonyProp {
 /// An object fetched from camera RAM (JPEG or RAW).
 struct CapturedObject {
     let data: Data
-    let format: UInt16       // 0x3801 JPEG, 0xB101 Sony RAW (ARW)
+    let format: UInt16       // 0x3801 JPEG, 0xB101 Sony RAW (ARW), 0xB103 Canon CR2, 0xB108 Canon CR3
     let filename: String
-    var isRAW: Bool { format == 0xB101 || filename.uppercased().hasSuffix(".ARW") }
-    var isJPEG: Bool { format == 0x3801 || filename.uppercased().hasSuffix(".JPG") }
+    static let rawFormats: Set<UInt16> = [0xB101, 0xB103, 0xB108]
+    static let rawExtensions: Set<String> = ["ARW", "CR2", "CR3"]
+    var fileExtension: String { (filename as NSString).pathExtension.uppercased() }
+    var isRAW: Bool { Self.rawFormats.contains(format) || Self.rawExtensions.contains(fileExtension) }
+    var isJPEG: Bool { format == 0x3801 || fileExtension == "JPG" || fileExtension == "JPEG" }
+    /// Extension for the RAW file on disk and in the photo library
+    var rawExtension: String {
+        if Self.rawExtensions.contains(fileExtension) { return fileExtension }
+        switch format { case 0xB103: return "CR2"; case 0xB108: return "CR3"; default: return "ARW" }
+    }
+    static func rawUTI(_ ext: String) -> String {
+        switch ext.uppercased() {
+        case "CR3": return "com.canon.cr3-raw-image"
+        case "CR2": return "com.canon.cr2-raw-image"
+        case "ARW": return "com.sony.arw-raw-image"
+        default: return "public.camera-raw-image"
+        }
+    }
 }
 
 enum SonyHandle {
