@@ -220,10 +220,10 @@ final class CanonCamera: CameraDriver {
         }
         // Heartbeat: the camera wants GetEvent now and then; this also catches ObjectAdded from its own shutter
         if Date().timeIntervalSince(lastEventPoll) > 1.0 { _ = try? await pollEvents() }
-        // The body delivers 50 small frames a second, more than the iPad can decode smoothly: pace to ~25 fps
+        // The body delivers 50 small frames a second, more than the iPad can decode smoothly: pace to ~30 fps
         let since = Date().timeIntervalSince(lastFrameAt)
-        if since < 0.04 { try await Task.sleep(nanoseconds: UInt64((0.04 - since) * 1_000_000_000)) }
-        var tries = 12
+        if since < 0.033 { try await Task.sleep(nanoseconds: UInt64((0.033 - since) * 1_000_000_000)) }
+        var tries = 40
         while tries > 0 {
             tries -= 1
             let (resp, data) = try await transport.runWithResponse(CanonOp.getViewFinderData, params: [0x0010_0000], quiet: true)
@@ -235,7 +235,8 @@ final class CanonCamera: CameraDriver {
             }
             // 0xA102 not ready, busy, access denied: the frame is not there yet
             if resp.code == 0xA102 || resp.code == PTP.RC.deviceBusy || resp.code == PTP.RC.accessDenied || resp.code == 0xA104 || resp.code == 0 {
-                try await Task.sleep(nanoseconds: 40_000_000)
+                // Frame not ready yet: ask again right away, a long wait here halves the frame rate
+                try await Task.sleep(nanoseconds: 8_000_000)
                 continue
             }
             if !resp.ok { throw SonyError.ptp(op: CanonOp.getViewFinderData, code: resp.code) }
@@ -357,18 +358,13 @@ final class CanonCamera: CameraDriver {
         return pending.isEmpty ? nil : pending.removeFirst()
     }
 
-    /// The standard BatteryLevel 0x5001 is stale on the R100 (67 % regardless of charge), so the EOS BatteryPower
-    /// levels are used (libgphoto2 canon_eos_batterylevel: 0 low, 1 50 %, 2 100 %, 4 75 %, 5 25 %).
+    /// The R100 reports BatteryLevel 0x5001 in thirds (100, 67, 33) and BatteryPower 0xD111 as level 2/1/0;
+    /// level 0 is the red segment, shown as 10 %.
     func batteryPercent() -> Int? {
-        guard let v = currentValue(CanonProp.batteryPower) else { return batteryPct }
-        switch v {
-        case 0: return 10
-        case 1: return 50
-        case 2: return 100
-        case 4: return 75
-        case 5: return 25
-        default: return batteryPct
-        }
+        if currentValue(CanonProp.batteryPower) == 0 { return 10 }
+        if let b = batteryPct { return b }
+        if let v = currentValue(CanonProp.batteryPower) { return [1: 50, 2: 100, 4: 75, 5: 25][v] }
+        return nil
     }
 
     func capabilitiesReport() -> String {
