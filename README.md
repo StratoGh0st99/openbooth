@@ -7,8 +7,8 @@ exactly as the photographer set it up, as JPEG or RAW, and lands where it belong
 Reduced to the essentials, with a few smart details (idle collage that wakes on motion, the camera’s own shutter is
 picked up, QR code to the album, the display regulates itself). Optimized for performance, open source.
 
-Status: **prototype, core works.** As of 2026-09-06: Sony ILCE-7M4 over USB-C on an iPad Air (M4), PTP pass-through
-confirmed, Sony handshake, live view, capture, RAW, uploads, remote shutter via camera events, all verified on device.
+Status: **prototype, core works.** Sony ILCE-7M4 and Canon EOS R100 over USB-C on an iPad Air (M4): PTP pass-through,
+handshake, live view, capture, RAW, uploads and remote shutter via camera events, all verified on device (2026-09-08).
 
 ## Technology
 
@@ -18,9 +18,11 @@ confirmed, Sony handshake, live view, capture, RAW, uploads, remote shutter via 
 - Sony protocol (PC Remote) re-implemented after libgphoto2 `camlibs/ptp2` (LGPL):
   handshake `0x9201` phases 1/2, `0x9202`, phase 3, PriorityMode; live view via object `0xFFFFC002`;
   shutter via `0x9207` with `0xD2C1`/`0xD2C2`; image from RAM via `0xFFFFC001` once `0xD215 >= 0x8000`.
-- Cameras: Sony ILCE-7M4 first, ILCE-6400 next. Canon later via the EOS PTP extension.
+- Cameras: Sony ILCE-7M4 (PC Remote protocol) and Canon EOS R100 (EOS PTP extension: `0x9114`/`0x9115` remote and
+  event mode, `0x9116` GetEvent, `0x9128`/`0x9129` release, `0x9153` live view, `0x9110` settings, capture to RAM with
+  `0xD11C = 4` after `0x911A` PCHDDCapacity, image announced by event `0xC1A9`). ILCE-6400 next.
 - iPad camera (front or rear, standard or ultra-wide lens) as a fallback when no USB camera is present.
-- `CameraDriver` protocol: Sony is the first implementation; unknown vendors get a generic driver that writes the
+- `CameraDriver` protocol: Sony and Canon EOS are implemented; unknown vendors get a generic driver that writes the
   capability report and asks for diagnostics instead of looping through recovery.
 
 ## Building
@@ -93,7 +95,7 @@ GUI: `xcrun devicectl list devices`, write the ID to `.device`, then `tools/inst
 ## Roadmap
 
 1. Test Sony ILCE-6400 (protocol version 2, settings are set stepwise)
-2. Photo printer via AirPrint (plain 10×15), later Canon EOS
+2. Photo printer via AirPrint (plain 10×15)
 
 ## License
 

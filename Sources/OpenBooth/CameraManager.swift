@@ -623,6 +623,9 @@ final class CameraManager: NSObject, ObservableObject {
                 if cam.supportsRemoteControl == false, let generic = cam as? GenericPTPCamera {
                     let chosen = CameraDrivers.make(for: info, transport: generic.transport)
                     if chosen !== cam { driver = chosen; appendLog("Driver: \(type(of: chosen))") }
+                    if let c = chosen as? CanonCamera {
+                        c.logHandler = { [weak self] line in Task { @MainActor in self?.appendLog(line) } }
+                    }
                 }
                 let ops = info.operations.map { String(format: "%04X", $0) }.joined(separator: " ")
                 deviceSummary = "\(info.manufacturer) \(info.model) FW \(info.deviceVersion), VendorExt 0x\(String(info.vendorExtensionID, radix: 16)), \(info.operations.count) operations"

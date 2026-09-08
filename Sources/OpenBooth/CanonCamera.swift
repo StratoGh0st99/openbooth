@@ -14,6 +14,7 @@ enum CanonOp {
     static let setEventMode: UInt16 = 0x9115           // param 1 = on
     static let getEvent: UInt16 = 0x9116               // data: records (u32 size, u32 type, payload), end record type 0
     static let transferComplete: UInt16 = 0x9117       // param handle: frees a RAM object after download
+    static let pcHDDCapacity: UInt16 = 0x911A            // params (free space, ?, ?): host storage for RAM capture
     static let requestDevicePropValue: UInt16 = 0x9127
     static let remoteReleaseOn: UInt16 = 0x9128        // params (1 half | 2 full | 3 both, 0)
     static let remoteReleaseOff: UInt16 = 0x9129       // param 1 half | 2 full | 3 both
@@ -43,6 +44,8 @@ enum CanonProp {
 
 enum CanonEvent {
     static let objectAddedEx: UInt16 = 0xC181
+    static let requestObjectTransfer: UInt16 = 0xC186   // RAM capture: "come and get handle X"
+    static let requestObjectTransfer64: UInt16 = 0xC1A9 // same on newer bodies (R100): handle @8, format @12, size u64 @20
     static let propValueChanged: UInt16 = 0xC189
     static let availListChanged: UInt16 = 0xC18A
     static let cameraStatusChanged: UInt16 = 0xC18B
@@ -74,10 +77,16 @@ final class CanonCamera: CameraDriver {
     private(set) var rawDumps: [(name: String, data: Data)] = []
     private var evfOn = false
     private var lastEventPoll = Date.distantPast
+    private var lastFrameAt = Date.distantPast
     private var lastBatteryRead = Date.distantPast
     private var batteryPct: Int?
+    private var batteryLogged = false
     private var sawRAWObject = false
     private var eventRecordCounts: [UInt32: Int] = [:]
+    /// ImageFormat 0xD120 options as the camera sends them (u32 count, then count × size/type/imagesize/compression)
+    private var imageFormatOptions: [[UInt32]] = []
+    /// While waiting for a capture: log every event record, so unknown announcements can be identified
+    private var traceEvents = false
     var logHandler: ((String) -> Void)?
 
     init(transport: PTPTransport, deviceInfo: PTP.DeviceInfo) {
@@ -93,12 +102,12 @@ final class CanonCamera: CameraDriver {
     // MARK: CameraDriver
 
     var supportsRemoteControl: Bool { true }
-    var objectAddedEventCodes: Set<UInt16> { [CanonEvent.objectAddedEx, CanonEvent.objectAddedEx64, 0x4002] }
+    var objectAddedEventCodes: Set<UInt16> { [CanonEvent.objectAddedEx, CanonEvent.objectAddedEx64, CanonEvent.requestObjectTransfer, CanonEvent.requestObjectTransfer64, 0x4002] }
     var quickSettingCodes: Set<UInt16> { [CanonProp.aeMode, CanonProp.iso, CanonProp.aperture, CanonProp.shutterSpeed] }
     var connectSummary: String {
         lock.lock(); defer { lock.unlock() }
         let lens = props[CanonProp.lensName]?.raw.map { Self.cString($0) } ?? ""
-        return "EOS handshake OK, \(props.count) properties from events\(lens.isEmpty ? "" : ", lens \(lens)")"
+        return "EOS handshake OK, \(props.count) properties from events, capture to card\(lens.isEmpty ? "" : ", lens \(lens)")"
     }
     var vendorPropertyCount: Int { lock.lock(); defer { lock.unlock() }; return props.count }
     var controlCodeCount: Int { 0 }
@@ -127,24 +136,28 @@ final class CanonCamera: CameraDriver {
             if n == 0 && i >= 2 { break }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
-        // Capture destination: 6 = card + host. The R100 reports 0 shots left and refuses to focus or fire with
-        // RAM only (4), so the image goes to the card and the app is told about it and downloads it.
-        let choices = lock.withLock { props[CanonProp.captureDestination]?.choices ?? [] }
-        let dest: UInt32 = choices.contains(6) ? 6 : 4
-        do { try await setValueEx(CanonProp.captureDestination, value: dest); logHandler?("Canon: capture destination \(dest == 6 ? "card + app" : "app RAM")") }
-        catch { logHandler?("Canon: capture destination not set (\(error.localizedDescription)), images may land on the card") }
+        try await selectDestination(preferRAM: true)
         _ = try await pollEvents()
-        try await ensureOneShotAF()
         await readBattery()
     }
 
-    /// Servo AF never reports a lock to the host, so the full press stays busy forever: switch to One-Shot.
-    private func ensureOneShotAF() async throws {
-        guard currentValue(CanonProp.focusMode) == 1 else { return }
-        logHandler?("Canon: focus mode is Servo, switching to One-Shot for remote release")
-        try await setValueEx(CanonProp.focusMode, value: 0)
-        try await Task.sleep(nanoseconds: 200_000_000)
+    /// Destination 4 = app (RAM) like the Sony; if the body then still reports 0 shots left, fall back to the memory
+    /// card (2), where it announces every new file and the app downloads it.
+    private var ramCapture = false
+    private func selectDestination(preferRAM: Bool) async throws {
+        let wanted: UInt32 = preferRAM ? 4 : 2
+        if currentValue(CanonProp.captureDestination) != Int64(wanted) {
+            try await setValueEx(CanonProp.captureDestination, value: wanted)
+        }
+        if preferRAM, deviceInfo.supports(CanonOp.pcHDDCapacity) {
+            // After switching to the host the body wants to know the host's free space (libgphoto2 _put_Canon_EOS_CaptureTarget)
+            let (r, _) = try await transport.runWithResponse(CanonOp.pcHDDCapacity, params: [0x0FFF_FFFF, 0x1000, 1])
+            logHandler?("Canon: PCHDDCapacity announced -> \(r.codeHex)")
+        }
+        try await Task.sleep(nanoseconds: 400_000_000)
         _ = try await pollEvents()
+        ramCapture = preferRAM
+        logHandler?("Canon: capture destination \(wanted == 4 ? "app (RAM)" : "memory card"), shots left \(currentValue(CanonProp.availableShots) ?? -1)")
     }
 
     func refreshProps() async throws {
@@ -161,7 +174,11 @@ final class CanonCamera: CameraDriver {
         lock.lock(); defer { lock.unlock() }
         return CanonFormat.wanted.compactMap { w in
             guard let p = props[w.code] else { return nil }
-            let opts = p.choices.map { CameraSetting.Option(value: $0, label: CanonFormat.label(code: w.code, value: $0)) }
+            let opts = p.choices.map { v in
+                CameraSetting.Option(value: v, label: w.code == CanonProp.imageFormat
+                                     ? Self.imageFormatLabel(imageFormatOptions.indices.contains(Int(v)) ? imageFormatOptions[Int(v)] : [])
+                                     : CanonFormat.label(code: w.code, value: v))
+            }
             // Settable when the camera offers a list with more than the current value (AE mode has none: dial)
             let writable = opts.count > 1
             return CameraSetting(code: w.code, title: w.title, options: opts, current: p.value, writable: writable)
@@ -171,7 +188,16 @@ final class CanonCamera: CameraDriver {
     func setSetting(_ code: UInt16, to target: Int64, log: ((String) -> Void)? = nil) async throws {
         if currentValue(code) == target { return }
         log?("setting 0x\(String(code, radix: 16)) to \(target)")
-        try await setValueEx(code, value: UInt32(truncatingIfNeeded: target))
+        if code == CanonProp.imageFormat {
+            let opts = lock.withLock { imageFormatOptions }
+            guard opts.indices.contains(Int(target)) else { throw SonyError.badData("image format option unknown") }
+            var d = Data()
+            d.appendLE(UInt32(8 + 4 * opts[Int(target)].count)); d.appendLE(UInt32(code))
+            for w in opts[Int(target)] { d.appendLE(w) }
+            try await transport.run(CanonOp.setDevicePropValueEx, dataOut: d)
+        } else {
+            try await setValueEx(code, value: UInt32(truncatingIfNeeded: target))
+        }
         // The new value comes back as a PropValueChanged event
         let start = Date()
         while Date().timeIntervalSince(start) < 1.5 {
@@ -194,17 +220,21 @@ final class CanonCamera: CameraDriver {
         }
         // Heartbeat: the camera wants GetEvent now and then; this also catches ObjectAdded from its own shutter
         if Date().timeIntervalSince(lastEventPoll) > 1.0 { _ = try? await pollEvents() }
+        // The body delivers 50 small frames a second, more than the iPad can decode smoothly: pace to ~25 fps
+        let since = Date().timeIntervalSince(lastFrameAt)
+        if since < 0.04 { try await Task.sleep(nanoseconds: UInt64((0.04 - since) * 1_000_000_000)) }
         var tries = 12
         while tries > 0 {
             tries -= 1
             let (resp, data) = try await transport.runWithResponse(CanonOp.getViewFinderData, params: [0x0010_0000], quiet: true)
             if resp.ok, data.count > 8 {
+                lastFrameAt = Date()
                 if rawDumps.first(where: { $0.name.hasPrefix("Canon ViewFinder") }) == nil { dump("Canon ViewFinder header (\(data.count) bytes)", data, limit: 96) }
                 if let jpeg = Self.extractViewFinderJPEG(data) { return jpeg }
                 return nil
             }
             // 0xA102 not ready, busy, access denied: the frame is not there yet
-            if resp.code == 0xA102 || resp.code == PTP.RC.deviceBusy || resp.code == PTP.RC.accessDenied || resp.code == 0xA104 {
+            if resp.code == 0xA102 || resp.code == PTP.RC.deviceBusy || resp.code == PTP.RC.accessDenied || resp.code == 0xA104 || resp.code == 0 {
                 try await Task.sleep(nanoseconds: 40_000_000)
                 continue
             }
@@ -233,7 +263,6 @@ final class CanonCamera: CameraDriver {
     /// Half press (AF), full press, release, then wait for ObjectAddedEx and download from RAM.
     func capture(progress: ((String) -> Void)? = nil) async throws -> [CapturedObject] {
         _ = try? await pollEvents()
-        try await ensureOneShotAF()
         objectAdded.reset()
         let countBefore = pendingCount
         progress?(String(format: "Releasing shutter… (focus mode %@, AE mode %@, shots left %@, destination %@)",
@@ -255,6 +284,12 @@ final class CanonCamera: CameraDriver {
         progress?(String(format: "Full press after %d attempt(s): %@", attempts, full.codeHex))
         _ = try? await transport.runWithResponse(CanonOp.remoteReleaseOff, params: [2], quiet: true)
         _ = try? await transport.runWithResponse(CanonOp.remoteReleaseOff, params: [1], quiet: true)
+        if full.code == PTP.RC.deviceBusy, ramCapture {
+            // The body will not fire into RAM: switch to the memory card for good and run the release once more
+            progress?("Body refuses RAM capture, switching to the memory card")
+            try await selectDestination(preferRAM: false)
+            return try await capture(progress: progress)
+        }
         if full.code == PTP.RC.deviceBusy {
             // Still busy. Second route used by libgphoto2 in live view: explicit DoAf, then the full press again
             progress?("AF did not lock via half press, trying DoAf")
@@ -272,6 +307,8 @@ final class CanonCamera: CameraDriver {
 
         progress?("Waiting for the image…")
         let start = Date()
+        traceEvents = true
+        defer { traceEvents = false }
         while Date().timeIntervalSince(start) < 35 {
             _ = objectAdded.consume()
             _ = try await pollEvents()
@@ -289,14 +326,21 @@ final class CanonCamera: CameraDriver {
     func fetchObjects(progress: ((String) -> Void)? = nil) async throws -> [CapturedObject] {
         var objects: [CapturedObject] = []
         while let obj = popPending() {
-            progress?("Fetching \(obj.filename)…")
+            // Format and filename from GetObjectInfo: the event layout differs between bodies, this does not
+            var format = obj.format, filename = obj.filename
+            if obj.format == 0, let (oiResp, oiData) = try? await transport.runWithResponse(PTP.Op.getObjectInfo, params: [obj.handle], quiet: true), oiResp.ok, oiData.count > 52 {
+                let oi = PTP.parseObjectInfo(oiData)
+                if oi.objectFormat != 0 { format = oi.objectFormat }
+                if !oi.filename.isEmpty { filename = oi.filename }
+            }
+            progress?("Fetching \(filename)…")
             let data = try await transport.run(PTP.Op.getObject, params: [obj.handle])
             _ = try? await transport.runWithResponse(CanonOp.transferComplete, params: [obj.handle], quiet: true)
             guard data.count > 1000 else { continue }
-            let captured = CapturedObject(data: data, format: obj.format, filename: obj.filename)
+            let captured = CapturedObject(data: data, format: format, filename: filename)
             if captured.isRAW { sawRAWObject = true }
             objects.append(captured)
-            progress?(String(format: "Received: %@ format 0x%04X (%d KB)", obj.filename, obj.format, data.count / 1024))
+            progress?(String(format: "Received: %@ format 0x%04X (%d KB)", filename, format, data.count / 1024))
         }
         guard !objects.isEmpty else { throw SonyError.noImage }
         return objects
@@ -313,11 +357,18 @@ final class CanonCamera: CameraDriver {
         return pending.isEmpty ? nil : pending.removeFirst()
     }
 
+    /// The standard BatteryLevel 0x5001 is stale on the R100 (67 % regardless of charge), so the EOS BatteryPower
+    /// levels are used (libgphoto2 canon_eos_batterylevel: 0 low, 1 50 %, 2 100 %, 4 75 %, 5 25 %).
     func batteryPercent() -> Int? {
-        if let b = batteryPct { return b }
-        // Fallback: EOS BatteryPower levels (0 empty … 3 full)
-        if let v = currentValue(CanonProp.batteryPower), (0...3).contains(v) { return Int(v) * 33 }
-        return nil
+        guard let v = currentValue(CanonProp.batteryPower) else { return batteryPct }
+        switch v {
+        case 0: return 10
+        case 1: return 50
+        case 2: return 100
+        case 4: return 75
+        case 5: return 25
+        default: return batteryPct
+        }
     }
 
     func capabilitiesReport() -> String {
@@ -359,6 +410,9 @@ final class CanonCamera: CameraDriver {
             n += 1
             eventRecordCounts[type, default: 0] += 1
             let rec = d.subdata(in: (d.startIndex + off)..<(d.startIndex + off + size))
+            if traceEvents, type != UInt32(CanonEvent.propValueChanged), type != UInt32(CanonEvent.availListChanged) {
+                logHandler?(String(format: "Canon event 0x%04X (%d bytes): ", type, size) + rec.prefix(40).map { String(format: "%02x", $0) }.joined(separator: " "))
+            }
             switch UInt16(truncatingIfNeeded: type) {
             case CanonEvent.propValueChanged where size >= 12:
                 let code = UInt16(truncatingIfNeeded: rec.readLE(UInt32.self, at: 8))
@@ -373,13 +427,33 @@ final class CanonCamera: CameraDriver {
                 var p = 20
                 for _ in 0..<count where p + 4 <= rec.count { vals.append(Int64(rec.readLE(UInt32.self, at: p))); p += 4 }
                 lists.append((code, vals))
+            case CanonEvent.requestObjectTransfer64 where size >= 28:
+                let handle = rec.readLE(UInt32.self, at: 8)
+                let format = rec.readLE(UInt16.self, at: 12)
+                let objSize = UInt32(truncatingIfNeeded: rec.readLE(UInt64.self, at: 20))
+                if rawDumps.filter({ $0.name.hasPrefix("Canon RequestObjectTransfer") }).count < 2 { dump("Canon RequestObjectTransfer64 event", rec) }
+                newObjects.append(CanonPendingObject(handle: handle, format: format, size: objSize, filename: String(format: "IMG_%08X.%@", handle, CapturedObject.rawFormats.contains(format) ? "CR3" : "JPG")))
+            case CanonEvent.requestObjectTransfer where size >= 12:
+                // Capture to host: only the handle; format and name come from GetObjectInfo before the download
+                let handle = rec.readLE(UInt32.self, at: 8)
+                if rawDumps.filter({ $0.name.hasPrefix("Canon RequestObjectTransfer") }).count < 2 {
+                    dump("Canon RequestObjectTransfer event", rec)
+                    logHandler?("Canon RequestObjectTransfer hex: " + rec.prefix(48).map { String(format: "%02x", $0) }.joined(separator: " "))
+                }
+                newObjects.append(CanonPendingObject(handle: handle, format: 0, size: 0, filename: String(format: "IMG_%08X.JPG", handle)))
             case CanonEvent.objectAddedEx where size >= 36, CanonEvent.objectAddedEx64 where size >= 40:
+                // 0xC181 (libgphoto2): format u16 @20, size u32 @28, name @32. 0xC1A7 (seen on the R100):
+                // format u32 @16, size u64 @28, name @44
                 let is64 = UInt16(truncatingIfNeeded: type) == CanonEvent.objectAddedEx64
                 let handle = rec.readLE(UInt32.self, at: 8)
-                let format = rec.readLE(UInt16.self, at: 20)
+                let format = is64 ? rec.readLE(UInt16.self, at: 16) : rec.readLE(UInt16.self, at: 20)
                 let objSize = is64 ? UInt32(truncatingIfNeeded: rec.readLE(UInt64.self, at: 28)) : rec.readLE(UInt32.self, at: 28)
-                let name = Self.cString(rec.subdata(in: (rec.startIndex + (is64 ? 36 : 32))..<rec.endIndex))
-                if rawDumps.filter({ $0.name.hasPrefix("Canon ObjectAddedEx") }).count < 4 { dump("Canon ObjectAddedEx event", rec) }
+                let name = Self.cString(rec.subdata(in: (rec.startIndex + (is64 ? 44 : 32))..<rec.endIndex))
+                if rawDumps.filter({ $0.name.hasPrefix("Canon ObjectAddedEx") }).count < 4 {
+                    dump("Canon ObjectAddedEx event", rec)
+                    // Into the log too, so the record layout can be read off without a report
+                    logHandler?("Canon ObjectAddedEx hex: " + rec.prefix(72).map { String(format: "%02x", $0) }.joined(separator: " "))
+                }
                 newObjects.append(CanonPendingObject(handle: handle, format: format, size: objSize, filename: name.isEmpty ? String(format: "IMG_%08X.JPG", handle) : name))
             default:
                 break
@@ -396,7 +470,17 @@ final class CanonCamera: CameraDriver {
         for (code, vals) in lists {
             var cur = props[code] ?? CanonPropState()
             cur.choices = vals
+            if code == CanonProp.imageFormat {
+                imageFormatOptions = Self.splitImageFormats(vals.map { UInt32(truncatingIfNeeded: $0) })
+                cur.choices = imageFormatOptions.indices.map(Int64.init)
+            }
             props[code] = cur
+        }
+        // Image format: the current value is the raw list, map it to its option index
+        if var cur = props[CanonProp.imageFormat], let raw = cur.raw {
+            let words = stride(from: 0, to: raw.count - 3, by: 4).map { raw.readLE(UInt32.self, at: $0) }
+            cur.value = imageFormatOptions.firstIndex(of: words).map(Int64.init)
+            props[CanonProp.imageFormat] = cur
         }
         pending.append(contentsOf: newObjects)
         lock.unlock()
@@ -423,7 +507,38 @@ final class CanonCamera: CameraDriver {
         let dtc = d.readLE(UInt16.self, at: 2)
         var off = 5
         _ = PTP.readValue(d, type: dtc, at: &off)
-        if let cur = PTP.readValue(d, type: dtc, at: &off), (0...100).contains(cur) { batteryPct = Int(cur) }
+        let cur = PTP.readValue(d, type: dtc, at: &off)
+        if !batteryLogged {
+            batteryLogged = true
+            logHandler?("Canon battery: 0x5001 desc " + d.prefix(24).map { String(format: "%02x", $0) }.joined(separator: " ") + ", BatteryPower 0xD111 = \(currentValue(CanonProp.batteryPower).map(String.init) ?? "?")")
+        }
+        if let cur, (0...100).contains(cur) { batteryPct = Int(cur) }
+    }
+
+    /// Splits the flat word list of allowed image formats into options: [count, (size, type, imagesize, compression) × count]
+    static func splitImageFormats(_ words: [UInt32]) -> [[UInt32]] {
+        var out: [[UInt32]] = []
+        var i = 0
+        while i < words.count {
+            let n = Int(words[i]); let len = 1 + 4 * n
+            guard n >= 1, n <= 3, i + len <= words.count else { break }
+            out.append(Array(words[i..<(i + len)])); i += len
+        }
+        return out
+    }
+    static let imageSizes: [UInt32: String] = [0: "L", 1: "M", 2: "S", 5: "M1", 6: "M2", 14: "S1", 15: "S2", 16: "S3"]
+    static let imageQualities: [UInt32: String] = [2: "Normal", 3: "Fine", 5: "Superfine"]
+    static func imageFormatLabel(_ w: [UInt32]) -> String {
+        guard let n = w.first, n >= 1 else { return "?" }
+        var parts: [String] = []
+        for k in 0..<Int(n) {
+            let b = 1 + 4 * k
+            guard b + 3 < w.count else { break }
+            let type = w[b + 1], size = w[b + 2], comp = w[b + 3]
+            if type == 6 || type == 7 || comp == 4 || comp == 6 { parts.append(comp == 6 || type == 7 ? "C-RAW" : "RAW"); continue }
+            parts.append("\(imageSizes[size] ?? "\(size)") \(imageQualities[comp] ?? "\(comp)")")
+        }
+        return parts.joined(separator: " + ")
     }
 
     static func cString(_ d: Data) -> String {
@@ -455,6 +570,7 @@ enum CanonFormat {
         (CanonProp.expCompensation, String(localized: "Exposure compensation")),
         (CanonProp.whiteBalance, String(localized: "White balance")),
         (CanonProp.focusMode, String(localized: "Focus")),
+        (CanonProp.imageFormat, String(localized: "Image quality")),
         (CanonProp.driveMode, String(localized: "Drive mode")),
         (CanonProp.captureDestination, String(localized: "Save destination")),
     ]
