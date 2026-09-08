@@ -1,105 +1,67 @@
 # OpenBooth
 
-Open-source photo booth app for the iPad. The camera is connected directly to the iPad via USB-C, no computer in between.
+A simple, open-source photo booth for the iPad. Connect a camera via USB-C, take a photo and save it locally or to your server. No filters, frames or subscription.
 
-**Simple, basic, functional.** No filters, no frames, no stickers, no subscription. The photo comes out of the camera
-exactly as the photographer set it up, as JPEG or RAW, and lands where it belongs: iPad photo library, Immich, WebDAV.
-Reduced to the essentials, with a few smart details (idle collage that wakes on motion, the camera’s own shutter is
-picked up, QR code to the album, the display regulates itself). Optimized for performance, open source.
+Live view, countdown, photo review and gallery. Optional photo series, idle slideshow and a QR code to an Immich album.
 
-Status: **prototype, core works.** Sony ILCE-7M4 and Canon EOS R100 over USB-C on an iPad Air (M4): PTP pass-through,
-handshake, live view, capture, RAW, uploads and remote shutter via camera events, all verified on device (2026-09-08).
+**Status: prototype.** Tested with Sony ILCE-7M4 and Canon EOS R100 on an iPad Air (M4). Canon still needs endurance testing. Other camera models are not yet verified. The iPad’s own camera is available as a fallback.
 
-## Technology
+## Install
 
-- SwiftUI, iPadOS 17+
-- Camera link via `ImageCaptureCore`: iPadOS passes raw PTP commands through to USB cameras
-  (`ICCameraDevice.requestSendPTPCommand`). `NSCameraUsageDescription` is required for that.
-- Sony protocol (PC Remote) re-implemented after libgphoto2 `camlibs/ptp2` (LGPL):
-  handshake `0x9201` phases 1/2, `0x9202`, phase 3, PriorityMode; live view via object `0xFFFFC002`;
-  shutter via `0x9207` with `0xD2C1`/`0xD2C2`; image from RAM via `0xFFFFC001` once `0xD215 >= 0x8000`.
-- Cameras: Sony ILCE-7M4 (PC Remote protocol) and Canon EOS R100 (EOS PTP extension: `0x9114`/`0x9115` remote and
-  event mode, `0x9116` GetEvent, `0x9128`/`0x9129` release, `0x9153` live view, `0x9110` settings, capture to RAM with
-  `0xD11C = 4` after `0x911A` PCHDDCapacity, image announced by event `0xC1A9`). ILCE-6400 next.
-- iPad camera (front or rear, standard or ultra-wide lens) as a fallback when no USB camera is present.
-- `CameraDriver` protocol: Sony and Canon EOS are implemented; unknown vendors get a generic driver that writes the
-  capability report and asks for diagnostics instead of looping through recovery.
-
-## Building
+Requires a Mac with Xcode, XcodeGen and an iPad with iPadOS 17 or later. USB camera tests have been performed on iPadOS 26.
 
 ```bash
 brew install xcodegen
+git clone https://github.com/StratoGh0st99/openbooth.git
 cd openbooth
-cp Local.xcconfig.example Local.xcconfig   # enter your own team ID
+cp Local.xcconfig.example Local.xcconfig
+```
+
+Enter your Apple development team ID in `Local.xcconfig`, then generate and open the project:
+
+```bash
 xcodegen generate
 open OpenBooth.xcodeproj
 ```
 
-Signing via `Local.xcconfig` (not in the repo): Apple development team, optionally your own bundle ID. A free
-Personal Team is enough; the app then runs for 7 days and must be reinstalled. Straight to the iPad without the Xcode
-GUI: `xcrun devicectl list devices`, write the ID to `.device`, then `tools/install.sh`. Fetch the log: `tools/pull-log.sh`.
+Select your connected iPad in Xcode and run the app.
 
-## Findings from the first device test
+For subsequent builds, save the device ID from `xcrun devicectl list devices` in `.device` and run `tools/install.sh` to build, install and launch. The script uses the default bundle ID; use Xcode if you customize it.
 
-- iPadOS 26 allows `requestSendPTPCommand` to the Sony without special entitlements; the feared
-  `ICReturnPTPNotAuthorizedToSendCommand` (-21249) never occurred. `NSCameraUsageDescription` suffices.
-- The completion delivers the blocks in the order (data-in, response container, error).
-  The response container is a regular 12-byte PTP container, code at offset 6.
-- Transaction IDs are assigned by the framework; the value in the sent command is replaced.
-- Live view: ~24 fps at ~180 KB via `GetObject 0xFFFFC002`, limited by the camera.
-- Photos rejects an ARW as `alternatePhoto` to the JPEG (PHPhotosError 3300); separate assets work.
-- Sony vendor events (`0xC201 ObjectAdded`, `0xC203 PropertyChanged`) are passed through to the app.
-- In PC Remote mode the Sony appears as `ICCameraDevice` with `ICTransportTypeUSB`.
+## Set up and use
 
-## Usage
+1. First launch opens setup. Connect your camera; on Sony, select **PC Remote** mode. Without USB, the enabled iPad fallback starts automatically.
+2. Create or select an event under **Event**.
+3. Under **Destinations**, choose storage, allow photo-library access and test any configured servers.
+4. Take a test photo, check the result and select **Start booth**.
 
-- **First setup**: the app opens the admin readiness check. Connect a camera, grant access for every enabled destination,
-  verify server destinations and take one test photo. The booth can only start after these checks pass.
-- **Guest mode** (default): full-screen live view, red button, countdown, large review with “One more!”, gallery.
-- **Idle collage**: after a configurable time without activity, a changing collage of the evening’s photos; the button stays visible.
-- **Admin**: swipe down with two fingers, enter the PIN (default `0000`, change it in Admin). Sidebar with sections
-  Event, Camera, Flow, Display & Sounds, Destinations, Phrases, Access, Log.
-- **Camera settings** (program, ISO, aperture, shutter, focus, setting effect, save destination) are set directly in the camera;
-  values set in the app are remembered per model and restored on reconnect.
-- **RAW**: set image quality to RAW+JPEG or RAW; both objects are fetched from camera RAM and the ARW goes to every enabled target (the admin warns about the size) (the counter `0xD215` reports
-  `0x8001` after the first fetch); the ARW is stored as its own asset in the library and under `Fotos/raw`.
-  With “RAW only”, the embedded 1616×1080 preview of the ARW is used for display.
-- **Event**: the event name is the Immich album and the WebDAV folder; both are created automatically. Pending uploads keep
-  the destination captured when the photo was taken, so changing events cannot move older photos into the new event.
-- **Destinations**: app gallery (always, a 2000 px web copy, source for review and collage), iPad photo library, Immich, WebDAV,
-  each switchable; every external target (photo library, Immich, WebDAV) can receive the original or the web copy (good for LTE setups). Originals are kept in the
-  app folder only until every target has them, then discarded (the admin warns if no target keeps originals).
-- **Warnings**: iPad battery, camera battery and free storage are shown as a chip on the guest screen when they get low.
-- **Immich upload** (optional): server, API key (keychain) and album; each photo is queued via `POST /api/assets` and then
-  added to the album (`PUT /api/albums/{id}/assets`). Offline uploads catch up later, “Test connection” checks key and album.
-- **WebDAV upload** (optional): base URL, user, password (keychain). Folder via `MKCOL`, files via `PUT`, own retry queue.
-  Tested with Nextcloud (`remote.php/dav/files/USER`).
-- **Collage ends on motion**: the live view is downscaled to 32×18 gray, split into 4×4 cells; the strongest cell minus the
-  median (global brightness changes) above an adaptive threshold ends the collage. Idle level is logged every 30 s.
-- **Camera shutter pickup**: photos taken with the camera’s own shutter or a remote are detected instantly via the Sony event
-  `0xC201 ObjectAdded`, stored the same way and shown in review. Polling `0xD215` remains a safety net.
-- **Gallery**: full screen, three columns, large view with paging, auto-closes after a configurable idle time;
-  800 px thumbnails via ImageIO cached in `.thumbs/`.
-- **Sounds** (switchable): welcome chime on wake-up, countdown beeps, shutter signal, all synthesized.
-- **Display**: QR page always at full brightness, optionally permanent; the idle collage restores the previous value.
-- **Operator overlay** (Admin › Camera): histogram (RGB and luminance) in live view and review, iPad and camera battery, and quick controls for program, ISO, aperture and shutter on the guest screen.
-- **Capability report**: after the handshake the app writes `openbooth-capabilities.log` (operations, events, properties),
-  fetch with `tools/pull-caps.sh`.
-- **Remote access** (optional, Admin › Access): read-only status page on Wi‑Fi on port 8787 (own HTTP server on
-  Network.framework, Bonjour “OpenBooth”): camera, frame rate, photos, destinations, battery, last log lines, motion
-  threshold, send diagnostics. PIN login, five failed attempts lock for one minute.
-- **Diagnostics**: “Share diagnostics” (share sheet) or “Send to OpenBooth” (HTTPS endpoint); contains environment,
-  capabilities with raw data and the log, no credentials, serial number shortened. Optionally automatic on errors.
-- **Admin helpers**: test photo, retry or clear upload queues, storage used per event with “Delete photos”, settings export/import
-  (JSON without secrets), warning while the default PIN is active, and a protected full reset under Admin › Access.
-- Series of 1/3/5 shots with pause (cancellable, taken photos are kept), review with progress bar (hold to pause) and delete, editable phrases, status banner with automatic
-  recovery, log in `Documents/openbooth.log` (fetch with `tools/pull-log.sh`).
+Guests press **Take a photo**, wait for the countdown and see the result. They can take another photo or browse the gallery.
 
-## Roadmap
+To reopen Admin, swipe down with two fingers and enter the PIN. The default is `0000`; change it under **Access**. Countdown and photo series are under **Flow**, camera controls under **Camera**.
 
-1. Test Sony ILCE-6400 (protocol version 2, settings are set stepwise)
-2. Photo printer via AirPrint (plain 10×15)
+## Save photos
 
-## License
+- **App gallery:** always keeps a display copy, normally up to 2000 px, under `Documents/Fotos/<event>/`.
+- **iPad photo library:** saves originals or display copies.
+- **Immich:** enter server URL and API key. The event name becomes the album name. The optional guest QR code links to a public album.
+- **WebDAV:** enter base URL, username and password. The event name becomes a subfolder. For Nextcloud: `https://your-server/remote.php/dav/files/your-user`.
 
-MIT for the app’s own code. Protocol knowledge from libgphoto2 (LGPL-2.1), no code copied.
+RAW files also go to enabled destinations, even when display copies are selected.
+
+Failed uploads remain queued for retry. New entries keep their destination across event changes. Finish pending uploads before switching events after an upgrade: older WebDAV entries use the current destination.
+
+**Originals in the app are temporary.** Cleanup removes JPEG originals and RAW files older than two minutes when no upload queue needs them. Photo-library failures do not prevent cleanup; verify your saved originals.
+
+## Troubleshooting and reset
+
+Check **Event** for readiness and **Destinations** for upload status. For camera problems, check power, USB cable and camera mode. The app attempts to reconnect automatically. Diagnostics are under **Admin → Log**.
+
+**Remove from gallery** removes only the local gallery copy. Copies already saved elsewhere remain.
+
+**Admin → Access → Reset OpenBooth…** clears settings, credentials, local event photos, queues and logs, then returns to setup. Copies in the iPad photo library, Immich and WebDAV remain. iPadOS permissions are managed separately in Settings.
+
+## Development and license
+
+SwiftUI with ImageCaptureCore for USB cameras. Driver and protocol details are in `Sources/OpenBooth/`. Use `tools/pull-log.sh` and `tools/pull-caps.sh` to retrieve diagnostics.
+
+[MIT](LICENSE) for the app’s code. Protocol knowledge from libgphoto2 (LGPL-2.1); no code copied.
