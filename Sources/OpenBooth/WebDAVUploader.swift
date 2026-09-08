@@ -12,20 +12,25 @@ import Foundation
 final class WebDAVUploader: ObservableObject {
     struct Item: Codable, Equatable {
         let path: String          // relative to the Documents folder
+        /// Immutable destination captured when queued. Optional for queues written by older builds.
+        var baseURL: String? = nil
+        var user: String? = nil
         var attempts: Int = 0
     }
 
     @Published private(set) var pending: [Item] = []
     @Published private(set) var uploaded = 0
     @Published private(set) var lastMessage = String(localized: "off")
+    @Published private(set) var connectionVerified = false
 
     var enabled = false
     var baseURL = ""        // base URL plus event folder, e.g. https://cloud.example.de/remote.php/dav/files/paul/Hochzeit
     var user = ""
     var log: ((String) -> Void)?
 
-    private var folderChecked = false
+    private var checkedFolders: Set<String> = []
     private var worker: Task<Void, Never>?
+    private var workerID: UUID?
     private var docs: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
     private var queueURL: URL { docs.appendingPathComponent("webdav-queue.json") }
 
@@ -42,7 +47,7 @@ final class WebDAVUploader: ObservableObject {
         var u = url.trimmingCharacters(in: .whitespacesAndNewlines)
         while u.hasSuffix("/") { u.removeLast() }
         if !u.isEmpty { u += "/" + (folder.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? folder) }
-        if u != baseURL { folderChecked = false }
+        if u != baseURL || self.user != user.trimmingCharacters(in: .whitespaces) { connectionVerified = false }
         baseURL = u
         self.user = user.trimmingCharacters(in: .whitespaces)
         lastMessage = enabled ? (pending.isEmpty ? String(localized: "ready") : String(localized: "\(pending.count) pending")) : String(localized: "off")
@@ -51,7 +56,7 @@ final class WebDAVUploader: ObservableObject {
 
     func enqueue(_ fileURL: URL) {
         guard enabled else { return }
-        pending.append(Item(path: fileURL.path.replacingOccurrences(of: docs.path + "/", with: "")))
+        pending.append(Item(path: fileURL.path.replacingOccurrences(of: docs.path + "/", with: ""), baseURL: baseURL, user: user))
         saveQueue()
         lastMessage = String(localized: "\(pending.count) pending")
         kick()
@@ -59,23 +64,41 @@ final class WebDAVUploader: ObservableObject {
 
     /// Retry now: cancel the running worker (which may be sleeping in the backoff) and restart
     func retryNow() {
-        worker?.cancel(); worker = nil
+        worker?.cancel(); worker = nil; workerID = nil
         for i in pending.indices { pending[i].attempts = 0 }
         kick()
     }
     /// Drop the queue (files stay until the cleanup removes them)
     func clearQueue() {
-        worker?.cancel(); worker = nil
+        worker?.cancel(); worker = nil; workerID = nil
         pending = []; saveQueue()
         lastMessage = enabled ? String(localized: "ready") : String(localized: "off")
         log?("WebDAV: queue cleared")
     }
 
+    /// Drop only files belonging to one event. Other events keep their pending uploads.
+    func clearQueue(relativeDirectory: String) {
+        worker?.cancel(); worker = nil; workerID = nil
+        let prefix = relativeDirectory.hasSuffix("/") ? relativeDirectory : relativeDirectory + "/"
+        let before = pending.count
+        pending.removeAll { $0.path.hasPrefix(prefix) }
+        saveQueue()
+        lastMessage = enabled ? (pending.isEmpty ? String(localized: "ready") : String(localized: "\(pending.count) pending")) : String(localized: "off")
+        log?("WebDAV: dropped \(before - pending.count) queued file(s) for \(relativeDirectory)")
+        kick()
+    }
+
     private func kick() {
         guard worker == nil, enabled, !pending.isEmpty else { return }
+        let id = UUID()
+        workerID = id
         worker = Task { [weak self] in
             await self?.drain()
-            await MainActor.run { self?.worker = nil }
+            await MainActor.run {
+                guard self?.workerID == id else { return }
+                self?.worker = nil
+                self?.workerID = nil
+            }
         }
     }
 
@@ -104,7 +127,7 @@ final class WebDAVUploader: ObservableObject {
                 log?("WebDAV: \(error.localizedDescription) (attempt \(pending[0].attempts), waiting \(backoff) s)")
                 if pending[0].attempts >= 8 {
                     // Move the file to the end so others get through
-                    let it = pending.removeFirst(); pending.append(Item(path: it.path)); saveQueue()
+                    var it = pending.removeFirst(); it.attempts = 0; pending.append(it); saveQueue()
                 }
                 try? await Task.sleep(nanoseconds: backoff * 1_000_000_000)
                 backoff = min(backoff * 2, 120)
@@ -117,16 +140,18 @@ final class WebDAVUploader: ObservableObject {
 
     // MARK: HTTP
 
-    private func request(_ path: String, method: String) throws -> URLRequest {
-        guard !baseURL.isEmpty, let url = URL(string: baseURL + path) else {
+    private func request(_ path: String, method: String, base: String? = nil, user targetUser: String? = nil) throws -> URLRequest {
+        let targetBase = base ?? baseURL
+        let targetUser = targetUser ?? user
+        guard !targetBase.isEmpty, let url = URL(string: targetBase + path) else {
             throw NSError(domain: "WebDAV", code: 1, userInfo: [NSLocalizedDescriptionKey: String(localized: "Folder URL missing or invalid")])
         }
         var r = URLRequest(url: url)
         r.httpMethod = method
         r.timeoutInterval = 60
-        if !user.isEmpty {
+        if !targetUser.isEmpty {
             let pw = Keychain.get("webdavPassword") ?? ""
-            let token = Data("\(user):\(pw)".utf8).base64EncodedString()
+            let token = Data("\(targetUser):\(pw)".utf8).base64EncodedString()
             r.setValue("Basic \(token)", forHTTPHeaderField: "Authorization")
         }
         return r
@@ -135,33 +160,36 @@ final class WebDAVUploader: ObservableObject {
     private func status(_ resp: URLResponse) -> Int { (resp as? HTTPURLResponse)?.statusCode ?? 0 }
 
     /// Create the folder if missing (MKCOL; 405 = already exists).
-    private func ensureFolder() async throws {
-        if folderChecked { return }
-        var probe = try request("/", method: "PROPFIND")
+    private func ensureFolder(base: String? = nil, user: String? = nil) async throws {
+        let targetBase = base ?? baseURL
+        if checkedFolders.contains(targetBase) { return }
+        var probe = try request("/", method: "PROPFIND", base: targetBase, user: user)
         probe.setValue("0", forHTTPHeaderField: "Depth")
         probe.timeoutInterval = 15
         let (_, pr) = try await URLSession.shared.data(for: probe)
         switch status(pr) {
-        case 200...299: folderChecked = true; return
+        case 200...299: checkedFolders.insert(targetBase); return
         case 401, 403: throw NSError(domain: "WebDAV", code: 401, userInfo: [NSLocalizedDescriptionKey: "Access denied (HTTP \(status(pr))): check user or password"])
         case 404: break
         default: throw NSError(domain: "WebDAV", code: status(pr), userInfo: [NSLocalizedDescriptionKey: "Server answered HTTP \(status(pr))"])
         }
-        let (_, mr) = try await URLSession.shared.data(for: try request("", method: "MKCOL"))
+        let (_, mr) = try await URLSession.shared.data(for: try request("", method: "MKCOL", base: targetBase, user: user))
         guard (200...299).contains(status(mr)) || status(mr) == 405 else {
             throw NSError(domain: "WebDAV", code: status(mr), userInfo: [NSLocalizedDescriptionKey: String(localized: "Folder could not be created (HTTP \(status(mr)))")])
         }
-        folderChecked = true
+        checkedFolders.insert(targetBase)
         log?("WebDAV: folder created")
     }
 
     /// Connection test: folder reachable or creatable.
     func test() async -> String {
         do {
-            folderChecked = false
+            checkedFolders.remove(baseURL)
             try await ensureFolder()
+            connectionVerified = true
             return String(localized: "OK, folder reachable")
         } catch {
+            connectionVerified = false
             return String(localized: "Error: \(error.localizedDescription)")
         }
     }
@@ -171,9 +199,11 @@ final class WebDAVUploader: ObservableObject {
         guard let data = try? Data(contentsOf: fileURL) else {
             throw NSError(domain: "WebDAV", code: 4, userInfo: [NSLocalizedDescriptionKey: "File missing: \(item.path)"])
         }
-        try await ensureFolder()
+        let targetBase = item.baseURL ?? baseURL
+        let targetUser = item.user ?? user
+        try await ensureFolder(base: targetBase, user: targetUser)
         let name = fileURL.lastPathComponent.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? fileURL.lastPathComponent
-        var r = try request("/" + name, method: "PUT")
+        var r = try request("/" + name, method: "PUT", base: targetBase, user: targetUser)
         r.timeoutInterval = 300
         r.setValue(name.lowercased().hasSuffix(".arw") ? "image/x-sony-arw" : "image/jpeg", forHTTPHeaderField: "Content-Type")
         let (d, resp) = try await URLSession.shared.upload(for: r, from: data)
@@ -182,6 +212,7 @@ final class WebDAVUploader: ObservableObject {
             let txt = String(data: d.prefix(120), encoding: .utf8) ?? ""
             throw NSError(domain: "WebDAV", code: code, userInfo: [NSLocalizedDescriptionKey: "Upload HTTP \(code) \(txt)"])
         }
+        if targetBase == baseURL && targetUser == user { connectionVerified = true }
         log?("WebDAV: \(fileURL.lastPathComponent) uploaded (\(data.count / 1_000_000) MB)")
     }
 }

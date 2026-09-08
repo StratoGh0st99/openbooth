@@ -26,6 +26,8 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var lastPhoto: UIImage?
     @Published var status = String(localized: "Connect a camera")
     @Published var authorization = "unknown"
+    @Published private(set) var photoAuthorization = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+    @Published private(set) var photoLibraryError: String?
     @Published var settings: [CameraSetting] = []
     @Published var settingsBusy = false
     var autoConnect: Bool { settingsRef?.autoConnect ?? true }
@@ -34,6 +36,34 @@ final class CameraManager: NSObject, ObservableObject {
     func syncUploaders() {
         if let s = settingsRef { switchEvent(to: Self.safeName(s.eventName)) }
         syncImmich(); syncWebDAV(); syncWeb(); syncFallback()
+    }
+
+    var photoLibraryReady: Bool {
+        photoAuthorization == .authorized || photoAuthorization == .limited
+    }
+
+    func requestPhotoLibraryAccess() {
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
+            Task { @MainActor in
+                self?.photoAuthorization = status
+                self?.appendLog("Photo library authorization: \(status.rawValue)")
+                self?.checkResources()
+            }
+        }
+    }
+
+    /// Small operator-facing checklist. An enabled destination must be configured and verified.
+    var boothIssues: [String] {
+        guard let s = settingsRef else { return [String(localized: "Settings are not loaded")] }
+        var issues: [String] = []
+        if s.eventName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { issues.append(String(localized: "Enter an event name")) }
+        if state != .connected { issues.append(String(localized: "Connect and test the camera")) }
+        if s.saveToPhotos && !photoLibraryReady { issues.append(String(localized: "Allow access to the photo library")) }
+        if s.saveToPhotos && photoLibraryError != nil { issues.append(String(localized: "Saving to the photo library failed")) }
+        if s.immichEnabled && !immich.connectionVerified { issues.append(String(localized: "Test the Immich connection")) }
+        if s.webdavEnabled && !webdav.connectionVerified { issues.append(String(localized: "Test the WebDAV connection")) }
+        if !s.setupCompleted && !captureTested { issues.append(String(localized: "Take one test photo")) }
+        return issues
     }
 
     // MARK: Fallback: iPad camera when no USB camera is present
@@ -176,7 +206,7 @@ final class CameraManager: NSObject, ObservableObject {
     let webdav = WebDAVUploader()
     func syncWebDAV() {
         guard let s = settingsRef else { return }
-        webdav.log = { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
+        webdav.log = { [weak self] m in Task { @MainActor in self?.appendLog(m); self?.checkResources() } }
         webdav.configure(enabled: s.webdavEnabled, url: s.webdavURL, user: s.webdavUser, folder: Self.safeName(s.eventName))
     }
     /// Event name as album and folder name: no path characters, never empty.
@@ -196,9 +226,9 @@ final class CameraManager: NSObject, ObservableObject {
 
     func syncImmich() {
         guard let s = settingsRef else { return }
-        immich.log = { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
+        immich.log = { [weak self] m in Task { @MainActor in self?.appendLog(m); self?.checkResources() } }
         immich.configure(enabled: s.immichEnabled, server: s.immichURL, album: Self.safeName(s.eventName))
-        if s.immichEnabled, immich.shareURL == nil, !s.immichURL.isEmpty {
+        if s.immichEnabled, s.qrEnabled, immich.shareURL == nil, !s.immichURL.isEmpty {
             Task { [weak self] in
                 do { try await self?.immich.ensureShareLink() } catch { self?.appendLog("Immich: share link: \(error.localizedDescription)") }
             }
@@ -231,8 +261,10 @@ final class CameraManager: NSObject, ObservableObject {
     }
     @Published var banner: Banner? = Banner(kind: .info, text: String(localized: "Connect a camera"))
     @Published var captureError: String?      // overlay with "Try again"
+    @Published private(set) var captureTested = false
     @Published var lastError: String?         // for the admin panel
     private var recoverAttempts = 0
+    private var captureFailureStreak = 0
     private var recoverTask: Task<Void, Never>?
     private var connectedSince: Date?
     private var lastInteraction = Date()
@@ -392,13 +424,51 @@ final class CameraManager: NSObject, ObservableObject {
     /// Delete all photos of the current event from the iPad (photo library and servers untouched)
     func deleteEventPhotos() {
         dismissResult()
-        immich.clearQueue(); webdav.clearQueue()
+        let relativeDirectory = "Fotos/\(Self.currentEvent)"
+        immich.clearQueue(relativeDirectory: relativeDirectory)
+        webdav.clearQueue(relativeDirectory: relativeDirectory)
         let n = sessionPhotos.count
         sessionPhotos.forEach { ThumbnailStore.remove($0) }
         try? FileManager.default.removeItem(at: Self.photosDir)
         sessionPhotos = []
         lastPhoto = nil
         appendLog("Deleted all photos of event “\(Self.currentEvent)” from the iPad (\(n) in gallery)")
+    }
+
+    /// Factory reset for data owned by OpenBooth. Copies already delivered to Photos or servers are untouched.
+    func resetApp(settings appSettings: AppSettings) {
+        guard !capturing else { return }
+        dismissResult()
+        stopLiveView()
+        immich.clearQueue()
+        webdav.clearQueue()
+        web.stop()
+        Keychain.set("", for: "immichAPIKey")
+        Keychain.set("", for: "webdavPassword")
+
+        let fm = FileManager.default
+        let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let ownedURLs = [
+            Self.photosRoot,
+            docs.appendingPathComponent("immich-queue.json"),
+            docs.appendingPathComponent("webdav-queue.json"),
+            Self.capabilitiesURL,
+            docs.appendingPathComponent("openbooth.export.log"),
+        ]
+        for url in ownedURLs { try? fm.removeItem(at: url) }
+        Self.logFile.reset()
+
+        sessionPhotos = []
+        lastPhoto = nil
+        captureTested = false
+        captureFailureStreak = 0
+        photoLibraryError = nil
+        resourceWarnings = []
+        appSettings.resetToDefaults()
+        settingsRef = appSettings
+        syncUploaders()
+        appendLog("OpenBooth reset; first-run setup required")
+        if state == .connected { startLiveView() }
     }
 
     // MARK: Battery and storage: warnings for the guest screen
@@ -415,6 +485,9 @@ final class CameraManager: NSObject, ObservableObject {
         if ipad.0 >= 0, ipad.0 <= 20, !ipad.1 { w.append(String(localized: "iPad battery \(ipad.0) %")) }
         if let cb = cameraBattery(), cb <= 20 { w.append(String(localized: "Camera battery \(cb) %")) }
         if let free = Self.freeDiskGB(), free < 5 { w.append(String(localized: "Storage \(String(format: "%.1f", free)) GB free")) }
+        if settingsRef?.saveToPhotos == true, !photoLibraryReady || photoLibraryError != nil { w.append(String(localized: "Photo storage needs attention")) }
+        if settingsRef?.immichEnabled == true, immich.lastMessage.hasPrefix("Error:") { w.append(String(localized: "Immich needs attention")) }
+        if settingsRef?.webdavEnabled == true, webdav.lastMessage.hasPrefix("Error:") { w.append(String(localized: "WebDAV needs attention")) }
         if w != resourceWarnings {
             resourceWarnings = w
             if !w.isEmpty { appendLog("WARNING: " + w.joined(separator: ", ")) } else { appendLog("Resource warnings cleared") }
@@ -524,6 +597,15 @@ final class CameraManager: NSObject, ObservableObject {
                 }
             }
         }
+
+        func reset() {
+            q.async {
+                let fm = FileManager.default
+                try? fm.removeItem(at: self.url)
+                try? fm.removeItem(at: self.url.deletingPathExtension().appendingPathExtension("1.log"))
+                try? fm.removeItem(at: self.url.deletingLastPathComponent().appendingPathComponent("openbooth.export.log"))
+            }
+        }
     }
 
     // MARK: Discovery
@@ -535,7 +617,7 @@ final class CameraManager: NSObject, ObservableObject {
         authorization = "Simulator"
         state = .browsing
         status = String(localized: "Simulator: no camera available")
-        banner = Banner(kind: .info, text: String(localized: "Connect a camera"), detail: String(localized: "Sony in “PC Remote” mode via USB-C"))
+        banner = Banner(kind: .info, text: String(localized: "Connect a camera"), detail: String(localized: "Supported Sony or Canon via USB-C; otherwise the iPad camera starts automatically"))
         return
         #endif
         browser.requestContentsAuthorization { [weak self] status in
@@ -549,7 +631,7 @@ final class CameraManager: NSObject, ObservableObject {
                 if self.authorization == "denied" {
                     self.banner = Banner(kind: .error, text: String(localized: "No access to the camera"), detail: String(localized: "Allow Camera under Settings › OpenBooth"))
                 } else if self.devices.isEmpty {
-                    self.banner = Banner(kind: .info, text: String(localized: "Connect a camera"), detail: String(localized: "Sony in “PC Remote” mode via USB-C"))
+                    self.banner = Banner(kind: .info, text: String(localized: "Connect a camera"), detail: String(localized: "Supported Sony or Canon via USB-C; otherwise the iPad camera starts automatically"))
                     self.scheduleFallback()
                 }
             }
@@ -746,7 +828,7 @@ final class CameraManager: NSObject, ObservableObject {
 
     func startLiveView() {
         if ipadCam != nil { liveRunning = true; return }
-        guard let cam = driver, cam.supportsRemoteControl, liveTask == nil else { return }
+        guard state == .connected, let cam = driver, cam.supportsRemoteControl, liveTask == nil else { return }
         liveRunning = true
         lastFrame = Date()
         liveTask = Task { [weak self] in
@@ -774,6 +856,7 @@ final class CameraManager: NSObject, ObservableObject {
                         try await Task.sleep(nanoseconds: 100_000_000)
                     }
                 } catch {
+                    if Task.isCancelled || error is CancellationError { break }
                     failures += 1
                     await MainActor.run { self?.appendLog("Live view: \(error.localizedDescription)") }
                     if failures > 20 {
@@ -879,7 +962,9 @@ final class CameraManager: NSObject, ObservableObject {
                         objects = [o]
                     } else { throw SonyError.noSession }
                     if let (img, url) = try await store(objects) { taken.append(img); takenURLs.append(url) }
+                    captureFailureStreak = 0
                 } catch {
+                    captureFailureStreak += 1
                     appendLog("CAPTURE ERROR (image \(shot)/\(shots)): \(error.localizedDescription)")
                     status = String(localized: "Capture failed")
                     lastError = error.localizedDescription
@@ -887,6 +972,10 @@ final class CameraManager: NSObject, ObservableObject {
                         captureError = Self.friendly(error)
                         autoReport(String(localized: "Capture failed"))
                         capturePhrase = nil
+                        if captureFailureStreak >= 2, driver != nil {
+                            appendLog("Two consecutive capture failures, reconnecting before the next try")
+                            scheduleRecover(reason: "repeated capture failure")
+                        }
                         break
                     }
                 }
@@ -944,13 +1033,25 @@ final class CameraManager: NSObject, ObservableObject {
             }
             if settingsRef?.saveToPhotos ?? true {
                 let forLibrary = (settingsRef?.photosOriginal ?? true) ? jpeg : web
-                Self.saveToPhotos(forLibrary, raw: rawObj?.data, rawExt: rawExt) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
+                Self.saveToPhotos(forLibrary, raw: rawObj?.data, rawExt: rawExt) { [weak self] m in
+                    Task { @MainActor in
+                        self?.appendLog(m)
+                        self?.photoLibraryError = (m.contains("ERROR") || m.contains("no access")) ? m : nil
+                        self?.checkResources()
+                    }
+                }
             }
             if let img = UIImage(data: web) { result = (img, url); lastPhoto = img }
         } else if let raw = rawObj, let rawURL {
             // RAW only: ARW as RAW into the photo library, preview from the embedded image
             if settingsRef?.saveToPhotos ?? true {
-                Self.saveRAWOnlyToPhotos(raw.data, ext: rawExt) { [weak self] m in Task { @MainActor in self?.appendLog(m) } }
+                Self.saveRAWOnlyToPhotos(raw.data, ext: rawExt) { [weak self] m in
+                    Task { @MainActor in
+                        self?.appendLog(m)
+                        self?.photoLibraryError = (m.contains("ERROR") || m.contains("no access")) ? m : nil
+                        self?.checkResources()
+                    }
+                }
             }
             let preview = await Self.previewImage(from: raw.data)
             appendLog(preview == nil ? "RAW preview: no decodable preview in the \(rawExt)" : "RAW preview: \(Int(preview!.size.width))x\(Int(preview!.size.height))")
@@ -965,6 +1066,7 @@ final class CameraManager: NSObject, ObservableObject {
                 }
             }
         }
+        if result != nil { captureTested = true }
         return result
     }
 

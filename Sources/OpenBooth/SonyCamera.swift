@@ -153,8 +153,9 @@ actor PTPTransport {
 
     func runWithResponse(_ op: UInt16, params: [UInt32] = [], dataOut: Data? = nil, quiet: Bool = false) async throws -> (PTP.Response, Data) {
         let (resp, data) = try await transaction(op, params: params, dataOut: dataOut)
-        // quiet: log only real errors; AccessDenied/DeviceBusy are normal during live view (asked too fast)
-        if !quiet || (!resp.ok && resp.code != PTP.RC.accessDenied && resp.code != PTP.RC.deviceBusy && resp.code != PTP.RC.invalidObjectHandle) {
+        // Callers using quiet handle the response themselves. In particular Canon live view returns vendor
+        // "not ready" codes very frequently; logging those hides actionable failures and rotates the log early.
+        if !quiet {
             emit(String(format: "op 0x%04X -> %@ (%d bytes)", op, resp.codeHex, data.count))
         }
         return (resp, data)

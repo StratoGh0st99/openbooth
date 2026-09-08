@@ -53,6 +53,8 @@ GUI: `xcrun devicectl list devices`, write the ID to `.device`, then `tools/inst
 
 ## Usage
 
+- **First setup**: the app opens the admin readiness check. Connect a camera, grant access for every enabled destination,
+  verify server destinations and take one test photo. The booth can only start after these checks pass.
 - **Guest mode** (default): full-screen live view, red button, countdown, large review with “One more!”, gallery.
 - **Idle collage**: after a configurable time without activity, a changing collage of the evening’s photos; the button stays visible.
 - **Admin**: swipe down with two fingers, enter the PIN (default `0000`, change it in Admin). Sidebar with sections
@@ -62,7 +64,8 @@ GUI: `xcrun devicectl list devices`, write the ID to `.device`, then `tools/inst
 - **RAW**: set image quality to RAW+JPEG or RAW; both objects are fetched from camera RAM and the ARW goes to every enabled target (the admin warns about the size) (the counter `0xD215` reports
   `0x8001` after the first fetch); the ARW is stored as its own asset in the library and under `Fotos/raw`.
   With “RAW only”, the embedded 1616×1080 preview of the ARW is used for display.
-- **Event**: the event name is the Immich album and the WebDAV folder; both are created automatically.
+- **Event**: the event name is the Immich album and the WebDAV folder; both are created automatically. Pending uploads keep
+  the destination captured when the photo was taken, so changing events cannot move older photos into the new event.
 - **Destinations**: app gallery (always, a 2000 px web copy, source for review and collage), iPad photo library, Immich, WebDAV,
   each switchable; every external target (photo library, Immich, WebDAV) can receive the original or the web copy (good for LTE setups). Originals are kept in the
   app folder only until every target has them, then discarded (the admin warns if no target keeps originals).
@@ -88,7 +91,7 @@ GUI: `xcrun devicectl list devices`, write the ID to `.device`, then `tools/inst
 - **Diagnostics**: “Share diagnostics” (share sheet) or “Send to OpenBooth” (HTTPS endpoint); contains environment,
   capabilities with raw data and the log, no credentials, serial number shortened. Optionally automatic on errors.
 - **Admin helpers**: test photo, retry or clear upload queues, storage used per event with “Delete photos”, settings export/import
-  (JSON without secrets), warning while the default PIN is active.
+  (JSON without secrets), warning while the default PIN is active, and a protected full reset under Admin › Access.
 - Series of 1/3/5 shots with pause (cancellable, taken photos are kept), review with progress bar (hold to pause) and delete, editable phrases, status banner with automatic
   recovery, log in `Documents/openbooth.log` (fetch with `tools/pull-log.sh`).
 

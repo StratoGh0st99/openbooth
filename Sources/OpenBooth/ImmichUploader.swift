@@ -39,6 +39,9 @@ final class ImmichUploader: ObservableObject {
     struct Item: Codable, Equatable {
         let path: String          // relative to the Documents folder
         let createdAt: Date
+        /// Immutable destination captured when the photo is queued. Optional for queues written by older builds.
+        var server: String? = nil
+        var album: String? = nil
         var attempts: Int = 0
     }
 
@@ -46,6 +49,7 @@ final class ImmichUploader: ObservableObject {
     @Published private(set) var uploaded = 0
     @Published private(set) var lastMessage = String(localized: "off")
     @Published private(set) var busy = false
+    @Published private(set) var connectionVerified = false
 
     @Published private(set) var shareURL: String?   // public share link of the album (for the QR code)
 
@@ -54,8 +58,9 @@ final class ImmichUploader: ObservableObject {
     var albumName = ""
     var log: ((String) -> Void)?
 
-    private var albumID: String?
+    private var albumIDs: [String: String] = [:]
     private var worker: Task<Void, Never>?
+    private var workerID: UUID?
     private let deviceID = "openbooth-" + (UIDevice.current.identifierForVendor?.uuidString ?? "ipad")
     private var queueURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("immich-queue.json") }
     private var docs: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
@@ -70,9 +75,10 @@ final class ImmichUploader: ObservableObject {
 
     func configure(enabled: Bool, server: String, album: String) {
         self.enabled = enabled
-        let s = server.trimmingCharacters(in: .whitespacesAndNewlines)
-        if s != serverURL || album != albumName { albumID = nil; shareURL = nil }
-        serverURL = s.hasSuffix("/") ? String(s.dropLast()) : s
+        var s = server.trimmingCharacters(in: .whitespacesAndNewlines)
+        while s.hasSuffix("/") { s.removeLast() }
+        if s != serverURL || album != albumName { connectionVerified = false; shareURL = nil }
+        serverURL = s
         albumName = album.trimmingCharacters(in: .whitespaces)
         lastMessage = enabled ? (pending.isEmpty ? String(localized: "ready") : String(localized: "\(pending.count) pending")) : String(localized: "off")
         if enabled { kick() }
@@ -82,7 +88,7 @@ final class ImmichUploader: ObservableObject {
     func enqueue(_ fileURL: URL) {
         guard enabled else { return }
         let rel = fileURL.path.replacingOccurrences(of: docs.path + "/", with: "")
-        pending.append(Item(path: rel, createdAt: Date()))
+        pending.append(Item(path: rel, createdAt: Date(), server: serverURL, album: albumName))
         saveQueue()
         lastMessage = String(localized: "\(pending.count) pending")
         kick()
@@ -90,23 +96,41 @@ final class ImmichUploader: ObservableObject {
 
     /// Retry now: cancel the running worker (which may be sleeping in the backoff) and restart
     func retryNow() {
-        worker?.cancel(); worker = nil
+        worker?.cancel(); worker = nil; workerID = nil
         for i in pending.indices { pending[i].attempts = 0 }
         kick()
     }
     /// Drop the queue (files stay until the cleanup removes them)
     func clearQueue() {
-        worker?.cancel(); worker = nil
+        worker?.cancel(); worker = nil; workerID = nil
         pending = []; saveQueue()
         lastMessage = enabled ? String(localized: "ready") : String(localized: "off")
         log?("Immich: queue cleared")
     }
 
+    /// Drop only files belonging to one event. Other events keep their pending uploads.
+    func clearQueue(relativeDirectory: String) {
+        worker?.cancel(); worker = nil; workerID = nil
+        let prefix = relativeDirectory.hasSuffix("/") ? relativeDirectory : relativeDirectory + "/"
+        let before = pending.count
+        pending.removeAll { $0.path.hasPrefix(prefix) }
+        saveQueue()
+        lastMessage = enabled ? (pending.isEmpty ? String(localized: "ready") : String(localized: "\(pending.count) pending")) : String(localized: "off")
+        log?("Immich: dropped \(before - pending.count) queued file(s) for \(relativeDirectory)")
+        kick()
+    }
+
     private func kick() {
         guard worker == nil, enabled, !pending.isEmpty else { return }
+        let id = UUID()
+        workerID = id
         worker = Task { [weak self] in
             await self?.drain()
-            await MainActor.run { self?.worker = nil }
+            await MainActor.run {
+                guard self?.workerID == id else { return }
+                self?.worker = nil
+                self?.workerID = nil
+            }
         }
     }
 
@@ -137,7 +161,7 @@ final class ImmichUploader: ObservableObject {
                 log?("Immich: \(error.localizedDescription) (attempt \(pending[0].attempts), waiting \(backoff) s)")
                 if pending[0].attempts >= 8 {
                     // Move the file to the end so others get through
-                    let it = pending.removeFirst(); pending.append(Item(path: it.path, createdAt: it.createdAt, attempts: 0)); saveQueue()
+                    var it = pending.removeFirst(); it.attempts = 0; pending.append(it); saveQueue()
                 }
                 try? await Task.sleep(nanoseconds: backoff * 1_000_000_000)
                 backoff = min(backoff * 2, 120)
@@ -150,8 +174,9 @@ final class ImmichUploader: ObservableObject {
 
     // MARK: API
 
-    private func request(_ path: String, method: String = "GET") throws -> URLRequest {
-        guard let url = URL(string: serverURL + path), let key = Keychain.get("immichAPIKey"), !key.isEmpty else {
+    private func request(_ path: String, method: String = "GET", server: String? = nil) throws -> URLRequest {
+        let base = server ?? serverURL
+        guard let url = URL(string: base + path), let key = Keychain.get("immichAPIKey"), !key.isEmpty else {
             throw NSError(domain: "Immich", code: 1, userInfo: [NSLocalizedDescriptionKey: String(localized: "Server or API key missing")])
         }
         var r = URLRequest(url: url)
@@ -163,7 +188,7 @@ final class ImmichUploader: ObservableObject {
     }
 
     /// Connection test: server response and user.
-    func test() async -> String {
+    func test(createShareLink: Bool) async -> String {
         do {
             var r = try request("/api/users/me")
             r.timeoutInterval = 10
@@ -173,32 +198,40 @@ final class ImmichUploader: ObservableObject {
             let j = try JSONSerialization.jsonObject(with: d) as? [String: Any]
             let who = (j?["email"] as? String) ?? (j?["name"] as? String) ?? "?"
             let id = try await ensureAlbum()
-            let link = try await ensureShareLink()
-            return "OK as \(who), album “\(albumName)” (\(id.prefix(8))…), share \(link)"
+            connectionVerified = true
+            if createShareLink {
+                let link = try await ensureShareLink()
+                return "OK as \(who), album “\(albumName)” (\(id.prefix(8))…), share \(link)"
+            }
+            return "OK as \(who), album “\(albumName)” (\(id.prefix(8))…)"
         } catch {
+            connectionVerified = false
             return String(localized: "Error: \(error.localizedDescription)")
         }
     }
 
-    private func ensureAlbum() async throws -> String {
-        if let albumID { return albumID }
-        guard !albumName.isEmpty else { throw NSError(domain: "Immich", code: 2, userInfo: [NSLocalizedDescriptionKey: String(localized: "No album name")]) }
-        let (d, _) = try await URLSession.shared.data(for: try request("/api/albums"))
+    private func ensureAlbum(server: String? = nil, name: String? = nil) async throws -> String {
+        let base = server ?? serverURL
+        let targetAlbum = name ?? albumName
+        let cacheKey = base + "\n" + targetAlbum
+        if let id = albumIDs[cacheKey] { return id }
+        guard !targetAlbum.isEmpty else { throw NSError(domain: "Immich", code: 2, userInfo: [NSLocalizedDescriptionKey: String(localized: "No album name")]) }
+        let (d, _) = try await URLSession.shared.data(for: try request("/api/albums", server: base))
         if let list = try JSONSerialization.jsonObject(with: d) as? [[String: Any]],
-           let hit = list.first(where: { ($0["albumName"] as? String) == albumName }), let id = hit["id"] as? String {
-            albumID = id
+           let hit = list.first(where: { ($0["albumName"] as? String) == targetAlbum }), let id = hit["id"] as? String {
+            albumIDs[cacheKey] = id
             return id
         }
-        var r = try request("/api/albums", method: "POST")
+        var r = try request("/api/albums", method: "POST", server: base)
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        r.httpBody = try JSONSerialization.data(withJSONObject: ["albumName": albumName])
+        r.httpBody = try JSONSerialization.data(withJSONObject: ["albumName": targetAlbum])
         let (cd, cresp) = try await URLSession.shared.data(for: r)
         guard let code = (cresp as? HTTPURLResponse)?.statusCode, (200...201).contains(code),
               let j = try JSONSerialization.jsonObject(with: cd) as? [String: Any], let id = j["id"] as? String else {
             throw NSError(domain: "Immich", code: 3, userInfo: [NSLocalizedDescriptionKey: String(localized: "Album could not be created")])
         }
-        albumID = id
-        log?("Immich: album “\(albumName)” created")
+        albumIDs[cacheKey] = id
+        log?("Immich: album “\(targetAlbum)” created")
         return id
     }
 
@@ -235,10 +268,12 @@ final class ImmichUploader: ObservableObject {
         guard let data = try? Data(contentsOf: fileURL) else {
             throw NSError(domain: "Immich", code: 4, userInfo: [NSLocalizedDescriptionKey: "File missing: \(item.path)"])
         }
-        let album = try await ensureAlbum()
+        let targetServer = item.server ?? serverURL
+        let targetAlbum = item.album ?? Self.eventName(from: item.path) ?? albumName
+        let album = try await ensureAlbum(server: targetServer, name: targetAlbum)
 
         let boundary = "openbooth-\(UUID().uuidString)"
-        var r = try request("/api/assets", method: "POST")
+        var r = try request("/api/assets", method: "POST", server: targetServer)
         r.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         r.timeoutInterval = 300
         let iso = ISO8601DateFormatter()
@@ -264,7 +299,7 @@ final class ImmichUploader: ObservableObject {
             throw NSError(domain: "Immich", code: code, userInfo: [NSLocalizedDescriptionKey: "Upload HTTP \(code) \(txt)"])
         }
 
-        var a = try request("/api/albums/\(album)/assets", method: "PUT")
+        var a = try request("/api/albums/\(album)/assets", method: "PUT", server: targetServer)
         a.setValue("application/json", forHTTPHeaderField: "Content-Type")
         a.httpBody = try JSONSerialization.data(withJSONObject: ["ids": [assetID]])
         let (_, aresp) = try await URLSession.shared.data(for: a)
@@ -272,6 +307,14 @@ final class ImmichUploader: ObservableObject {
         guard (200...201).contains(acode) else {
             throw NSError(domain: "Immich", code: acode, userInfo: [NSLocalizedDescriptionKey: "Album assignment HTTP \(acode)"])
         }
+        if targetServer == serverURL && targetAlbum == albumName { connectionVerified = true }
         log?("Immich: \(name) uploaded (\(data.count / 1_000_000) MB)\(j["status"] as? String == "duplicate" ? ", already there" : "")")
+    }
+
+    /// Old queue files did not contain an album; recover it from Documents/Fotos/<event>/… where possible.
+    private static func eventName(from path: String) -> String? {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard parts.count >= 3, parts[0] == "Fotos" else { return nil }
+        return String(parts[1])
     }
 }

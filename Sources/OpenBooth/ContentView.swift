@@ -58,7 +58,8 @@ struct ContentView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: adminUnlocked)
         .onAppear {
-            adminUnlocked = settings.debugMode   // debug mode: admin open at launch, swipe gesture without PIN
+            // First launch opens the readiness page. Later launches stay in the guest-safe booth view.
+            adminUnlocked = settings.debugMode || !settings.setupCompleted
             cam.settingsRef = settings
             cam.start()
             cam.updateBrightness()
@@ -353,7 +354,7 @@ struct ContentView: View {
                                 Button(role: .destructive) {
                                     askDelete(0)
                                 } label: {
-                                    Label("Delete", systemImage: "trash").frame(width: 160, height: 56)
+                                    Label("Remove from gallery", systemImage: "trash").frame(width: 220, height: 56)
                                 }
                                 .buttonStyle(.bordered)
                             }
@@ -476,8 +477,8 @@ struct ContentView: View {
         }
         .contentShape(Rectangle())
         .simultaneousGesture(TapGesture().onEnded { cam.noteInteraction() })
-        .alert("Delete this photo?", isPresented: Binding(get: { deleteIndex != nil }, set: { if !$0 { deleteIndex = nil } })) {
-            Button("Delete", role: .destructive) { if let i = deleteIndex { cam.deleteResult(at: i) }; deleteIndex = nil }
+        .alert("Remove this photo from the booth gallery?", isPresented: Binding(get: { deleteIndex != nil }, set: { if !$0 { deleteIndex = nil } })) {
+            Button("Remove", role: .destructive) { if let i = deleteIndex { cam.deleteResult(at: i) }; deleteIndex = nil }
             Button("Keep", role: .cancel) { deleteIndex = nil; cam.setResultPaused(false) }
         } message: { Text("It is removed from the booth gallery only.") }
         .animation(.spring(duration: 0.3), value: cam.capturePhrase)
@@ -503,6 +504,7 @@ struct AdminPanel: View {
     @State private var exportURL: URL?
     @State private var importing = false
     @State private var importResult = ""
+    @State private var askReset = false
 
     private func writeExport() -> URL? {
         guard let data = settings.exportJSON() else { return nil }
@@ -572,6 +574,7 @@ struct AdminPanel: View {
                     Label("Back to the booth", systemImage: "xmark").frame(maxWidth: .infinity, minHeight: 40)
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!settings.setupCompleted)
                 .padding(.horizontal, 12).padding(.bottom, 16)
             }
             .frame(width: 230)
@@ -605,8 +608,14 @@ struct AdminPanel: View {
     @ViewBuilder private func badge(for sec: Section) -> some View {
         switch sec {
         case .storage:
-            let n = 1 + (settings.saveToPhotos ? 1 : 0) + (settings.immichEnabled ? 1 : 0) + (settings.webdavEnabled ? 1 : 0)
-            Text("\(n)").font(.caption2).padding(.horizontal, 6).padding(.vertical, 2).background(.quaternary, in: Capsule())
+            if (settings.saveToPhotos && (!cam.photoLibraryReady || cam.photoLibraryError != nil)) ||
+                (settings.immichEnabled && !cam.immich.connectionVerified) ||
+                (settings.webdavEnabled && !cam.webdav.connectionVerified) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.caption)
+            } else {
+                let n = 1 + (settings.saveToPhotos ? 1 : 0) + (settings.immichEnabled ? 1 : 0) + (settings.webdavEnabled ? 1 : 0)
+                Text("\(n)").font(.caption2).padding(.horizontal, 6).padding(.vertical, 2).background(.quaternary, in: Capsule())
+            }
         case .camera where cam.state != .connected:
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow).font(.caption)
         case .log where cam.lastError != nil:
@@ -619,7 +628,37 @@ struct AdminPanel: View {
 
     // MARK: Sections
 
-    private var eventSection: some View {
+    @ViewBuilder private var eventSection: some View {
+        SwiftUI.Section {
+            if cam.boothIssues.isEmpty {
+                Label("Ready for guests", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green).font(.headline)
+            } else {
+                ForEach(cam.boothIssues, id: \.self) { issue in
+                    Label(issue, systemImage: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                }
+            }
+            HStack(spacing: 12) {
+                if settings.saveToPhotos && !cam.photoLibraryReady {
+                    Button("Allow photo access") { cam.requestPhotoLibraryAccess() }.buttonStyle(.bordered)
+                }
+                if cam.state == .connected && !cam.captureTested {
+                    Button("Take test photo") { cam.capture(withCountdown: 0) }
+                        .buttonStyle(.bordered).disabled(cam.capturing)
+                }
+                if (settings.immichEnabled && !cam.immich.connectionVerified) || (settings.webdavEnabled && !cam.webdav.connectionVerified) {
+                    Button("Check destinations") { section = .storage }.buttonStyle(.bordered)
+                }
+                Spacer()
+                Button(settings.setupCompleted ? "Back to the booth" : "Start booth") {
+                    settings.setupCompleted = true
+                    adminUnlocked = false
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!cam.boothIssues.isEmpty)
+            }
+        } header: { Text(settings.setupCompleted ? "Readiness" : "Setup") }
+          footer: { Text("The booth starts only when the camera and every enabled destination are ready.") }
         SwiftUI.Section {
             EventPanel()
         } header: { Text("Event") } footer: { Text("Also used as Immich album and WebDAV folder.") }
@@ -629,7 +668,7 @@ struct AdminPanel: View {
         SwiftUI.Section("Connection") {
             if !cam.deviceSummary.isEmpty { Text(cam.deviceSummary).font(.caption).foregroundStyle(.secondary) }
             if cam.devices.isEmpty {
-                Label("No camera. Connect a Sony in “PC Remote” mode via USB-C.", systemImage: "cable.connector")
+                Label("No camera. Connect a supported Sony or Canon via USB-C, or use the iPad camera fallback.", systemImage: "cable.connector")
             }
             ForEach(cam.devices, id: \.self) { dev in
                 Button { cam.openSession(dev) } label: { Label(dev.name ?? "Camera", systemImage: "camera") }
@@ -816,6 +855,21 @@ struct AdminPanel: View {
         SwiftUI.Section {
             Toggle("Debug mode", isOn: $settings.debugMode)
         } header: { Text("Development") }
+        SwiftUI.Section {
+            Button("Reset OpenBooth…", role: .destructive) { askReset = true }
+                .disabled(cam.capturing)
+                .alert("Reset OpenBooth?", isPresented: $askReset) {
+                    Button("Reset everything", role: .destructive) {
+                        cam.resetApp(settings: settings)
+                        section = .event
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This removes all settings, credentials, local event photos, upload queues and logs. Copies already saved in the photo library, Immich or WebDAV remain untouched.")
+                }
+        } header: { Text("Reset") } footer: {
+            Text("After the reset, OpenBooth returns to first-time setup.")
+        }
     }
 
     @ViewBuilder private var logSection: some View {
@@ -1456,6 +1510,7 @@ struct ImmichPanel: View {
             }
             Text("Album: “\(settings.eventName)” (event name)").foregroundStyle(.secondary)
             Toggle("Show QR code to the album for guests", isOn: $settings.qrEnabled)
+                .onChange(of: settings.qrEnabled) { _, _ in cam.syncImmich() }
             if let link = cam.immich.shareURL {
                 Text("Share link: \(link)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             }
@@ -1477,6 +1532,6 @@ struct ImmichPanel: View {
     private func runTest() {
         guard !settings.immichURL.isEmpty, !testing else { return }
         testing = true
-        Task { testResult = await cam.immich.test(); testing = false }
+        Task { testResult = await cam.immich.test(createShareLink: settings.qrEnabled); testing = false }
     }
 }
