@@ -57,8 +57,6 @@ final class AppSettings: ObservableObject {
     @Published var maxBrightness: Bool = false { didSet { d.set(maxBrightness, forKey: "maxBrightness") } }
     @Published var motionWake: Bool = true { didSet { d.set(motionWake, forKey: "motionWake") } }
     @Published var motionThreshold: Int = 6 { didSet { d.set(motionThreshold, forKey: "motionThreshold") } }
-    /// First launch stays in the admin until the operator explicitly starts the booth once.
-    @Published var setupCompleted: Bool = false { didSet { d.set(setupCompleted, forKey: "setupCompleted") } }
 
     static let defaultPhrases = String(localized: "Cheese!|Smile!|Cheesecake!|Spaghetti!|Sunshine!|Show your teeth!|Everyone together!|And… smile!|Say cheeeese!|Pineapple!|Whisky!|Shine!|A smile please!|Now!|Gummy bears!|Big cheese!").components(separatedBy: "|")
 
@@ -120,11 +118,10 @@ final class AppSettings: ObservableObject {
         if mt == 8, !d.bool(forKey: "motionThresholdV2") { mt = 6 }
         d.set(true, forKey: "motionThresholdV2")
         motionThreshold = mt
-        setupCompleted = d.object(forKey: "setupCompleted") as? Bool ?? false
     }
 
     /// Exportable keys (without PIN and without keychain contents)
-    static let exportKeys: [String] = ["autoConnect", "autoReports", "countdownSeconds", "debugMode", "eventName", "events", "gallerySeconds", "guestGallery", "idleSeconds", "immichAlbum", "immichEnabled", "immichOriginal", "immichURL", "ipadFallback", "ipadFrontCamera", "ipadUltraWide", "maxBrightness", "mirrorLiveView", "motionThreshold", "motionWake", "photosOriginal", "phrases", "pickupExternal", "qrEnabled", "rememberedCamera", "restoreCameraSettings", "resultSeconds", "saveToPhotos", "setupCompleted", "shotInterval", "shotsPerCapture", "operatorOverlay", "slideshowInterval", "soundCountdown", "soundWelcome", "soundsEnabled", "webEnabled", "webdavEnabled", "webdavOriginal", "webdavURL", "webdavUser", "welcomeText", "welcomeTitle"]
+    static let exportKeys: [String] = ["autoConnect", "autoReports", "countdownSeconds", "debugMode", "eventName", "events", "gallerySeconds", "guestGallery", "idleSeconds", "immichAlbum", "immichEnabled", "immichOriginal", "immichURL", "ipadFallback", "ipadFrontCamera", "ipadUltraWide", "maxBrightness", "mirrorLiveView", "motionThreshold", "motionWake", "photosOriginal", "phrases", "pickupExternal", "qrEnabled", "rememberedCamera", "restoreCameraSettings", "resultSeconds", "saveToPhotos", "shotInterval", "shotsPerCapture", "operatorOverlay", "slideshowInterval", "soundCountdown", "soundWelcome", "soundsEnabled", "webEnabled", "webdavEnabled", "webdavOriginal", "webdavURL", "webdavUser", "welcomeText", "welcomeTitle"]
 
     func exportJSON() -> Data? {
         var dict: [String: Any] = [:]

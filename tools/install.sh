@@ -8,7 +8,7 @@ export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer
 ID=${1:-${OPENBOOTH_DEVICE:-$(cat .device 2>/dev/null)}}
 [ -z "$ID" ] && { echo "No device ID: run xcrun devicectl list devices, then write the ID to .device"; exit 1; }
 [ -f Local.xcconfig ] || { echo "Local.xcconfig missing, template: Local.xcconfig.example"; exit 1; }
-xcodegen generate >/dev/null   # immer, damit neue Dateien im Projekt landen
+xcodegen generate >/dev/null   # always, so new files end up in the project
 OUT=$(xcodebuild -project OpenBooth.xcodeproj -scheme OpenBooth -destination "id=$ID" -configuration Debug \
   -allowProvisioningUpdates -derivedDataPath build/dd build 2>&1 | grep -E "error:|BUILD (SUCCEEDED|FAILED)" | sed "s#$PWD/##" || true)
 echo "$OUT"

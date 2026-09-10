@@ -58,8 +58,7 @@ struct ContentView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: adminUnlocked)
         .onAppear {
-            // First launch opens the readiness page. Later launches stay in the guest-safe booth view.
-            adminUnlocked = settings.debugMode || !settings.setupCompleted
+            adminUnlocked = settings.debugMode   // debug mode: admin open at launch, swipe gesture without PIN
             cam.settingsRef = settings
             cam.start()
             cam.updateBrightness()
@@ -574,7 +573,6 @@ struct AdminPanel: View {
                     Label("Back to the booth", systemImage: "xmark").frame(maxWidth: .infinity, minHeight: 40)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!settings.setupCompleted)
                 .padding(.horizontal, 12).padding(.bottom, 16)
             }
             .frame(width: 230)
@@ -638,27 +636,18 @@ struct AdminPanel: View {
                     Label(issue, systemImage: "exclamationmark.circle.fill").foregroundStyle(.orange)
                 }
             }
-            HStack(spacing: 12) {
-                if settings.saveToPhotos && !cam.photoLibraryReady {
-                    Button("Allow photo access") { cam.requestPhotoLibraryAccess() }.buttonStyle(.bordered)
+            if !cam.boothIssues.isEmpty {
+                HStack(spacing: 12) {
+                    if settings.saveToPhotos && !cam.photoLibraryReady {
+                        Button("Allow photo access") { cam.requestPhotoLibraryAccess() }.buttonStyle(.bordered)
+                    }
+                    if (settings.immichEnabled && !cam.immich.connectionVerified) || (settings.webdavEnabled && !cam.webdav.connectionVerified) {
+                        Button("Check destinations") { section = .storage }.buttonStyle(.bordered)
+                    }
+                    Spacer()
                 }
-                if cam.state == .connected && !cam.captureTested {
-                    Button("Take test photo") { cam.capture(withCountdown: 0) }
-                        .buttonStyle(.bordered).disabled(cam.capturing)
-                }
-                if (settings.immichEnabled && !cam.immich.connectionVerified) || (settings.webdavEnabled && !cam.webdav.connectionVerified) {
-                    Button("Check destinations") { section = .storage }.buttonStyle(.bordered)
-                }
-                Spacer()
-                Button(settings.setupCompleted ? "Back to the booth" : "Start booth") {
-                    settings.setupCompleted = true
-                    adminUnlocked = false
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!cam.boothIssues.isEmpty)
             }
-        } header: { Text(settings.setupCompleted ? "Readiness" : "Setup") }
-          footer: { Text("The booth starts only when the camera and every enabled destination are ready.") }
+        } header: { Text("Readiness") }
         SwiftUI.Section {
             EventPanel()
         } header: { Text("Event") } footer: { Text("Also used as Immich album and WebDAV folder.") }

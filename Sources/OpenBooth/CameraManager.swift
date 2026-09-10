@@ -52,17 +52,16 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    /// Small operator-facing checklist. An enabled destination must be configured and verified.
+    /// Small operator-facing checklist, hints only: the booth runs regardless (iPad camera when nothing is connected).
     var boothIssues: [String] {
         guard let s = settingsRef else { return [String(localized: "Settings are not loaded")] }
         var issues: [String] = []
         if s.eventName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { issues.append(String(localized: "Enter an event name")) }
-        if state != .connected { issues.append(String(localized: "Connect and test the camera")) }
+        if state != .connected, !usingIPadCamera { issues.append(String(localized: "No camera connected")) }
         if s.saveToPhotos && !photoLibraryReady { issues.append(String(localized: "Allow access to the photo library")) }
         if s.saveToPhotos && photoLibraryError != nil { issues.append(String(localized: "Saving to the photo library failed")) }
         if s.immichEnabled && !immich.connectionVerified { issues.append(String(localized: "Test the Immich connection")) }
         if s.webdavEnabled && !webdav.connectionVerified { issues.append(String(localized: "Test the WebDAV connection")) }
-        if !s.setupCompleted && !captureTested { issues.append(String(localized: "Take one test photo")) }
         return issues
     }
 
@@ -100,6 +99,7 @@ final class CameraManager: NSObject, ObservableObject {
         status = String(localized: "iPad camera (fallback)")
         liveRunning = true
         lastFrame = Date()
+        resetFrameRateWindow()
         banner = nil
         appendLog("iPad camera started as fallback (\(settingsRef?.ipadFrontCamera ?? true ? "front" : "rear") \(cam.ultraWide ? "ultra wide" : "wide"), \(cam.formatSummary))")
         appendLog("iPad cameras: " + cam.deviceList.joined(separator: " | "))
@@ -261,7 +261,6 @@ final class CameraManager: NSObject, ObservableObject {
     }
     @Published var banner: Banner? = Banner(kind: .info, text: String(localized: "Connect a camera"))
     @Published var captureError: String?      // overlay with "Try again"
-    @Published private(set) var captureTested = false
     @Published var lastError: String?         // for the admin panel
     private var recoverAttempts = 0
     private var captureFailureStreak = 0
@@ -312,6 +311,13 @@ final class CameraManager: NSObject, ObservableObject {
 
     private var tickCount = 0
     private var frameCount = 0
+    private var fpsWindowStarted = ProcessInfo.processInfo.systemUptime
+
+    private func resetFrameRateWindow() {
+        frameCount = 0
+        lastFPS = 0
+        fpsWindowStarted = ProcessInfo.processInfo.systemUptime
+    }
     /// Every 2 s: detect idle, watch the live view, write the log copy.
     private func tick() {
         tickCount += 1
@@ -320,7 +326,13 @@ final class CameraManager: NSObject, ObservableObject {
         if tickCount % 15 == 0 { checkResources() }
         if tickCount % 150 == 0 { appendLog("Battery: iPad \(batteryText(iPadBattery())), camera \(cameraBattery().map { "\($0) %" } ?? "unknown")") }
         if tickCount % 3 == 0 { Self.logFile.snapshot() }
-        if tickCount % 15 == 0, liveRunning { lastFPS = frameCount / 30; appendLog("Live view: \(lastFPS) fps"); frameCount = 0 }
+        let fpsElapsed = ProcessInfo.processInfo.systemUptime - fpsWindowStarted
+        if liveRunning, fpsElapsed >= 30 {
+            lastFPS = Int((Double(frameCount) / fpsElapsed).rounded())
+            appendLog("Live view: \(lastFPS) fps (target \(LiveViewTiming.framesPerSecond))")
+            frameCount = 0
+            fpsWindowStarted = ProcessInfo.processInfo.systemUptime
+        }
         if !liveRunning { lastFPS = 0 }
         let idleFor = Date().timeIntervalSince(lastInteraction)
         let limit = TimeInterval(settingsRef?.idleSeconds ?? 120)
@@ -460,14 +472,13 @@ final class CameraManager: NSObject, ObservableObject {
 
         sessionPhotos = []
         lastPhoto = nil
-        captureTested = false
         captureFailureStreak = 0
         photoLibraryError = nil
         resourceWarnings = []
         appSettings.resetToDefaults()
         settingsRef = appSettings
         syncUploaders()
-        appendLog("OpenBooth reset; first-run setup required")
+        appendLog("OpenBooth reset to defaults")
         if state == .connected { startLiveView() }
     }
 
@@ -826,18 +837,37 @@ final class CameraManager: NSObject, ObservableObject {
 
     // MARK: Liveview
 
+    private var liveGeneration = UUID()
+
     func startLiveView() {
         if ipadCam != nil { liveRunning = true; return }
         guard state == .connected, let cam = driver, cam.supportsRemoteControl, liveTask == nil else { return }
         liveRunning = true
         lastFrame = Date()
-        liveTask = Task { [weak self] in
+        resetFrameRateWindow()
+        let generation = UUID()
+        liveGeneration = generation
+        liveTask = Task.detached(priority: .userInitiated) { [weak self] in
             var failures = 0
             var histCounter = 0
             var motion = MotionDetector()
+            var previousStart: TimeInterval?
+            var measuredFrames = 0
+            var acquisitionTime = 0.0
+            var processingTime = 0.0
             while !Task.isCancelled {
                 do {
-                    if let jpeg = try await cam.liveViewFrame(), let raw = UIImage(data: jpeg) {
+                    if let previousStart {
+                        let delay = LiveViewTiming.remainingDelay(startedAt: previousStart, now: ProcessInfo.processInfo.systemUptime)
+                        if delay > 0 { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
+                    }
+                    try Task.checkCancellation()
+                    let started = ProcessInfo.processInfo.systemUptime
+                    previousStart = started
+                    let jpeg = try await cam.liveViewFrame()
+                    try Task.checkCancellation()
+                    let received = ProcessInfo.processInfo.systemUptime
+                    if let jpeg, let raw = UIImage(data: jpeg) {
                         // Decode the JPEG here in the background so the main thread only displays
                         let img = raw.preparingForDisplay() ?? raw
                         let (armed, threshold, wantHist) = await MainActor.run { (self?.motionArmed ?? false, self?.motionThreshold ?? 8, self?.wantHistogram ?? false) }
@@ -845,11 +875,23 @@ final class CameraManager: NSObject, ObservableObject {
                         if armed { hit = motion.feed(img, threshold: threshold); level = motion.level; noise = motion.noiseLevel; global = motion.globalLevel } else { motion.reset() }
                         histCounter += 1
                         let hist: Histogram? = (wantHist && histCounter % 3 == 0) ? Histogram.compute(img) : nil
+                        try Task.checkCancellation()
+                        acquisitionTime += received - started
+                        processingTime += ProcessInfo.processInfo.systemUptime - received
+                        measuredFrames += 1
                         await MainActor.run {
-                            if let hist { self?.liveHistogram = hist } else if !wantHist, self?.liveHistogram != nil { self?.liveHistogram = nil }
-                            self?.liveFrame = img; self?.lastFrame = Date(); self?.frameCount += 1
-                            if self?.banner != nil { self?.banner = nil }
-                            if armed { self?.motionResult(level: level, hit: hit, noise: noise, global: global) } else if self?.motionLevel != 0 { self?.motionLevel = 0 }
+                            guard let self, self.liveGeneration == generation, !Task.isCancelled else { return }
+                            if let hist { self.liveHistogram = hist } else if !wantHist, self.liveHistogram != nil { self.liveHistogram = nil }
+                            self.liveFrame = img; self.lastFrame = Date(); self.frameCount += 1
+                            if self.banner != nil { self.banner = nil }
+                            if armed { self.motionResult(level: level, hit: hit, noise: noise, global: global) } else if self.motionLevel != 0 { self.motionLevel = 0 }
+                        }
+                        if measuredFrames >= 900 {
+                            let message = String(format: "Live view timing: acquisition %.1f ms, processing %.1f ms (average, %d frames)", acquisitionTime * 1000 / Double(measuredFrames), processingTime * 1000 / Double(measuredFrames), measuredFrames)
+                            await MainActor.run {
+                                if self?.liveGeneration == generation { self?.appendLog(message) }
+                            }
+                            measuredFrames = 0; acquisitionTime = 0; processingTime = 0
                         }
                         failures = 0
                     } else {
@@ -858,19 +900,23 @@ final class CameraManager: NSObject, ObservableObject {
                 } catch {
                     if Task.isCancelled || error is CancellationError { break }
                     failures += 1
-                    await MainActor.run { self?.appendLog("Live view: \(error.localizedDescription)") }
+                    await MainActor.run { if self?.liveGeneration == generation { self?.appendLog("Live view: \(error.localizedDescription)") } }
                     if failures > 20 {
-                        await MainActor.run { self?.scheduleRecover(reason: "live view") }
+                        await MainActor.run { if self?.liveGeneration == generation { self?.scheduleRecover(reason: "live view") } }
                         break
                     }
                     try? await Task.sleep(nanoseconds: 300_000_000)
                 }
             }
-            await MainActor.run { self?.liveRunning = false; self?.liveTask = nil }
+            await MainActor.run {
+                guard self?.liveGeneration == generation else { return }
+                self?.liveRunning = false; self?.liveTask = nil
+            }
         }
     }
 
     func stopLiveView() {
+        liveGeneration = UUID()
         liveTask?.cancel()
         liveTask = nil
         liveRunning = false
@@ -1066,7 +1112,6 @@ final class CameraManager: NSObject, ObservableObject {
                 }
             }
         }
-        if result != nil { captureTested = true }
         return result
     }
 

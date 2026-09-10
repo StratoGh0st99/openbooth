@@ -30,12 +30,15 @@ For subsequent builds, save the device ID from `xcrun devicectl list devices` in
 
 ## Set up and use
 
-1. First launch opens setup. Connect your camera; on Sony, select **PC Remote** mode. Without USB, the enabled iPad fallback starts automatically.
-2. Create or select an event under **Event**.
-3. Under **Destinations**, choose storage, allow photo-library access and test any configured servers.
-4. Take a test photo, check the result and select **Start booth**.
+The defaults work out of the box: photos go to the app gallery and the iPad photo library, and the iPad's own camera is used until a USB camera is connected. Optional steps in Admin:
+
+1. Connect a Sony (in **PC Remote** mode) or Canon EOS via USB-C.
+2. Create or select an event under **Event**. The page lists anything that still needs attention, such as a missing photo-library permission or an untested server.
+3. Under **Destinations**, add Immich or WebDAV and test the connection.
 
 Guests press **Take a photo**, wait for the countdown and see the result. They can take another photo or browse the gallery.
+
+Live view of USB cameras is paced to 30 fps; the log reports the measured rate and the per-frame timing.
 
 To reopen Admin, swipe down with two fingers and enter the PIN. The default is `0000`; change it under **Access**. Countdown and photo series are under **Flow**, camera controls under **Camera**.
 
@@ -54,11 +57,11 @@ Failed uploads remain queued for retry. New entries keep their destination acros
 
 ## Troubleshooting and reset
 
-Check **Event** for readiness and **Destinations** for upload status. For camera problems, check power, USB cable and camera mode. The app attempts to reconnect automatically. Diagnostics are under **Admin → Log**.
+Check **Event** for open issues and **Destinations** for upload status. For camera problems, check power, USB cable and camera mode. The app attempts to reconnect automatically. Diagnostics are under **Admin → Log**.
 
 **Remove from gallery** removes only the local gallery copy. Copies already saved elsewhere remain.
 
-**Admin → Access → Reset OpenBooth…** clears settings, credentials, local event photos, queues and logs, then returns to setup. Copies in the iPad photo library, Immich and WebDAV remain. iPadOS permissions are managed separately in Settings.
+**Admin → Access → Reset OpenBooth…** clears settings, credentials, local event photos, queues and logs. Copies in the iPad photo library, Immich and WebDAV remain. iPadOS permissions are managed separately in Settings.
 
 ## Development and license
 

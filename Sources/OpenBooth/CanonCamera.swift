@@ -77,7 +77,6 @@ final class CanonCamera: CameraDriver {
     private(set) var rawDumps: [(name: String, data: Data)] = []
     private var evfOn = false
     private var lastEventPoll = Date.distantPast
-    private var lastFrameAt = Date.distantPast
     private var lastBatteryRead = Date.distantPast
     private var batteryPct: Int?
     private var batteryLogged = false
@@ -220,15 +219,12 @@ final class CanonCamera: CameraDriver {
         }
         // Heartbeat: the camera wants GetEvent now and then; this also catches ObjectAdded from its own shutter
         if Date().timeIntervalSince(lastEventPoll) > 1.0 { _ = try? await pollEvents() }
-        // The body delivers 50 small frames a second, more than the iPad can decode smoothly: pace to ~30 fps
-        let since = Date().timeIntervalSince(lastFrameAt)
-        if since < 0.033 { try await Task.sleep(nanoseconds: UInt64((0.033 - since) * 1_000_000_000)) }
+        // Frame pacing is shared by all USB drivers in CameraManager.
         var tries = 40
         while tries > 0 {
             tries -= 1
             let (resp, data) = try await transport.runWithResponse(CanonOp.getViewFinderData, params: [0x0010_0000], quiet: true)
             if resp.ok, data.count > 8 {
-                lastFrameAt = Date()
                 if rawDumps.first(where: { $0.name.hasPrefix("Canon ViewFinder") }) == nil { dump("Canon ViewFinder header (\(data.count) bytes)", data, limit: 96) }
                 if let jpeg = Self.extractViewFinderJPEG(data) { return jpeg }
                 return nil
